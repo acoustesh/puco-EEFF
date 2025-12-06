@@ -55,6 +55,7 @@ from puco_eeff.config import (
 from puco_eeff.extractor.xbrl_parser import get_facts_by_name, parse_xbrl_file
 from puco_eeff.sheets.sheet1 import (
     Sheet1Data,
+    get_sheet1_detail_fields,
     get_sheet1_extraction_sections,
     get_sheet1_section_expected_items,
     get_sheet1_section_field_mappings,
@@ -1735,30 +1736,16 @@ def _merge_pdf_into_xbrl_data(pdf_data: Sheet1Data, xbrl_data: Sheet1Data) -> No
     PDF has detailed line items (cv_*, ga_*), XBRL has validated totals.
     This combines the best of both sources.
 
+    Detail fields are determined from config/sheet1/fields.json:
+    - Fields from nota_21 and nota_22 sections
+    - Excludes total fields (is_total: true)
+
     Args:
         pdf_data: Sheet1Data from PDF (detailed breakdown)
         xbrl_data: Sheet1Data from XBRL (totals) - modified in place
     """
-    # Copy detailed line items from PDF to XBRL data
-    detail_fields = [
-        "cv_gastos_personal",
-        "cv_materiales",
-        "cv_energia",
-        "cv_servicios_terceros",
-        "cv_depreciacion_amort",
-        "cv_deprec_leasing",
-        "cv_deprec_arrend",
-        "cv_serv_mineros",
-        "cv_fletes",
-        "cv_gastos_diferidos",
-        "cv_convenios",
-        "ga_gastos_personal",
-        "ga_materiales",
-        "ga_servicios_terceros",
-        "ga_gratificacion",
-        "ga_comercializacion",
-        "ga_otros",
-    ]
+    # Get detail fields from config (non-total fields from nota_21 and nota_22)
+    detail_fields = get_sheet1_detail_fields(sections=["nota_21", "nota_22"])
 
     for field_name in detail_fields:
         pdf_value = getattr(pdf_data, field_name, None)

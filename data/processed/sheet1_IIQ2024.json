@@ -2,6 +2,7 @@
   "quarter": "IIQ2024",
   "year": 2024,
   "quarter_num": 2,
+  "period_type": "quarterly",
   "source": "cmf",
   "xbrl_available": true,
   "ingresos_ordinarios": 179165,

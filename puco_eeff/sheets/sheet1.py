@@ -95,6 +95,37 @@ def get_sheet1_metadata_fields() -> list[str]:
     return fields.get("metadata_fields", [])
 
 
+def get_sheet1_detail_fields(sections: list[str] | None = None) -> list[str]:
+    """Get Sheet1 detail field names (non-total fields from specified sections).
+
+    Detail fields are line items that have individual values extracted from PDF.
+    Total fields (is_total: true) are excluded since they are computed or validated
+    separately.
+
+    Args:
+        sections: List of section names to filter by (e.g., ["nota_21", "nota_22"]).
+                  If None, returns detail fields from all PDF sections.
+
+    Returns:
+        List of detail field names (e.g., ["cv_gastos_personal", "cv_materiales", ...]).
+    """
+    value_fields = get_sheet1_value_fields()
+
+    # Default to PDF sections (nota_21, nota_22) if not specified
+    if sections is None:
+        sections = ["nota_21", "nota_22"]
+
+    detail_fields = []
+    for field_name, field_def in value_fields.items():
+        # Include field if it's in one of the specified sections and not a total
+        field_section = field_def.get("section")
+        is_total = field_def.get("is_total", False)
+        if field_section in sections and not is_total:
+            detail_fields.append(field_name)
+
+    return detail_fields
+
+
 def get_sheet1_row_mapping() -> dict[str, dict[str, Any]]:
     """Get Sheet1 row mapping (row number -> field definition).
 

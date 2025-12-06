@@ -14,6 +14,7 @@ Modules:
 from puco_eeff.sheets.sheet1 import (
     Sheet1Data,
     format_quarter_label,
+    get_sheet1_detail_fields,
     get_sheet1_extraction_config,
     get_sheet1_extraction_sections,
     get_sheet1_fields,
@@ -40,6 +41,7 @@ from puco_eeff.sheets.sheet1 import (
 __all__ = [
     "Sheet1Data",
     "format_quarter_label",
+    "get_sheet1_detail_fields",
     "get_sheet1_extraction_config",
     "get_sheet1_extraction_sections",
     "get_sheet1_fields",
