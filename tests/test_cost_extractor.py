@@ -518,3 +518,329 @@ class TestSaveExtractionResult:
         assert data["source"] == "pucobre.cl"
         assert data["xbrl_available"] is False
         assert data["nota_21"]["total_ytd_actual"] == -50000
+
+
+# =============================================================================
+# Tests for Sheet1Data
+# =============================================================================
+
+
+class TestSheet1Data:
+    """Tests for Sheet1Data dataclass."""
+
+    def test_create_with_sample_data(self) -> None:
+        """Create Sheet1Data with Q2 2024 sample values."""
+        from puco_eeff.extractor.cost_extractor import Sheet1Data
+
+        data = Sheet1Data(
+            quarter="IIQ2024",
+            year=2024,
+            quarter_num=2,
+            source="cmf",
+            xbrl_available=True,
+            ingresos_ordinarios=179165,
+            cv_gastos_personal=-19721,
+            cv_materiales=-23219,
+            cv_energia=-9589,
+            cv_servicios_terceros=-25063,
+            cv_depreciacion_amort=-21694,
+            cv_deprec_leasing=-881,
+            cv_deprec_arrend=-1577,
+            cv_serv_mineros=-10804,
+            cv_fletes=-5405,
+            cv_gastos_diferidos=-1587,
+            cv_convenios=-6662,
+            total_costo_venta=-126202,
+            ga_gastos_personal=-3818,
+            ga_materiales=-129,
+            ga_servicios_terceros=-4239,
+            ga_gratificacion=-639,
+            ga_comercializacion=-2156,
+            ga_otros=-651,
+            total_gasto_admin=-11632,
+        )
+
+        assert data.quarter == "IIQ2024"
+        assert data.ingresos_ordinarios == 179165
+        assert data.total_costo_venta == -126202
+        assert data.total_gasto_admin == -11632
+
+    def test_to_dict(self) -> None:
+        """Test conversion to dictionary."""
+        from puco_eeff.extractor.cost_extractor import Sheet1Data
+
+        data = Sheet1Data(
+            quarter="IQ2024",
+            year=2024,
+            quarter_num=1,
+            source="pucobre.cl",
+            xbrl_available=False,
+            ingresos_ordinarios=50000,
+            total_costo_venta=-30000,
+            total_gasto_admin=-5000,
+        )
+
+        d = data.to_dict()
+
+        assert d["quarter"] == "IQ2024"
+        assert d["source"] == "pucobre.cl"
+        assert d["xbrl_available"] is False
+        assert d["ingresos_ordinarios"] == 50000
+        assert d["total_costo_venta"] == -30000
+        assert d["total_gasto_admin"] == -5000
+
+    def test_to_row_list_has_27_rows(self) -> None:
+        """Row list should have exactly 27 rows."""
+        from puco_eeff.extractor.cost_extractor import Sheet1Data
+
+        data = Sheet1Data(
+            quarter="IIQ2024",
+            year=2024,
+            quarter_num=2,
+        )
+
+        rows = data.to_row_list()
+
+        assert len(rows) == 27
+
+    def test_to_row_list_structure(self) -> None:
+        """Row list should have correct structure."""
+        from puco_eeff.extractor.cost_extractor import Sheet1Data
+
+        data = Sheet1Data(
+            quarter="IIQ2024",
+            year=2024,
+            quarter_num=2,
+            ingresos_ordinarios=179165,
+            total_costo_venta=-126202,
+            total_gasto_admin=-11632,
+        )
+
+        rows = data.to_row_list()
+
+        # Row 1: Ingresos
+        assert rows[0] == (1, "Ingresos de actividades ordinarias M USD", 179165)
+
+        # Row 3: Costo de Venta header
+        assert rows[2][1] == "Costo de Venta"
+
+        # Row 15: Total Costo de Venta
+        assert rows[14] == (15, "Total Costo de Venta", -126202)
+
+        # Row 19: Gasto Admin header
+        assert rows[18][1] == "Gasto Adm, y Ventas"
+
+        # Row 27: Totales (Gasto Admin total, NOT Costo de Venta)
+        assert rows[26] == (27, "Totales", -11632)
+
+    def test_totales_disambiguation(self) -> None:
+        """Ensure 'Totales' in row 27 is distinct from 'Total Costo de Venta'."""
+        from puco_eeff.extractor.cost_extractor import Sheet1Data
+
+        data = Sheet1Data(
+            quarter="IIQ2024",
+            year=2024,
+            quarter_num=2,
+            total_costo_venta=-126202,
+            total_gasto_admin=-11632,
+        )
+
+        rows = data.to_row_list()
+
+        # Find all rows containing "Total"
+        total_rows = [(r[0], r[1], r[2]) for r in rows if r[1] and "total" in r[1].lower()]
+
+        assert len(total_rows) == 2
+        # Row 15 should be "Total Costo de Venta"
+        assert total_rows[0] == (15, "Total Costo de Venta", -126202)
+        # Row 27 should be "Totales" (Gasto Admin)
+        assert total_rows[1] == (27, "Totales", -11632)
+
+
+class TestQuarterFormatting:
+    """Tests for quarter label formatting."""
+
+    def test_quarter_to_roman(self) -> None:
+        """Test Roman numeral conversion."""
+        from puco_eeff.extractor.cost_extractor import quarter_to_roman
+
+        assert quarter_to_roman(1) == "I"
+        assert quarter_to_roman(2) == "II"
+        assert quarter_to_roman(3) == "III"
+        assert quarter_to_roman(4) == "IV"
+
+    def test_format_quarter_label(self) -> None:
+        """Test quarter label formatting."""
+        from puco_eeff.extractor.cost_extractor import format_quarter_label
+
+        assert format_quarter_label(2024, 1) == "IQ2024"
+        assert format_quarter_label(2024, 2) == "IIQ2024"
+        assert format_quarter_label(2024, 3) == "IIIQ2024"
+        assert format_quarter_label(2024, 4) == "IVQ2024"
+
+
+class TestSaveSheet1Data:
+    """Tests for saving Sheet1 data."""
+
+    def test_save_creates_json(self, tmp_path: Path) -> None:
+        """Should create a JSON file with Sheet1 data."""
+        from puco_eeff.extractor.cost_extractor import Sheet1Data, save_sheet1_data
+
+        data = Sheet1Data(
+            quarter="IIQ2024",
+            year=2024,
+            quarter_num=2,
+            source="cmf",
+            xbrl_available=True,
+            ingresos_ordinarios=179165,
+            total_costo_venta=-126202,
+            total_gasto_admin=-11632,
+        )
+
+        output_path = save_sheet1_data(data, tmp_path)
+
+        assert output_path.exists()
+        assert output_path.name == "sheet1_IIQ2024.json"
+
+        import json
+
+        with open(output_path) as f:
+            saved = json.load(f)
+
+        assert saved["quarter"] == "IIQ2024"
+        assert saved["ingresos_ordinarios"] == 179165
+        assert saved["total_costo_venta"] == -126202
+        assert saved["total_gasto_admin"] == -11632
+
+
+class TestXBRLExtraction:
+    """Tests for XBRL-based Sheet1 extraction."""
+
+    def test_validate_sheet1_with_xbrl_match(self) -> None:
+        """Should log match when PDF and XBRL totals agree."""
+        from puco_eeff.extractor.cost_extractor import Sheet1Data, _validate_sheet1_with_xbrl
+
+        data = Sheet1Data(
+            quarter="IIQ2024",
+            year=2024,
+            quarter_num=2,
+            total_costo_venta=-126202,
+            total_gasto_admin=-11632,
+        )
+
+        # Mock XBRL extraction to return matching values
+        with patch("puco_eeff.extractor.cost_extractor.extract_xbrl_totals") as mock_xbrl:
+            mock_xbrl.return_value = {
+                "cost_of_sales": -126202,
+                "admin_expense": -11632,
+            }
+
+            _validate_sheet1_with_xbrl(data, Path("/fake/path.xbrl"))
+
+            # Values should remain unchanged (already matched)
+            assert data.total_costo_venta == -126202
+            assert data.total_gasto_admin == -11632
+
+    def test_validate_sheet1_with_xbrl_fallback(self) -> None:
+        """Should use XBRL values when PDF extraction failed."""
+        from puco_eeff.extractor.cost_extractor import Sheet1Data, _validate_sheet1_with_xbrl
+
+        data = Sheet1Data(
+            quarter="IIQ2024",
+            year=2024,
+            quarter_num=2,
+            total_costo_venta=None,  # PDF extraction failed
+            total_gasto_admin=None,
+        )
+
+        with patch("puco_eeff.extractor.cost_extractor.extract_xbrl_totals") as mock_xbrl:
+            mock_xbrl.return_value = {
+                "cost_of_sales": -126202,
+                "admin_expense": -11632,
+            }
+
+            _validate_sheet1_with_xbrl(data, Path("/fake/path.xbrl"))
+
+            # Should now have XBRL values
+            assert data.total_costo_venta == -126202
+            assert data.total_gasto_admin == -11632
+
+    def test_merge_pdf_into_xbrl_data(self) -> None:
+        """Should copy detailed items from PDF to XBRL data."""
+        from puco_eeff.extractor.cost_extractor import Sheet1Data, _merge_pdf_into_xbrl_data
+
+        pdf_data = Sheet1Data(
+            quarter="IIQ2024",
+            year=2024,
+            quarter_num=2,
+            cv_gastos_personal=-19721,
+            cv_materiales=-23219,
+            ga_gastos_personal=-3818,
+            total_costo_venta=-126202,  # Will NOT be copied (not in detail_fields)
+        )
+
+        xbrl_data = Sheet1Data(
+            quarter="IIQ2024",
+            year=2024,
+            quarter_num=2,
+            total_costo_venta=-126000,  # XBRL has validated total
+            total_gasto_admin=-11632,
+        )
+
+        _merge_pdf_into_xbrl_data(pdf_data, xbrl_data)
+
+        # Detail items should be copied from PDF
+        assert xbrl_data.cv_gastos_personal == -19721
+        assert xbrl_data.cv_materiales == -23219
+        assert xbrl_data.ga_gastos_personal == -3818
+
+        # Totals should remain from XBRL (not overwritten)
+        assert xbrl_data.total_costo_venta == -126000
+        assert xbrl_data.total_gasto_admin == -11632
+
+
+class TestExtractSheet1MainEntry:
+    """Tests for the main extract_sheet1 entry point."""
+
+    def test_extract_sheet1_pdf_priority(self) -> None:
+        """Should try PDF first when prefer_pdf=True."""
+        from puco_eeff.extractor.cost_extractor import Sheet1Data, extract_sheet1
+
+        expected_data = Sheet1Data(
+            quarter="IIQ2024",
+            year=2024,
+            quarter_num=2,
+            ingresos_ordinarios=179165,
+        )
+
+        with patch("puco_eeff.extractor.cost_extractor.extract_sheet1_from_analisis_razonado") as mock_pdf:
+            mock_pdf.return_value = expected_data
+
+            result = extract_sheet1(2024, 2, prefer_pdf=True)
+
+            assert result is not None
+            assert result.quarter == "IIQ2024"
+            mock_pdf.assert_called_once()
+
+    def test_extract_sheet1_xbrl_fallback(self) -> None:
+        """Should fall back to XBRL when PDF fails."""
+        from puco_eeff.extractor.cost_extractor import Sheet1Data, extract_sheet1
+
+        xbrl_data = Sheet1Data(
+            quarter="IIQ2024",
+            year=2024,
+            quarter_num=2,
+            total_costo_venta=-126202,
+        )
+
+        with patch("puco_eeff.extractor.cost_extractor.extract_sheet1_from_analisis_razonado") as mock_pdf:
+            mock_pdf.return_value = None  # PDF failed
+
+            with patch("puco_eeff.extractor.cost_extractor.extract_sheet1_from_xbrl") as mock_xbrl:
+                mock_xbrl.return_value = xbrl_data
+
+                result = extract_sheet1(2024, 2, prefer_pdf=True)
+
+                assert result is not None
+                assert result.total_costo_venta == -126202
+                mock_xbrl.assert_called_once()
