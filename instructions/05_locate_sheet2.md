@@ -56,33 +56,45 @@ print(f"Alternative found on: {[s['page'] for s in alt_sections]}")
 
 ### 3. Document Mappings
 
-Update `config/config.json`:
+Configuration is split into three files:
 
+**config/config.json** - Add sheet2 layout:
 ```json
 {
   "sheets": {
     "sheet2": {
       "name": "Estado de Resultados",
-      "description": "Income Statement / Statement of Profit or Loss",
-      "xml_paths": [
-        "//ifrs-full:Revenue",
-        "//ifrs-full:CostOfSales",
-        "//ifrs-full:GrossProfit",
-        "//ifrs-full:AdministrativeExpense",
-        "//ifrs-full:SellingExpense",
-        "//ifrs-full:FinanceCosts",
-        "//ifrs-full:ProfitLossBeforeTax",
-        "//ifrs-full:IncomeTaxExpenseContinuingOperations",
-        "//ifrs-full:ProfitLoss"
-      ],
-      "pdf_sections": [
-        "Estado de Resultados",
-        "Estado de Resultados Integrales"
-      ]
+      "description": "Income Statement / Statement of Profit or Loss"
     }
   }
 }
 ```
+
+**config/extraction_specs.json** - Add sheet2 extraction rules (follow same pattern as sheet1):
+```json
+{
+  "default": {
+    "sections": {
+      "estado_resultados": {
+        "search_patterns": ["estado de resultados"],
+        "field_mappings": {
+          "revenue": {"xbrl_path": "Revenue"},
+          "cost_of_sales": {"xbrl_path": "CostOfSales"},
+          "gross_profit": {"xbrl_path": "GrossProfit"},
+          "admin_expense": {"xbrl_path": "AdministrativeExpense"},
+          "selling_expense": {"xbrl_path": "SellingExpense"},
+          "finance_costs": {"xbrl_path": "FinanceCosts"},
+          "profit_before_tax": {"xbrl_path": "ProfitLossBeforeTax"},
+          "income_tax": {"xbrl_path": "IncomeTaxExpenseContinuingOperations"},
+          "profit_loss": {"xbrl_path": "ProfitLoss"}
+        }
+      }
+    }
+  }
+}
+```
+
+**config/reference_data.json** - Add verified values when available.
 
 ## Common IFRS Income Statement Elements
 

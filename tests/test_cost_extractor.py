@@ -451,11 +451,14 @@ class TestExtractDetailedCostsMocked:
         # Setup mocks
         mock_paths_fn.return_value = mock_paths
 
-        # Create fake PDF and XBRL files
+        # Create fake PDF file
         pdf_path = mock_paths["raw_pdf"] / "estados_financieros_2024_Q2.pdf"
         pdf_path.write_text("fake pdf content")
 
-        xbrl_path = mock_paths["raw_pdf"] / "estados_financieros_2024_Q2.xbrl"
+        # Create XBRL directory and file
+        xbrl_dir = mock_paths["raw_xbrl"]
+        xbrl_dir.mkdir(parents=True, exist_ok=True)
+        xbrl_path = xbrl_dir / "estados_financieros_2024_Q2.xbrl"
         xbrl_path.write_text("fake xbrl content")
 
         # Mock extraction results

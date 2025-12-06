@@ -146,9 +146,22 @@ GASTOS ADM Y VENTAS (Nota 22):
 
 ## XBRL Fact Name Mapping
 
+> **Note**: XBRL fact names and scaling are now configured in `config/xbrl_specs.json`.
+> The `fact_mappings` section defines primary and fallback fact names for each field.
+
+| Internal Field | Primary XBRL Fact | Fallbacks | Apply Scaling |
+|----------------|-------------------|-----------|---------------|
+| ingresos_ordinarios | RevenueFromContractsWithCustomers | Revenue, IngresosPorActividadesOrdinarias | true |
+| total_costo_venta | CostOfSales | CostoDeVentas | true |
+| total_gasto_admin | AdministrativeExpense | GastosDeAdministracion | true |
+| gross_profit | GrossProfit | UtilidadBruta | true |
+| profit_loss | ProfitLoss | GananciaPerdida | true |
+
+**Scaling Factor**: 1000 (XBRL values in USD → divide by 1000 to get MUS$)
+
 | Spanish Name | XBRL Fact | Context |
 |--------------|-----------|---------|
-| Ingresos de actividades ordinarias | `Revenue` | Duration (YTD) |
+| Ingresos de actividades ordinarias | `RevenueFromContractsWithCustomers` | Duration (YTD) |
 | Costo de ventas | `CostOfSales` | Duration (YTD) |
 | Ganancia bruta | `GrossProfit` | Duration (YTD) |
 | Gastos de administración y ventas | `AdministrativeExpense` | Duration (YTD) |
@@ -218,3 +231,110 @@ Some line items may vary between periods:
 3. **OCR fallback**: Only when PDF extraction fails (image-based tables)
 
 Always validate OCR results against XBRL totals.
+
+## Configuration Architecture (4-File System)
+
+Configuration is split into **four** JSON files in `config/`:
+
+| File | Purpose |
+|------|---------|
+| `config.json` | Shared project config: file patterns, period types (quarterly/monthly/yearly), sources |
+| `extraction_specs.json` | PDF extraction rules: search patterns, field mappings with `match_keywords` |
+| `xbrl_specs.json` | **NEW**: XBRL-specific config: fact names, scaling factor, validation rules |
+| `reference_data.json` | Known-good values for validation (by period) |
+
+### xbrl_specs.json (NEW)
+
+XBRL configuration is now in a dedicated file:
+
+```json
+{
+  "scaling_factor": 1000,
+  "fact_mappings": {
+    "ingresos_ordinarios": {
+      "primary": "RevenueFromContractsWithCustomers",
+      "fallbacks": ["Revenue", "IngresosPorActividadesOrdinarias"],
+      "apply_scaling": true
+    },
+    "total_costo_venta": {
+      "primary": "CostOfSales",
+      "fallbacks": ["CostoDeVentas"],
+      "apply_scaling": true
+    },
+    "total_gasto_admin": {
+      "primary": "AdministrativeExpense",
+      "fallbacks": ["GastosDeAdministracion"],
+      "apply_scaling": true
+    },
+    "gross_profit": {
+      "primary": "GrossProfit",
+      "fallbacks": ["UtilidadBruta"],
+      "apply_scaling": true
+    },
+    "profit_loss": {
+      "primary": "ProfitLoss",
+      "fallbacks": ["GananciaPerdida"],
+      "apply_scaling": true
+    }
+  },
+  "validation_rules": {
+    "sum_tolerance": 1
+  }
+}
+```
+
+**Key fields:**
+- `scaling_factor`: XBRL values are in full USD, divide by this to get MUS$
+- `apply_scaling`: Set to `true` for all fields that need conversion to MUS$
+- `fallbacks`: Alternative XBRL fact names tried if primary not found
+
+### extraction_specs.json (Keyword-Based Matching)
+
+PDF field matching now uses `match_keywords` instead of exact labels:
+
+```json
+{
+  "default": {
+    "sections": {
+      "nota_21": {
+        "field_mappings": {
+          "cv_gastos_personal": {
+            "match_keywords": ["gastos en personal"],
+            "sheet1_field": "cv_gastos_personal"
+          },
+          "cv_deprec_leasing": {
+            "match_keywords": ["leasing"],
+            "sheet1_field": "cv_deprec_leasing"
+          },
+          "cv_depreciacion_amort": {
+            "match_keywords": ["amort"],
+            "exclude_keywords": ["leasing", "arrendamiento"],
+            "sheet1_field": "cv_depreciacion_amort"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+**Matching rules:**
+- `match_keywords`: At least one keyword must match (case-insensitive)
+- `exclude_keywords`: If any match, skip this field mapping
+- Use unique identifiers to avoid overlapping matches
+
+### Default + Deviation Pattern
+
+`extraction_specs.json` uses a **default template + per-quarter deviations** pattern:
+- `default` section contains the full extraction template
+- Per-quarter sections (e.g., `2024_Q2`) only need to specify deviations
+- `verified: true` flag indicates quarters with confirmed extraction
+
+### Reference Values
+
+`reference_data.json` stores known-good values for validation:
+- `2024_Q2`: Fully verified with 20 reference values (all fields match)
+- `2024_Q3`: Verified with totals and key fields
+- Other quarters: Placeholders until verified
+
+This architecture allows learning from each quarter's extraction experience.

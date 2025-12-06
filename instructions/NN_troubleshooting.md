@@ -232,6 +232,115 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 ```
 
+---
+
+## Updating Config After Successful Recovery
+
+**IMPORTANT**: After successfully recovering from an extraction failure, always update the configuration files to prevent the same issue in the future.
+
+### What to Update
+
+#### 1. extraction_specs.json - Period-Specific Entry
+
+Add or update the period entry with what worked:
+
+```json
+{
+  "2024_Q3": {
+    "_comment": "Describe what was different about this period",
+    "verified": true,
+    "verified_date": "2024-12-06",
+    "deviations": {
+      "sections": {
+        "nota_21": {
+          "search_patterns": ["pattern that worked"],
+          "_deviation_reason": "Why this was needed"
+        }
+      }
+    },
+    "page_numbers": {
+      "nota_21": 74,
+      "nota_22": 74
+    },
+    "recovery_notes": "Brief description of recovery method used"
+  }
+}
+```
+
+#### 2. extraction_specs.json - Default Updates
+
+If the same deviation appears in multiple periods, add to defaults:
+
+```json
+{
+  "default": {
+    "sections": {
+      "nota_21": {
+        "search_patterns": [
+          "existing pattern",
+          "new pattern that worked"  // Add here
+        ],
+        "field_mappings": {
+          "cv_energia": {
+            "pdf_labels": [
+              "Energía eléctrica",
+              "Energia electrica"  // Add variant if encountered
+            ]
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+#### 3. reference_data.json - Verified Values
+
+After confirming extracted values are correct:
+
+```json
+{
+  "2024_Q3": {
+    "verified": true,
+    "verified_date": "2024-12-06",
+    "values": {
+      "ingresos_ordinarios": 231472,
+      "cv_gastos_personal": -30294,
+      // ... all 20 values
+    },
+    "internal_checks": {
+      "nota_21_sum_matches_total": true,
+      "nota_22_sum_matches_total": true
+    }
+  }
+}
+```
+
+### Decision Guide: When to Update Defaults
+
+| Scenario | Action |
+|----------|--------|
+| New label variant (e.g., accent difference) | Add to default's pdf_labels |
+| New search pattern works for 2+ periods | Add to default's search_patterns |
+| Page numbers vary significantly | Keep in period-specific, not default |
+| OCR consistently needed for a section | Note in default's extraction_method |
+| Same unique_item missing | Add to default's unique_items |
+
+### Validation After Updates
+
+```bash
+# Always run after config changes
+poetry run pytest tests/test_config_integrity.py -v
+```
+
+This catches:
+- JSON syntax errors
+- Missing required fields
+- Field name mismatches
+- Invalid reference values
+
+---
+
 ## Getting Help
 
 1. Check the logs in `logs/YYYY-MM-DD_run.log`

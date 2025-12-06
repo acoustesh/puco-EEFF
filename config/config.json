@@ -1,4 +1,49 @@
 {
+  "_description": "Shared project configuration for puco-EEFF. XBRL-specific config is in xbrl_specs.json.",
+
+  "period_types": {
+    "quarterly": {
+      "key_format": "{year}_Q{period}",
+      "display_format": "{roman}Q{year}",
+      "periods_per_year": 4,
+      "roman_numerals": {"1": "I", "2": "II", "3": "III", "4": "IV"}
+    },
+    "monthly": {
+      "key_format": "{year}_M{period:02d}",
+      "display_format": "{period:02d}-{year}",
+      "periods_per_year": 12
+    },
+    "yearly": {
+      "key_format": "{year}_FY",
+      "display_format": "FY{year}",
+      "periods_per_year": 1
+    }
+  },
+
+  "file_patterns": {
+    "analisis_razonado": {
+      "pattern": "analisis_razonado_{year}_Q{quarter}.pdf",
+      "description": "Management Discussion and Analysis (MD&A)"
+    },
+    "estados_financieros_pdf": {
+      "pattern": "estados_financieros_{year}_Q{quarter}.pdf",
+      "description": "Financial Statements PDF"
+    },
+    "estados_financieros_xbrl": {
+      "pattern": "estados_financieros_{year}_Q{quarter}.xbrl",
+      "alt_patterns": ["estados_financieros_{year}_Q{quarter}.xml"],
+      "description": "Financial Statements XBRL/XML"
+    },
+    "xbrl_zip": {
+      "pattern": "estados_financieros_{year}_Q{quarter}_xbrl.zip",
+      "description": "XBRL package download"
+    },
+    "pucobre_combined": {
+      "pattern": "pucobre_combined_{year}_Q{quarter}.pdf",
+      "description": "Combined PDF from pucobre.cl fallback source"
+    }
+  },
+
   "sources": {
     "cmf_chile": {
       "name": "CMF Chile - Pucobre EEFF",
@@ -88,10 +133,11 @@
       ]
     }
   },
+
   "sheets": {
     "sheet1": {
       "name": "Ingresos y Costos",
-      "description": "Revenue and detailed cost breakdown from Análisis Razonado - Cuadro Resumen de Costos",
+      "description": "Revenue and detailed cost breakdown from Estados Financieros - Nota 21 & 22",
       "layout": {
         "columns": "One column per quarter, from Q1 2024 onwards",
         "header_row": "Quarter label (e.g., 'IQ2024', 'IIQ2024', 'IIIQ2024', 'IVQ2024')",
@@ -99,29 +145,12 @@
         "sections": [
           {
             "name": "Ingresos",
-            "rows": [
-              1
-            ],
-            "items": [
-              "Ingresos de actividades ordinarias M USD"
-            ]
+            "rows": [1],
+            "items": ["Ingresos de actividades ordinarias M USD"]
           },
           {
             "name": "Costo de Venta",
-            "rows": [
-              3,
-              4,
-              5,
-              6,
-              7,
-              8,
-              9,
-              10,
-              11,
-              12,
-              13,
-              14
-            ],
+            "rows": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
             "header_row": 2,
             "items": [
               "Gastos en personal",
@@ -142,15 +171,7 @@
           },
           {
             "name": "Gasto Adm. y Ventas",
-            "rows": [
-              18,
-              19,
-              20,
-              21,
-              22,
-              23,
-              24
-            ],
+            "rows": [18, 19, 20, 21, 22, 23, 24],
             "header_row": 17,
             "items": [
               "Gastos en personal",
@@ -167,333 +188,59 @@
           }
         ]
       },
-      "source": {
-        "document": "analisis_razonado",
-        "section": "Cuadro Resumen de Costos",
-        "page_search_pattern": "CUADRO RESUMEN DE COSTOS",
-        "validation": {
-          "xbrl_fields": {
-            "ingresos": "RevenueFromContractsWithCustomers",
-            "total_costo_venta": "CostOfSales",
-            "total_gastos_admin": "AdministrativeExpense"
-          }
-        }
-      },
       "row_mapping": {
-        "1": {
-          "field": "ingresos_ordinarios",
-          "label": "Ingresos de actividades ordinarias M USD",
-          "section": null
-        },
-        "2": {
-          "field": null,
-          "label": "",
-          "section": null
-        },
-        "3": {
-          "field": "costo_venta_header",
-          "label": "Costo de Venta",
-          "section": "header"
-        },
-        "4": {
-          "field": "cv_gastos_personal",
-          "label": "Gastos en personal",
-          "section": "costo_venta"
-        },
-        "5": {
-          "field": "cv_materiales",
-          "label": "Materiales y repuestos",
-          "section": "costo_venta"
-        },
-        "6": {
-          "field": "cv_energia",
-          "label": "Energía eléctrica",
-          "section": "costo_venta"
-        },
-        "7": {
-          "field": "cv_servicios_terceros",
-          "label": "Servicios de terceros",
-          "section": "costo_venta"
-        },
-        "8": {
-          "field": "cv_depreciacion_amort",
-          "label": "Depreciación y amort del periodo",
-          "section": "costo_venta"
-        },
-        "9": {
-          "field": "cv_deprec_leasing",
-          "label": "Depreciación Activos en leasing -Nota 20",
-          "section": "costo_venta"
-        },
-        "10": {
-          "field": "cv_deprec_arrend",
-          "label": "Depreciación Arrendamientos -Nota 20",
-          "section": "costo_venta"
-        },
-        "11": {
-          "field": "cv_serv_mineros",
-          "label": "Servicios mineros de terceros",
-          "section": "costo_venta"
-        },
-        "12": {
-          "field": "cv_fletes",
-          "label": "Fletes y otros gastos operacionales",
-          "section": "costo_venta"
-        },
-        "13": {
-          "field": "cv_gastos_diferidos",
-          "label": "Gastos Diferidos, ajustes existencias y otros",
-          "section": "costo_venta"
-        },
-        "14": {
-          "field": "cv_convenios",
-          "label": "Obligaciones por convenios colectivos",
-          "section": "costo_venta"
-        },
-        "15": {
-          "field": "total_costo_venta",
-          "label": "Total Costo de Venta",
-          "section": "costo_venta_total"
-        },
-        "16": {
-          "field": null,
-          "label": "",
-          "section": null
-        },
-        "17": {
-          "field": null,
-          "label": "",
-          "section": null
-        },
-        "18": {
-          "field": null,
-          "label": "",
-          "section": null
-        },
-        "19": {
-          "field": "gasto_admin_header",
-          "label": "Gasto Adm, y Ventas",
-          "section": "header"
-        },
-        "20": {
-          "field": "ga_gastos_personal",
-          "label": "Gastos en personal",
-          "section": "gasto_admin"
-        },
-        "21": {
-          "field": "ga_materiales",
-          "label": "Materiales y repuestos",
-          "section": "gasto_admin"
-        },
-        "22": {
-          "field": "ga_servicios_terceros",
-          "label": "Servicios de terceros",
-          "section": "gasto_admin"
-        },
-        "23": {
-          "field": "ga_gratificacion",
-          "label": "Provision gratificacion legal y otros",
-          "section": "gasto_admin"
-        },
-        "24": {
-          "field": "ga_comercializacion",
-          "label": "Gastos comercializacion",
-          "section": "gasto_admin"
-        },
-        "25": {
-          "field": "ga_otros",
-          "label": "Otros gastos",
-          "section": "gasto_admin"
-        },
-        "26": {
-          "field": null,
-          "label": "",
-          "section": null
-        },
-        "27": {
-          "field": "total_gasto_admin",
-          "label": "Totales",
-          "section": "gasto_admin_total",
-          "_note": "This is the ONLY 'Totales' that should be in row 27"
-        }
-      },
-      "data": {
-        "IQ2024": {
-          "source": "pucobre.cl",
-          "xbrl_available": false
-        },
-        "IIQ2024": {
-          "ingresos_ordinarios": 179165,
-          "cv_gastos_personal": -19721,
-          "cv_materiales": -23219,
-          "cv_energia": -9589,
-          "cv_servicios_terceros": -25063,
-          "cv_depreciacion_amort": -21694,
-          "cv_deprec_leasing": -881,
-          "cv_deprec_arrend": -1577,
-          "cv_serv_mineros": -10804,
-          "cv_fletes": -5405,
-          "cv_gastos_diferidos": -1587,
-          "cv_convenios": -6662,
-          "total_costo_venta": -126202,
-          "ga_gastos_personal": -3818,
-          "ga_materiales": -129,
-          "ga_servicios_terceros": -4239,
-          "ga_gratificacion": -639,
-          "ga_comercializacion": -2156,
-          "ga_otros": -651,
-          "total_gasto_admin": -11632,
-          "source": "cmf",
-          "xbrl_available": true
-        },
-        "IIIQ2024": {
-          "source": "cmf",
-          "xbrl_available": true
-        },
-        "IVQ2024": {
-          "source": "cmf",
-          "xbrl_available": true
-        }
-      },
-      "extraction_rules": {
-        "number_format": "chilean",
-        "negatives": "Values in parentheses (X.XXX) are negative",
-        "thousands_separator": ".",
-        "currency": "MUS$ (Miles de dólares estadounidenses)",
-        "disambiguation": {
-          "totales_gasto_admin": {
-            "context": "Must appear AFTER 'Gasto Adm, y Ventas' header and 'Otros gastos' row",
-            "not_to_confuse_with": "Total Costo de Venta (which is labeled differently)"
-          },
-          "gastos_personal": {
-            "appears_twice": true,
-            "context_1": "Under 'Costo de Venta' section - larger values, typically -19K to -30K",
-            "context_2": "Under 'Gasto Adm. y Ventas' section - smaller values, typically -3K to -6K"
-          },
-          "materiales_repuestos": {
-            "appears_twice": true,
-            "context_1": "Under 'Costo de Venta' section - larger values",
-            "context_2": "Under 'Gasto Adm. y Ventas' section - very small, typically under -500"
-          },
-          "servicios_terceros": {
-            "appears_twice": true,
-            "context_1": "Under 'Costo de Venta' section",
-            "context_2": "Under 'Gasto Adm. y Ventas' section"
-          }
-        }
-      },
-      "extraction_labels": {
-        "costo_venta_items": [
-          "Gastos en personal",
-          "Materiales y repuestos",
-          "Energía eléctrica",
-          "Servicios de terceros",
-          "Depreciación y amort del periodo",
-          "Depreciación Activos en leasing",
-          "Depreciación Arrendamientos",
-          "Servicios mineros de terceros",
-          "Fletes y otros gastos operacionales",
-          "Gastos Diferidos, ajustes existencias y otros",
-          "Obligaciones por convenios colectivos"
-        ],
-        "gasto_admin_items": [
-          "Gastos en personal",
-          "Materiales y repuestos",
-          "Servicios de terceros",
-          "Provision gratificacion legal y otros",
-          "Gastos comercializacion",
-          "Otros gastos"
-        ],
-        "field_labels": {
-          "ingresos_ordinarios": "Ingresos de actividades ordinarias",
-          "cv_gastos_personal": "Gastos en personal",
-          "cv_materiales": "Materiales y repuestos",
-          "cv_energia": "Energía eléctrica",
-          "cv_servicios_terceros": "Servicios de terceros",
-          "cv_depreciacion_amort": "Depreciación y amort del periodo",
-          "cv_deprec_leasing": "Depreciación Activos en leasing",
-          "cv_deprec_arrend": "Depreciación Arrendamientos",
-          "cv_serv_mineros": "Servicios mineros de terceros",
-          "cv_fletes": "Fletes y otros gastos operacionales",
-          "cv_gastos_diferidos": "Gastos Diferidos, ajustes existencias y otros",
-          "cv_convenios": "Obligaciones por convenios colectivos",
-          "total_costo_venta": "Total Costo de Venta",
-          "ga_gastos_personal": "Gastos en personal",
-          "ga_materiales": "Materiales y repuestos",
-          "ga_servicios_terceros": "Servicios de terceros",
-          "ga_gratificacion": "Provision gratificacion legal y otros",
-          "ga_comercializacion": "Gastos comercializacion",
-          "ga_otros": "Otros gastos",
-          "total_gasto_admin": "Totales"
-        }
+        "1": {"field": "ingresos_ordinarios", "label": "Ingresos de actividades ordinarias M USD", "section": null},
+        "2": {"field": null, "label": "", "section": null},
+        "3": {"field": "costo_venta_header", "label": "Costo de Venta", "section": "header"},
+        "4": {"field": "cv_gastos_personal", "label": "Gastos en personal", "section": "costo_venta"},
+        "5": {"field": "cv_materiales", "label": "Materiales y repuestos", "section": "costo_venta"},
+        "6": {"field": "cv_energia", "label": "Energía eléctrica", "section": "costo_venta"},
+        "7": {"field": "cv_servicios_terceros", "label": "Servicios de terceros", "section": "costo_venta"},
+        "8": {"field": "cv_depreciacion_amort", "label": "Depreciación y amort del periodo", "section": "costo_venta"},
+        "9": {"field": "cv_deprec_leasing", "label": "Depreciación Activos en leasing -Nota 20", "section": "costo_venta"},
+        "10": {"field": "cv_deprec_arrend", "label": "Depreciación Arrendamientos -Nota 20", "section": "costo_venta"},
+        "11": {"field": "cv_serv_mineros", "label": "Servicios mineros de terceros", "section": "costo_venta"},
+        "12": {"field": "cv_fletes", "label": "Fletes y otros gastos operacionales", "section": "costo_venta"},
+        "13": {"field": "cv_gastos_diferidos", "label": "Gastos Diferidos, ajustes existencias y otros", "section": "costo_venta"},
+        "14": {"field": "cv_convenios", "label": "Obligaciones por convenios colectivos", "section": "costo_venta"},
+        "15": {"field": "total_costo_venta", "label": "Total Costo de Venta", "section": "costo_venta_total"},
+        "16": {"field": null, "label": "", "section": null},
+        "17": {"field": null, "label": "", "section": null},
+        "18": {"field": null, "label": "", "section": null},
+        "19": {"field": "gasto_admin_header", "label": "Gasto Adm, y Ventas", "section": "header"},
+        "20": {"field": "ga_gastos_personal", "label": "Gastos en personal", "section": "gasto_admin"},
+        "21": {"field": "ga_materiales", "label": "Materiales y repuestos", "section": "gasto_admin"},
+        "22": {"field": "ga_servicios_terceros", "label": "Servicios de terceros", "section": "gasto_admin"},
+        "23": {"field": "ga_gratificacion", "label": "Provision gratificacion legal y otros", "section": "gasto_admin"},
+        "24": {"field": "ga_comercializacion", "label": "Gastos comercializacion", "section": "gasto_admin"},
+        "25": {"field": "ga_otros", "label": "Otros gastos", "section": "gasto_admin"},
+        "26": {"field": null, "label": "", "section": null},
+        "27": {"field": "total_gasto_admin", "label": "Totales", "section": "gasto_admin_total", "_note": "This is the ONLY 'Totales' that should be in row 27"}
       }
     },
     "sheet2": {
       "name": "TBD - Estado de Resultados",
-      "description": "Income Statement / Statement of Profit or Loss",
-      "xml_paths": [],
-      "pdf_sections": []
+      "description": "Income Statement / Statement of Profit or Loss"
     },
     "sheet3": {
       "name": "TBD - Estado de Flujos de Efectivo",
-      "description": "Cash Flow Statement",
-      "xml_paths": [],
-      "pdf_sections": []
+      "description": "Cash Flow Statement"
     },
     "sheet4": {
       "name": "TBD - Notas",
-      "description": "Notes to Financial Statements",
-      "xml_paths": [],
-      "pdf_sections": []
+      "description": "Notes to Financial Statements"
     }
   },
-  "pdf_section_patterns": {
-    "description": "String patterns to identify sections in PDFs",
-    "examples": [
-      "note 20.b",
-      "note 5",
-      "section 3.a.ii"
-    ],
-    "format": "note {number}[.{subsection}]"
-  },
-  "xbrl": {
-    "namespaces": {
-      "xbrli": "http://www.xbrl.org/2003/instance",
-      "link": "http://www.xbrl.org/2003/linkbase",
-      "xlink": "http://www.w3.org/1999/xlink",
-      "ifrs-full": "http://xbrl.ifrs.org/taxonomy/2023-03-23/ifrs-full"
-    },
-    "aggregate_facts": [
-      "RevenueFromContractsWithCustomers",
-      "Revenue",
-      "CostOfSales",
-      "GrossProfit",
-      "AdministrativeExpense",
-      "SellingExpense",
-      "ProfitLoss",
-      "ProfitLossBeforeTax"
-    ],
-    "period_filter": {
-      "type": "duration",
-      "description": "Filter to current period (YTD) values, not instant balances"
-    }
-  },
+
+
   "ocr": {
     "primary": {
       "provider": "mistral",
       "model": "mistral-ocr-latest"
     },
     "fallback": [
-      {
-        "provider": "openrouter",
-        "model": "anthropic/claude-3.5-sonnet",
-        "description": "Anthropic Claude via OpenRouter"
-      },
-      {
-        "provider": "openrouter",
-        "model": "openai/gpt-4o",
-        "description": "OpenAI GPT-4o via OpenRouter"
-      }
+      {"provider": "openrouter", "model": "anthropic/claude-3.5-sonnet", "description": "Anthropic Claude via OpenRouter"},
+      {"provider": "openrouter", "model": "openai/gpt-4o", "description": "OpenAI GPT-4o via OpenRouter"}
     ],
     "retry": {
       "max_attempts": 3,
@@ -503,36 +250,20 @@
     },
     "save_all_responses": true
   },
+
   "output": {
     "filename_pattern": "EEFF_{year}_Q{quarter}.xlsx",
     "date_format": "YYYY_QN"
   },
+
   "logging": {
     "format": "simple",
     "filename_pattern": "{date}_run.log"
   },
-  "reference_values": {
-    "IIQ2024": {
-      "ingresos_ordinarios": 179165,
-      "cv_gastos_personal": -19721,
-      "cv_materiales": -23219,
-      "cv_energia": -9589,
-      "cv_servicios_terceros": -25063,
-      "cv_depreciacion_amort": -21694,
-      "cv_deprec_leasing": -881,
-      "cv_deprec_arrend": -1577,
-      "cv_serv_mineros": -10804,
-      "cv_fletes": -5405,
-      "cv_gastos_diferidos": -1587,
-      "cv_convenios": -6662,
-      "total_costo_venta": -126202,
-      "ga_gastos_personal": -3818,
-      "ga_materiales": -129,
-      "ga_servicios_terceros": -4239,
-      "ga_gratificacion": -639,
-      "ga_comercializacion": -2156,
-      "ga_otros": -651,
-      "total_gasto_admin": -11632
-    }
+
+  "temp_files": {
+    "directory": "temp",
+    "auto_cleanup": true,
+    "page_extraction_prefix": "page_review_"
   }
 }

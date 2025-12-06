@@ -43,7 +43,7 @@ print(format_validation_report(validation_results))
 
 ### 3. Validate Against Reference (IIQ2024)
 
-For Q2 2024, we have known-good reference values in config.json:
+For Q2 2024, we have known-good reference values in `config/reference_data.json`:
 
 ```python
 from puco_eeff.transformer import validate_against_reference, format_validation_report
