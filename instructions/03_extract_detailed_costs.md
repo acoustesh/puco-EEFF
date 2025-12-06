@@ -2,13 +2,17 @@
 
 ## Objective
 
-Extract the **"Cuadro Resumen de Costos"** from Análisis Razonado into Sheet1 with a 27-row structure:
+Extract **Nota 21 (Costo de Venta)** and **Nota 22 (Gastos de Administración)** from Estados Financieros PDF into Sheet1 with a 27-row structure:
 
-- **Row 1**: Ingresos de actividades ordinarias
+- **Row 1**: Ingresos de actividades ordinarias (from XBRL)
 - **Rows 3-15**: Costo de Venta section (header + 11 line items + total)
 - **Rows 19-27**: Gasto Admin y Ventas section (header + 6 line items + **Totales**)
 
-**IMPORTANT DISAMBIGUATION**: 
+**Source Documents**:
+- **Estados Financieros PDF**: Contains Nota 21 and Nota 22 with detailed cost breakdowns
+- **XBRL file**: Contains Revenue (Ingresos) and totals for validation
+
+**IMPORTANT DISAMBIGUATION**:
 - "**Total Costo de Venta**" (row 15) is the sum of Costo de Venta items
 - "**Totales**" (row 27) is the sum of Gasto Admin items - this is the ONLY "Totales" that goes in row 27
 
@@ -48,7 +52,7 @@ Extract the **"Cuadro Resumen de Costos"** from Análisis Razonado into Sheet1 w
 Row  Label                                          IIQ2024
 ───────────────────────────────────────────────────────────
 1    Ingresos de actividades ordinarias M USD       179,165
-2    
+2
 3    Costo de Venta
 4    Gastos en personal                             -19,721
 5    Materiales y repuestos                         -23,219
@@ -62,9 +66,9 @@ Row  Label                                          IIQ2024
 13   Gastos Diferidos, ajustes existencias y otros   -1,587
 14   Obligaciones por convenios colectivos           -6,662
 15   Total Costo de Venta                          -126,202
-16   
-17   
-18   
+16
+17
+18
 19   Gasto Adm, y Ventas
 20   Gastos en personal                              -3,818
 21   Materiales y repuestos                            -129
@@ -72,7 +76,7 @@ Row  Label                                          IIQ2024
 23   Provision gratificacion legal y otros             -639
 24   Gastos comercializacion                         -2,156
 25   Otros gastos                                      -651
-26   
+26
 27   Totales                                        -11,632
 ```
 
@@ -125,12 +129,11 @@ print(f"Totales (Gasto Admin): {data.total_gasto_admin:,}")  # -11,632
 ## Extraction from Different Sources
 
 ### CMF Chile (Q2-Q4)
-- **Document**: `analisis_razonado_YYYY_QN.pdf`
-- **Section**: "Cuadro Resumen de Costos" 
-- **XBRL Validation**: Available for cross-checking totals
+- **Estados Financieros PDF**: Contains Nota 21 and Nota 22 with detailed breakdowns (~page 70-75)
+- **XBRL file**: Contains Revenue and totals for validation
 
 ### Pucobre.cl Fallback (Q1)
-- **Document**: `analisis_razonado_YYYY_Q1.pdf` (split from combined PDF)
+- **Document**: `estados_financieros_YYYY_Q1.pdf` (split from combined PDF)
 - **XBRL**: NOT available - PDF-only extraction
 
 ## Batch Extraction Across Quarters

@@ -307,3 +307,193 @@
 2025-12-06 04:01:40,106 - puco_eeff.extractor.cost_extractor - DEBUG - Could not extract Ingresos from XBRL: XBRL file not found: /fake/path.xbrl
 2025-12-06 04:01:40,107 - puco_eeff.extractor.cost_extractor - INFO - PDF extraction failed, trying XBRL for 2024 Q2
 2025-12-06 04:01:40,996 - puco_eeff.transformer.formatter - WARNING - No reference data found for period: IQ2030
+2025-12-06 06:55:35,892 - puco_eeff.scraper.cmf_downloader - INFO - Downloading all documents for 2024 Q2
+2025-12-06 06:55:35,892 - puco_eeff.scraper.cmf_downloader - DEBUG - Filters: tipo=C, tipo_norma=IFRS
+2025-12-06 06:55:37,239 - puco_eeff.scraper.cmf_downloader - DEBUG - Navigating to: https://www.cmfchile.cl/institucional/mercados/entidad.php?mercado=V&rut=96561560&grupo=&tipoentidad=RVEMI&row=&vig=VI&control=svs&pestania=3
+2025-12-06 06:55:38,596 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting month: 06
+2025-12-06 06:55:38,620 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting year: 2024
+2025-12-06 06:55:38,626 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting tipo: C
+2025-12-06 06:55:38,631 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting tipo_norma: IFRS
+2025-12-06 06:55:38,635 - puco_eeff.scraper.cmf_downloader - DEBUG - Clicking Consultar button
+2025-12-06 06:55:44,558 - puco_eeff.scraper.cmf_downloader - INFO - Successfully filtered for 2024 Q2
+2025-12-06 06:55:44,558 - puco_eeff.scraper.cmf_downloader - DEBUG - Looking for link: Análisis Razonado
+2025-12-06 06:55:44,727 - puco_eeff.scraper.cmf_downloader - INFO - Downloaded: analisis_razonado_2024_Q2.pdf (225,683 bytes)
+2025-12-06 06:55:44,727 - puco_eeff.scraper.cmf_downloader - DEBUG - Looking for link: Estados financieros (PDF)
+2025-12-06 06:55:44,937 - puco_eeff.scraper.cmf_downloader - INFO - Downloaded: estados_financieros_2024_Q2.pdf (938,858 bytes)
+2025-12-06 06:55:44,937 - puco_eeff.scraper.cmf_downloader - DEBUG - Looking for link: Estados financieros (XBRL)
+2025-12-06 06:55:45,046 - puco_eeff.scraper.cmf_downloader - INFO - Downloaded: estados_financieros_2024_Q2_xbrl.zip (53,117 bytes)
+2025-12-06 06:55:45,113 - puco_eeff.scraper.cmf_downloader - DEBUG - Files in ZIP: ['96561560_2024-07-30_C_dim_label.xml', '96561560_2024-07-30_C_dimension.xsd', '96561560_202406_C.xbrl', '96561560_202406_C_shell.xsd', '96561560_2024-07-30_C_dim_definicion.xml']
+2025-12-06 06:55:45,113 - puco_eeff.scraper.cmf_downloader - INFO - Found .xbrl instance document: 96561560_202406_C.xbrl
+2025-12-06 06:55:45,113 - puco_eeff.scraper.cmf_downloader - DEBUG - Extracting: 96561560_202406_C.xbrl -> /home/alvaro/aa-ml/puco-EEFF/data/raw/xbrl/estados_financieros_2024_Q2.xbrl
+2025-12-06 06:55:45,114 - puco_eeff.scraper.cmf_downloader - INFO - Extracted XBRL to: /home/alvaro/aa-ml/puco-EEFF/data/raw/xbrl/estados_financieros_2024_Q2.xbrl (686,925 bytes)
+2025-12-06 06:55:56,920 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /home/alvaro/aa-ml/puco-EEFF/data/raw/xbrl/estados_financieros_2024_Q2.xbrl
+2025-12-06 06:55:56,924 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full', 'cl-ci', 'cl-ci-i', 'ifrs-mc', 'iso4217', 'ref', 'tx', 'xbrldi', 'xsd', 'xsi']
+2025-12-06 06:55:56,927 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 1931 facts from XBRL
+2025-12-06 06:55:56,933 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 364 contexts
+2025-12-06 06:55:56,933 - puco_eeff.extractor.xbrl_parser - DEBUG - Using context: AcumuladoActual (end: 2024-06-30)
+2025-12-06 06:55:56,933 - puco_eeff.extractor.xbrl_parser - DEBUG - Revenue: 179,165,000
+2025-12-06 06:55:56,934 - puco_eeff.extractor.xbrl_parser - DEBUG - CostOfSales: 126,202,000
+2025-12-06 06:55:56,934 - puco_eeff.extractor.xbrl_parser - DEBUG - GrossProfit: 52,963,000
+2025-12-06 06:55:56,934 - puco_eeff.extractor.xbrl_parser - DEBUG - AdministrativeExpense: 11,632,000
+2025-12-06 06:55:56,934 - puco_eeff.extractor.xbrl_parser - DEBUG - SellingExpense: 126,202,000
+2025-12-06 06:55:56,934 - puco_eeff.extractor.xbrl_parser - DEBUG - ProfitLoss: 30,079,000
+2025-12-06 06:55:56,934 - puco_eeff.extractor.xbrl_parser - DEBUG - ProfitLossBeforeTax: 42,052,000
+2025-12-06 06:55:56,934 - puco_eeff.extractor.xbrl_parser - INFO - Saved XBRL aggregates to: /home/alvaro/aa-ml/puco-EEFF/data/processed/xbrl_aggregates.json
+2025-12-06 06:56:12,635 - puco_eeff.extractor.cost_extractor - ERROR - Could not find 'Cuadro Resumen de Costos' in Análisis Razonado
+2025-12-06 06:56:12,635 - puco_eeff.extractor.cost_extractor - INFO - PDF extraction failed, trying XBRL for 2024 Q2
+2025-12-06 06:56:12,635 - puco_eeff.extractor.cost_extractor - WARNING - XBRL file not found for 2024 Q2
+2025-12-06 06:56:12,635 - puco_eeff.extractor.cost_extractor - ERROR - Failed to extract Sheet1 from any source for 2024 Q2
+2025-12-06 06:59:15,363 - puco_eeff.extractor.cost_extractor - INFO - Found Nota 21 on page 11
+2025-12-06 06:59:15,538 - puco_eeff.extractor.cost_extractor - WARNING - No tables found on page 11
+2025-12-06 06:59:15,711 - puco_eeff.extractor.cost_extractor - WARNING - No tables found on page 12
+2025-12-06 06:59:15,712 - puco_eeff.extractor.cost_extractor - ERROR - Could not extract Nota 21 table
+2025-12-06 06:59:15,993 - puco_eeff.extractor.cost_extractor - INFO - Found Nota 22 on page 6
+2025-12-06 06:59:16,158 - puco_eeff.extractor.cost_extractor - WARNING - Could not find expected cost table on page 6
+2025-12-06 06:59:16,325 - puco_eeff.extractor.cost_extractor - WARNING - Could not find expected cost table on page 7
+2025-12-06 06:59:16,326 - puco_eeff.extractor.cost_extractor - ERROR - Could not extract Nota 22 table
+2025-12-06 06:59:16,326 - puco_eeff.extractor.cost_extractor - ERROR - Could not extract Nota 21 or 22 from /home/alvaro/aa-ml/puco-EEFF/data/raw/pdf/estados_financieros_2024_Q2.pdf
+2025-12-06 07:00:05,842 - puco_eeff.extractor.cost_extractor - INFO - Found Nota 21 with details on page 72
+2025-12-06 07:00:06,001 - puco_eeff.extractor.cost_extractor - INFO - Extracted 1 items from Nota 21
+2025-12-06 07:00:09,013 - puco_eeff.extractor.cost_extractor - INFO - Found Nota 22 with details on page 72
+2025-12-06 07:00:09,172 - puco_eeff.extractor.cost_extractor - INFO - Extracted 1 items from Nota 22
+2025-12-06 07:00:09,172 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /home/alvaro/aa-ml/puco-EEFF/data/raw/xbrl/estados_financieros_2024_Q2.xbrl
+2025-12-06 07:00:09,177 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full', 'cl-ci', 'cl-ci-i', 'ifrs-mc', 'iso4217', 'ref', 'tx', 'xbrldi', 'xsd', 'xsi']
+2025-12-06 07:00:09,181 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 1931 facts from XBRL
+2025-12-06 07:00:09,186 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 364 contexts
+2025-12-06 07:00:09,187 - puco_eeff.extractor.cost_extractor - WARNING - ✗ Total Costo de Venta mismatch - PDF: -126,202, XBRL: 126,202,000
+2025-12-06 07:00:09,188 - puco_eeff.extractor.cost_extractor - WARNING - ✗ Total Gasto Admin mismatch - PDF: -126,202, XBRL: 11,632,000
+2025-12-06 07:00:09,188 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /home/alvaro/aa-ml/puco-EEFF/data/raw/xbrl/estados_financieros_2024_Q2.xbrl
+2025-12-06 07:00:09,190 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full', 'cl-ci', 'cl-ci-i', 'ifrs-mc', 'iso4217', 'ref', 'tx', 'xbrldi', 'xsd', 'xsi']
+2025-12-06 07:00:09,192 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 1931 facts from XBRL
+2025-12-06 07:00:09,198 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 364 contexts
+2025-12-06 07:00:09,199 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Ingresos: 179,165,000
+2025-12-06 07:00:09,200 - puco_eeff.extractor.cost_extractor - INFO - Saved Sheet1 data to: /home/alvaro/aa-ml/puco-EEFF/data/processed/sheet1_IIQ2024.json
+2025-12-06 07:00:57,581 - puco_eeff.extractor.cost_extractor - INFO - Found Nota 21 with details on page 72
+2025-12-06 07:00:57,745 - puco_eeff.extractor.cost_extractor - INFO - Extracted 10 items from Nota 21
+2025-12-06 07:01:00,789 - puco_eeff.extractor.cost_extractor - INFO - Found Nota 22 with details on page 72
+2025-12-06 07:01:00,949 - puco_eeff.extractor.cost_extractor - INFO - Extracted 4 items from Nota 22
+2025-12-06 07:01:00,949 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /home/alvaro/aa-ml/puco-EEFF/data/raw/xbrl/estados_financieros_2024_Q2.xbrl
+2025-12-06 07:01:00,952 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full', 'cl-ci', 'cl-ci-i', 'ifrs-mc', 'iso4217', 'ref', 'tx', 'xbrldi', 'xsd', 'xsi']
+2025-12-06 07:01:00,955 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 1931 facts from XBRL
+2025-12-06 07:01:00,960 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 364 contexts
+2025-12-06 07:01:00,961 - puco_eeff.extractor.cost_extractor - WARNING - ✗ Total Costo de Venta mismatch - PDF: -126,202, XBRL: 126,202,000
+2025-12-06 07:01:00,961 - puco_eeff.extractor.cost_extractor - WARNING - ✗ Total Gasto Admin mismatch - PDF: -126,202, XBRL: 11,632,000
+2025-12-06 07:01:00,961 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /home/alvaro/aa-ml/puco-EEFF/data/raw/xbrl/estados_financieros_2024_Q2.xbrl
+2025-12-06 07:01:00,964 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full', 'cl-ci', 'cl-ci-i', 'ifrs-mc', 'iso4217', 'ref', 'tx', 'xbrldi', 'xsd', 'xsi']
+2025-12-06 07:01:00,966 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 1931 facts from XBRL
+2025-12-06 07:01:00,972 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 364 contexts
+2025-12-06 07:01:00,972 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Ingresos: 179,165,000
+2025-12-06 07:01:00,974 - puco_eeff.extractor.cost_extractor - INFO - Saved Sheet1 data to: /home/alvaro/aa-ml/puco-EEFF/data/processed/sheet1_IIQ2024.json
+2025-12-06 07:02:26,569 - puco_eeff.extractor.cost_extractor - INFO - Found Nota 21 with details on page 72
+2025-12-06 07:02:26,736 - puco_eeff.extractor.cost_extractor - INFO - Extracted 10 items from Nota 21
+2025-12-06 07:02:29,854 - puco_eeff.extractor.cost_extractor - INFO - Found Nota 22 with details on page 72
+2025-12-06 07:02:30,017 - puco_eeff.extractor.cost_extractor - INFO - Extracted 4 items from Nota 22
+2025-12-06 07:02:30,017 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /home/alvaro/aa-ml/puco-EEFF/data/raw/xbrl/estados_financieros_2024_Q2.xbrl
+2025-12-06 07:02:30,020 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full', 'cl-ci', 'cl-ci-i', 'ifrs-mc', 'iso4217', 'ref', 'tx', 'xbrldi', 'xsd', 'xsi']
+2025-12-06 07:02:30,023 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 1931 facts from XBRL
+2025-12-06 07:02:30,028 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 364 contexts
+2025-12-06 07:02:30,029 - puco_eeff.extractor.cost_extractor - WARNING - ✗ Total Costo de Venta mismatch - PDF: -126,202, XBRL: 126,202,000
+2025-12-06 07:02:30,029 - puco_eeff.extractor.cost_extractor - WARNING - ✗ Total Gasto Admin mismatch - PDF: -11,632, XBRL: 11,632,000
+2025-12-06 07:02:30,029 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /home/alvaro/aa-ml/puco-EEFF/data/raw/xbrl/estados_financieros_2024_Q2.xbrl
+2025-12-06 07:02:30,032 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full', 'cl-ci', 'cl-ci-i', 'ifrs-mc', 'iso4217', 'ref', 'tx', 'xbrldi', 'xsd', 'xsi']
+2025-12-06 07:02:30,035 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 1931 facts from XBRL
+2025-12-06 07:02:30,040 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 364 contexts
+2025-12-06 07:02:30,041 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Ingresos: 179,165,000
+2025-12-06 07:02:30,042 - puco_eeff.extractor.cost_extractor - INFO - Saved Sheet1 data to: /home/alvaro/aa-ml/puco-EEFF/data/processed/sheet1_IIQ2024.json
+2025-12-06 07:03:45,046 - puco_eeff.extractor.cost_extractor - INFO - Found Nota 21 with details on page 72
+2025-12-06 07:03:45,214 - puco_eeff.extractor.cost_extractor - INFO - Extracted 11 items from Nota 21
+2025-12-06 07:03:48,231 - puco_eeff.extractor.cost_extractor - INFO - Found Nota 22 with details on page 72
+2025-12-06 07:03:48,391 - puco_eeff.extractor.cost_extractor - INFO - Extracted 6 items from Nota 22
+2025-12-06 07:03:48,392 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /home/alvaro/aa-ml/puco-EEFF/data/raw/xbrl/estados_financieros_2024_Q2.xbrl
+2025-12-06 07:03:48,394 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full', 'cl-ci', 'cl-ci-i', 'ifrs-mc', 'iso4217', 'ref', 'tx', 'xbrldi', 'xsd', 'xsi']
+2025-12-06 07:03:48,397 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 1931 facts from XBRL
+2025-12-06 07:03:48,402 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 364 contexts
+2025-12-06 07:03:48,404 - puco_eeff.extractor.cost_extractor - WARNING - ✗ Total Costo de Venta mismatch - PDF: -126,202, XBRL: 126,202,000
+2025-12-06 07:03:48,404 - puco_eeff.extractor.cost_extractor - WARNING - ✗ Total Gasto Admin mismatch - PDF: -11,632, XBRL: 11,632,000
+2025-12-06 07:03:48,404 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /home/alvaro/aa-ml/puco-EEFF/data/raw/xbrl/estados_financieros_2024_Q2.xbrl
+2025-12-06 07:03:48,406 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full', 'cl-ci', 'cl-ci-i', 'ifrs-mc', 'iso4217', 'ref', 'tx', 'xbrldi', 'xsd', 'xsi']
+2025-12-06 07:03:48,409 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 1931 facts from XBRL
+2025-12-06 07:03:48,414 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 364 contexts
+2025-12-06 07:03:48,415 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Ingresos: 179,165,000
+2025-12-06 07:03:48,416 - puco_eeff.extractor.cost_extractor - INFO - Saved Sheet1 data to: /home/alvaro/aa-ml/puco-EEFF/data/processed/sheet1_IIQ2024.json
+2025-12-06 07:04:37,367 - puco_eeff.extractor.cost_extractor - INFO - Found Nota 21 with details on page 72
+2025-12-06 07:04:37,532 - puco_eeff.extractor.cost_extractor - INFO - Extracted 11 items from Nota 21
+2025-12-06 07:04:40,594 - puco_eeff.extractor.cost_extractor - INFO - Found Nota 22 with details on page 72
+2025-12-06 07:04:40,756 - puco_eeff.extractor.cost_extractor - INFO - Extracted 6 items from Nota 22
+2025-12-06 07:04:40,757 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /home/alvaro/aa-ml/puco-EEFF/data/raw/xbrl/estados_financieros_2024_Q2.xbrl
+2025-12-06 07:04:40,759 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full', 'cl-ci', 'cl-ci-i', 'ifrs-mc', 'iso4217', 'ref', 'tx', 'xbrldi', 'xsd', 'xsi']
+2025-12-06 07:04:40,762 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 1931 facts from XBRL
+2025-12-06 07:04:40,767 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 364 contexts
+2025-12-06 07:04:40,769 - puco_eeff.extractor.cost_extractor - WARNING - ✗ Total Costo de Venta mismatch - PDF: -126,202, XBRL: 126,202,000
+2025-12-06 07:04:40,769 - puco_eeff.extractor.cost_extractor - WARNING - ✗ Total Gasto Admin mismatch - PDF: -11,632, XBRL: 11,632,000
+2025-12-06 07:04:40,769 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /home/alvaro/aa-ml/puco-EEFF/data/raw/xbrl/estados_financieros_2024_Q2.xbrl
+2025-12-06 07:04:40,771 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full', 'cl-ci', 'cl-ci-i', 'ifrs-mc', 'iso4217', 'ref', 'tx', 'xbrldi', 'xsd', 'xsi']
+2025-12-06 07:04:40,774 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 1931 facts from XBRL
+2025-12-06 07:04:40,779 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 364 contexts
+2025-12-06 07:04:40,780 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Ingresos: 179,165,000
+2025-12-06 07:04:40,781 - puco_eeff.extractor.cost_extractor - INFO - Saved Sheet1 data to: /home/alvaro/aa-ml/puco-EEFF/data/processed/sheet1_IIQ2024.json
+2025-12-06 07:04:47,277 - puco_eeff.extractor.cost_extractor - INFO - No XBRL available for 2024 Q1 - using PDF only
+2025-12-06 07:04:47,280 - puco_eeff.extractor.cost_extractor - INFO - Saved extraction result to: /tmp/pytest-of-alvaro/pytest-14/test_save_creates_json0/detailed_costs.json
+2025-12-06 07:04:47,283 - puco_eeff.extractor.cost_extractor - INFO - Saved Sheet1 data to: /tmp/pytest-of-alvaro/pytest-14/test_save_creates_json1/sheet1_IIQ2024.json
+2025-12-06 07:04:47,283 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
+2025-12-06 07:04:47,283 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
+2025-12-06 07:04:47,283 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /fake/path.xbrl
+2025-12-06 07:04:47,283 - puco_eeff.extractor.xbrl_parser - ERROR - File not found: /fake/path.xbrl
+2025-12-06 07:04:47,284 - puco_eeff.extractor.cost_extractor - DEBUG - Could not extract Ingresos from XBRL: XBRL file not found: /fake/path.xbrl
+2025-12-06 07:04:47,284 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Total Costo de Venta: -126,202
+2025-12-06 07:04:47,284 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Total Gasto Admin: -11,632
+2025-12-06 07:04:47,284 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /fake/path.xbrl
+2025-12-06 07:04:47,284 - puco_eeff.extractor.xbrl_parser - ERROR - File not found: /fake/path.xbrl
+2025-12-06 07:04:47,284 - puco_eeff.extractor.cost_extractor - DEBUG - Could not extract Ingresos from XBRL: XBRL file not found: /fake/path.xbrl
+2025-12-06 07:04:47,286 - puco_eeff.extractor.cost_extractor - INFO - PDF extraction failed, trying XBRL for 2024 Q2
+2025-12-06 07:04:48,215 - puco_eeff.transformer.formatter - WARNING - No reference data found for period: IQ2030
+2025-12-06 07:04:54,013 - puco_eeff.extractor.cost_extractor - INFO - No XBRL available for 2024 Q1 - using PDF only
+2025-12-06 07:04:54,015 - puco_eeff.extractor.cost_extractor - INFO - Saved extraction result to: /tmp/pytest-of-alvaro/pytest-15/test_save_creates_json0/detailed_costs.json
+2025-12-06 07:04:54,018 - puco_eeff.extractor.cost_extractor - INFO - Saved Sheet1 data to: /tmp/pytest-of-alvaro/pytest-15/test_save_creates_json1/sheet1_IIQ2024.json
+2025-12-06 07:04:54,019 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
+2025-12-06 07:04:54,019 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
+2025-12-06 07:04:54,019 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /fake/path.xbrl
+2025-12-06 07:04:54,019 - puco_eeff.extractor.xbrl_parser - ERROR - File not found: /fake/path.xbrl
+2025-12-06 07:04:54,019 - puco_eeff.extractor.cost_extractor - DEBUG - Could not extract Ingresos from XBRL: XBRL file not found: /fake/path.xbrl
+2025-12-06 07:04:54,020 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Total Costo de Venta: -126,202
+2025-12-06 07:04:54,020 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Total Gasto Admin: -11,632
+2025-12-06 07:04:54,020 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /fake/path.xbrl
+2025-12-06 07:04:54,020 - puco_eeff.extractor.xbrl_parser - ERROR - File not found: /fake/path.xbrl
+2025-12-06 07:04:54,020 - puco_eeff.extractor.cost_extractor - DEBUG - Could not extract Ingresos from XBRL: XBRL file not found: /fake/path.xbrl
+2025-12-06 07:04:54,021 - puco_eeff.extractor.cost_extractor - INFO - PDF extraction failed, trying XBRL for 2024 Q2
+2025-12-06 07:04:54,653 - puco_eeff.transformer.formatter - WARNING - No reference data found for period: IQ2030
+2025-12-06 07:11:00,440 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /home/alvaro/aa-ml/puco-EEFF/data/raw/xbrl/estados_financieros_2024_Q2.xbrl
+2025-12-06 07:11:00,448 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full', 'cl-ci', 'cl-ci-i', 'ifrs-mc', 'iso4217', 'ref', 'tx', 'xbrldi', 'xsd', 'xsi']
+2025-12-06 07:11:00,454 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 1931 facts from XBRL
+2025-12-06 07:11:00,464 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 364 contexts
+2025-12-06 07:11:58,576 - puco_eeff.extractor.cost_extractor - INFO - Found Nota 21 with details on page 72
+2025-12-06 07:11:58,741 - puco_eeff.extractor.cost_extractor - INFO - Extracted 11 items from Nota 21
+2025-12-06 07:12:01,830 - puco_eeff.extractor.cost_extractor - INFO - Found Nota 22 with details on page 72
+2025-12-06 07:12:01,991 - puco_eeff.extractor.cost_extractor - INFO - Extracted 6 items from Nota 22
+2025-12-06 07:12:01,992 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /home/alvaro/aa-ml/puco-EEFF/data/raw/xbrl/estados_financieros_2024_Q2.xbrl
+2025-12-06 07:12:01,997 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full', 'cl-ci', 'cl-ci-i', 'ifrs-mc', 'iso4217', 'ref', 'tx', 'xbrldi', 'xsd', 'xsi']
+2025-12-06 07:12:02,001 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 1931 facts from XBRL
+2025-12-06 07:12:02,006 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 364 contexts
+2025-12-06 07:12:02,007 - puco_eeff.extractor.cost_extractor - WARNING - ✗ Total Costo de Venta mismatch - PDF: -126,202, XBRL: 126,202,000
+2025-12-06 07:12:02,007 - puco_eeff.extractor.cost_extractor - WARNING - ✗ Total Gasto Admin mismatch - PDF: -11,632, XBRL: 11,632,000
+2025-12-06 07:12:02,008 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /home/alvaro/aa-ml/puco-EEFF/data/raw/xbrl/estados_financieros_2024_Q2.xbrl
+2025-12-06 07:12:02,010 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full', 'cl-ci', 'cl-ci-i', 'ifrs-mc', 'iso4217', 'ref', 'tx', 'xbrldi', 'xsd', 'xsi']
+2025-12-06 07:12:02,012 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 1931 facts from XBRL
+2025-12-06 07:12:02,018 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 364 contexts
+2025-12-06 07:12:02,019 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Ingresos: 179,165 (scaled from 179,165,000)
+2025-12-06 07:12:02,020 - puco_eeff.extractor.cost_extractor - INFO - Saved Sheet1 data to: /home/alvaro/aa-ml/puco-EEFF/data/processed/sheet1_IIQ2024.json
+2025-12-06 07:12:09,503 - puco_eeff.extractor.cost_extractor - INFO - No XBRL available for 2024 Q1 - using PDF only
+2025-12-06 07:12:09,505 - puco_eeff.extractor.cost_extractor - INFO - Saved extraction result to: /tmp/pytest-of-alvaro/pytest-16/test_save_creates_json0/detailed_costs.json
+2025-12-06 07:12:09,508 - puco_eeff.extractor.cost_extractor - INFO - Saved Sheet1 data to: /tmp/pytest-of-alvaro/pytest-16/test_save_creates_json1/sheet1_IIQ2024.json
+2025-12-06 07:12:09,509 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
+2025-12-06 07:12:09,509 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
+2025-12-06 07:12:09,509 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /fake/path.xbrl
+2025-12-06 07:12:09,509 - puco_eeff.extractor.xbrl_parser - ERROR - File not found: /fake/path.xbrl
+2025-12-06 07:12:09,509 - puco_eeff.extractor.cost_extractor - DEBUG - Could not extract Ingresos from XBRL: XBRL file not found: /fake/path.xbrl
+2025-12-06 07:12:09,509 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Total Costo de Venta: -126,202
+2025-12-06 07:12:09,509 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Total Gasto Admin: -11,632
+2025-12-06 07:12:09,509 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /fake/path.xbrl
+2025-12-06 07:12:09,509 - puco_eeff.extractor.xbrl_parser - ERROR - File not found: /fake/path.xbrl
+2025-12-06 07:12:09,509 - puco_eeff.extractor.cost_extractor - DEBUG - Could not extract Ingresos from XBRL: XBRL file not found: /fake/path.xbrl
+2025-12-06 07:12:09,511 - puco_eeff.extractor.cost_extractor - INFO - PDF extraction failed, trying XBRL for 2024 Q2
+2025-12-06 07:12:10,449 - puco_eeff.transformer.formatter - WARNING - No reference data found for period: IQ2030

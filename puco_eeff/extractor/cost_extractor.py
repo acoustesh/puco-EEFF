@@ -253,7 +253,7 @@ def parse_chilean_number(value: str | None) -> int | None:
 
 
 def find_nota_page(pdf_path: Path, nota_number: int) -> int | None:
-    """Find the page number where a Nota section starts.
+    """Find the page number where a Nota section with detailed breakdown exists.
 
     Args:
         pdf_path: Path to the PDF file
@@ -262,26 +262,50 @@ def find_nota_page(pdf_path: Path, nota_number: int) -> int | None:
     Returns:
         0-indexed page number or None if not found
     """
-    search_patterns = [
-        f"{nota_number}. COSTO",
-        f"{nota_number}. GASTOS",
-        f"NOTA {nota_number}",
-        f"{nota_number}.",
+    # Define the detailed items we expect to find for each Nota
+    nota_21_detail_items = [
+        "gastos en personal",
+        "materiales",
+        "energía",
+        "energia",  # Without accent
+        "servicios de terceros",
+        "depreciación",
+        "depreciacion",  # Without accent
     ]
+
+    nota_22_detail_items = [
+        "gastos en personal",
+        "materiales",
+        "servicios de terceros",
+        "gratificación",
+        "gratificacion",  # Without accent
+        "comercialización",
+        "comercializacion",  # Without accent
+    ]
+
+    detail_items = nota_21_detail_items if nota_number == 21 else nota_22_detail_items
 
     with pdfplumber.open(pdf_path) as pdf:
         for page_idx, page in enumerate(pdf.pages):
-            text = (page.extract_text() or "").upper()
+            text = (page.extract_text() or "").lower()
 
-            for pattern in search_patterns:
-                if pattern.upper() in text:
-                    # Verify this is the right section
-                    if nota_number == 21 and "COSTO" in text and "VENTA" in text:
-                        logger.info(f"Found Nota 21 on page {page_idx + 1}")
-                        return page_idx
-                    elif nota_number == 22 and "GASTOS" in text and "ADMINISTRACI" in text:
-                        logger.info(f"Found Nota 22 on page {page_idx + 1}")
-                        return page_idx
+            # Look for the section header pattern
+            header_patterns = [
+                f"{nota_number}. costo" if nota_number == 21 else f"{nota_number}. gastos",
+                f"{nota_number} costo" if nota_number == 21 else f"{nota_number} gastos",
+            ]
+
+            has_header = any(pattern in text for pattern in header_patterns)
+            if not has_header:
+                continue
+
+            # Check if this page has detailed breakdown (at least 3 detail items)
+            detail_count = sum(1 for item in detail_items if item in text)
+            if detail_count >= 3:
+                # Also check for "totales" which indicates the complete table
+                if "totales" in text:
+                    logger.info(f"Found Nota {nota_number} with details on page {page_idx + 1}")
+                    return page_idx
 
     return None
 
@@ -290,6 +314,7 @@ def extract_table_from_page(
     pdf_path: Path,
     page_index: int,
     expected_items: list[str],
+    nota_number: int = 0,
 ) -> list[dict[str, Any]]:
     """Extract cost table data from a specific page.
 
@@ -297,6 +322,7 @@ def extract_table_from_page(
         pdf_path: Path to the PDF file
         page_index: 0-indexed page number
         expected_items: List of expected line item names
+        nota_number: Nota number (21 or 22) to help select correct table
 
     Returns:
         List of dictionaries with concepto and value columns
@@ -314,22 +340,52 @@ def extract_table_from_page(
             logger.warning(f"No tables found on page {page_index + 1}")
             return []
 
-        # Find the table containing our expected items
+        # Find the table for the specific Nota
+        # Use unique identifiers to distinguish between Nota 21 and Nota 22
         best_table = None
-        best_match_count = 0
+        best_score = 0
 
         for table in tables:
             if not table:
                 continue
 
             table_text = str(table).lower()
+
+            # Score based on matches with expected items
             match_count = sum(1 for item in expected_items if item.lower() in table_text)
 
-            if match_count > best_match_count:
-                best_match_count = match_count
+            # Use unique identifiers to boost score for correct table
+            if nota_number == 21:
+                # Nota 21 unique: "energía eléctrica", "servicios mineros", "fletes"
+                if "energía" in table_text or "energia" in table_text:
+                    match_count += 5
+                if "servicios mineros" in table_text:
+                    match_count += 3
+                if "fletes" in table_text:
+                    match_count += 3
+                # Penalize if has Nota 22 unique items
+                if "gratificación" in table_text or "gratificacion" in table_text:
+                    match_count -= 5
+                if "comercialización" in table_text or "comercializacion" in table_text:
+                    match_count -= 5
+
+            elif nota_number == 22:
+                # Nota 22 unique: "gratificación", "comercialización"
+                if "gratificación" in table_text or "gratificacion" in table_text:
+                    match_count += 5
+                if "comercialización" in table_text or "comercializacion" in table_text:
+                    match_count += 5
+                # Penalize if has Nota 21 unique items
+                if "energía" in table_text or "energia" in table_text:
+                    match_count -= 5
+                if "servicios mineros" in table_text:
+                    match_count -= 3
+
+            if match_count > best_score:
+                best_score = match_count
                 best_table = table
 
-        if best_table is None or best_match_count < 3:
+        if best_table is None or best_score < 3:
             logger.warning(f"Could not find expected cost table on page {page_index + 1}")
             return []
 
@@ -337,8 +393,80 @@ def extract_table_from_page(
         return _parse_cost_table(best_table, expected_items)
 
 
+def _normalize_for_matching(text: str) -> str:
+    """Normalize text for fuzzy matching.
+
+    Removes accents, punctuation, and extra whitespace for comparison.
+
+    Args:
+        text: Text to normalize
+
+    Returns:
+        Normalized lowercase text
+    """
+    import unicodedata
+
+    # Normalize unicode to decomposed form (separate base char from accent)
+    text = unicodedata.normalize("NFD", text)
+    # Remove combining characters (accents)
+    text = "".join(c for c in text if not unicodedata.combining(c))
+    # Lowercase
+    text = text.lower()
+    # Remove periods and extra punctuation (but keep spaces)
+    text = re.sub(r"[.,;:()\[\]]", " ", text)
+    # Collapse multiple spaces
+    text = re.sub(r"\s+", " ", text).strip()
+
+    return text
+
+
+def _match_item(concept: str, expected_items: list[str]) -> str | None:
+    """Match a concept text against expected items.
+
+    Uses normalized fuzzy matching to handle accent and punctuation differences.
+    Tries more specific (longer) items first to avoid false matches.
+
+    Args:
+        concept: Concept text from PDF
+        expected_items: List of expected item names
+
+    Returns:
+        Matched expected item or None
+    """
+    norm_concept = _normalize_for_matching(concept)
+
+    # Sort expected items by length (descending) to match more specific items first
+    # This prevents "Servicios de terceros" from matching "Servicios mineros de terceros"
+    sorted_items = sorted(expected_items, key=lambda x: len(x), reverse=True)
+
+    for expected in sorted_items:
+        norm_expected = _normalize_for_matching(expected)
+
+        # Check if normalized expected is in normalized concept
+        if norm_expected in norm_concept:
+            return expected
+
+        # Also check for partial matches (handle variations like "amort." vs "amort")
+        # Split into words and check if most words match
+        expected_words = norm_expected.split()
+        concept_words = norm_concept.split()
+
+        # Count how many expected words appear in the concept
+        matching_words = sum(1 for word in expected_words if any(word in cw for cw in concept_words))
+
+        # If at least 80% of expected words match, consider it a match
+        if expected_words and matching_words >= len(expected_words) * 0.8:
+            return expected
+
+    return None
+
+
 def _parse_cost_table(table: list[list[str | None]], expected_items: list[str]) -> list[dict[str, Any]]:
     """Parse a cost breakdown table.
+
+    Handles tables where multiple items are concatenated with newlines into single cells.
+    Example: One cell contains "Gastos en personal\\nMateriales y repuestos\\n..."
+    and adjacent cells contain corresponding values "19.721\\n23.219\\n..."
 
     Args:
         table: Raw table data from pdfplumber
@@ -353,34 +481,76 @@ def _parse_cost_table(table: list[list[str | None]], expected_items: list[str]) 
         if not row or not any(row):
             continue
 
-        # First cell usually contains the concept name
-        # May be merged with values or split across multiple lines
-        row_text = str(row[0] or "")
+        # First cell contains concept name(s)
+        concept_cell = str(row[0] or "").strip()
 
-        # Check if any expected item is in this row
-        matched_item = None
-        for expected in expected_items:
-            if expected.lower() in row_text.lower():
-                matched_item = expected
-                break
+        # Check if this is a multi-line cell (items concatenated with newlines)
+        if "\n" in concept_cell:
+            # Split the concept names and corresponding values
+            concepts = concept_cell.split("\n")
 
-        # Also check for "Totales" or "Total"
-        if not matched_item and ("total" in row_text.lower()):
-            matched_item = "Totales"
-
-        if matched_item:
-            # Extract numeric values from remaining columns
-            values = []
+            # Get value columns (each also has newline-separated values)
+            value_columns: list[list[str]] = []
             for cell in row[1:]:
                 if cell:
-                    parsed = parse_chilean_number(str(cell))
-                    if parsed is not None:
-                        values.append(parsed)
+                    values = str(cell).strip().split("\n")
+                    value_columns.append(values)
+                else:
+                    value_columns.append([])
 
-            parsed_rows.append({
-                "concepto": matched_item,
-                "values": values,
-            })
+            # Match concepts with their values
+            for idx, concept in enumerate(concepts):
+                concept = concept.strip()
+                if not concept:
+                    continue
+
+                # Check if any expected item is in this concept (using fuzzy matching)
+                matched_item = _match_item(concept, expected_items)
+
+                # Also check for "Totales" or "Total"
+                if not matched_item and "total" in concept.lower():
+                    matched_item = "Totales"
+
+                if matched_item:
+                    # Get corresponding values from each column
+                    values = []
+                    for col_values in value_columns:
+                        if idx < len(col_values):
+                            parsed = parse_chilean_number(col_values[idx])
+                            if parsed is not None:
+                                values.append(parsed)
+
+                    parsed_rows.append({
+                        "concepto": matched_item,
+                        "values": values,
+                    })
+
+        else:
+            # Single-line row (normal format)
+            row_text = concept_cell
+
+            # Check if any expected item is in this row (using fuzzy matching)
+            matched_item = _match_item(row_text, expected_items)
+
+            # Also check for "Totales" or "Total"
+            if not matched_item and "total" in row_text.lower():
+                matched_item = "Totales"
+
+            if matched_item:
+                # Extract numeric values from remaining columns
+                values = []
+                for cell in row[1:]:
+                    if cell:
+                        # Handle multi-value cells (take first value)
+                        cell_str = str(cell).split("\n")[0].strip()
+                        parsed = parse_chilean_number(cell_str)
+                        if parsed is not None:
+                            values.append(parsed)
+
+                parsed_rows.append({
+                    "concepto": matched_item,
+                    "values": values,
+                })
 
     return parsed_rows
 
@@ -402,11 +572,11 @@ def extract_nota_21(pdf_path: Path, config: dict | None = None) -> CostBreakdown
         logger.error("Could not find Nota 21 in PDF")
         return None
 
-    rows = extract_table_from_page(pdf_path, page_idx, costo_venta_items)
+    rows = extract_table_from_page(pdf_path, page_idx, costo_venta_items, nota_number=21)
 
     if not rows:
         # Try next page (table might span pages)
-        rows = extract_table_from_page(pdf_path, page_idx + 1, costo_venta_items)
+        rows = extract_table_from_page(pdf_path, page_idx + 1, costo_venta_items, nota_number=21)
 
     if not rows:
         logger.error("Could not extract Nota 21 table")
@@ -461,11 +631,11 @@ def extract_nota_22(pdf_path: Path, config: dict | None = None) -> CostBreakdown
             logger.error("Could not find Nota 22 in PDF")
             return None
 
-    rows = extract_table_from_page(pdf_path, page_idx, gasto_admin_items)
+    rows = extract_table_from_page(pdf_path, page_idx, gasto_admin_items, nota_number=22)
 
     if not rows:
         # Try next page
-        rows = extract_table_from_page(pdf_path, page_idx + 1, gasto_admin_items)
+        rows = extract_table_from_page(pdf_path, page_idx + 1, gasto_admin_items, nota_number=22)
 
     if not rows:
         logger.error("Could not extract Nota 22 table")
@@ -1028,16 +1198,17 @@ def extract_sheet1_from_analisis_razonado(
     quarter: int,
     validate_with_xbrl: bool = True,
 ) -> Sheet1Data | None:
-    """Extract Sheet1 data from Análisis Razonado PDF.
+    """Extract Sheet1 data from Estados Financieros PDF (Nota 21 & 22).
 
-    This extracts the "Cuadro Resumen de Costos" table which contains:
-    - Ingresos de actividades ordinarias
-    - Costo de Venta breakdown (11 items)
-    - Total Costo de Venta
-    - Gasto Admin breakdown (6 items)
-    - Totales (specifically Gasto Admin total in row 27)
+    This extracts the detailed cost breakdown from Nota 21 (Costo de Venta)
+    and Nota 22 (Gastos de Administración y Ventas) which contain:
+    - Costo de Venta breakdown (11 items) + Total
+    - Gasto Admin breakdown (6 items) + Totales
 
-    When XBRL is available, it validates and supplements the PDF extraction.
+    Ingresos de actividades ordinarias is extracted from XBRL when available.
+
+    Note: Despite the function name (kept for backward compatibility),
+    the detailed cost breakdown is in Estados Financieros PDF, not Análisis Razonado.
 
     Args:
         year: Year of the financial statement
@@ -1050,10 +1221,10 @@ def extract_sheet1_from_analisis_razonado(
     paths = get_period_paths(year, quarter)
     raw_dir = paths["raw_pdf"]
 
-    # Find Análisis Razonado PDF
-    ar_path = raw_dir / f"analisis_razonado_{year}_Q{quarter}.pdf"
-    if not ar_path.exists():
-        logger.warning(f"Análisis Razonado not found: {ar_path}")
+    # Find Estados Financieros PDF (contains Nota 21 and 22)
+    ef_path = raw_dir / f"estados_financieros_{year}_Q{quarter}.pdf"
+    if not ef_path.exists():
+        logger.warning(f"Estados Financieros PDF not found: {ef_path}")
         return None
 
     # Determine source
@@ -1061,18 +1232,12 @@ def extract_sheet1_from_analisis_razonado(
     source = "pucobre.cl" if combined_path.exists() else "cmf"
 
     # Check XBRL availability
-    xbrl_path = raw_dir / f"estados_financieros_{year}_Q{quarter}.xbrl"
+    xbrl_path = paths["raw_xbrl"] / f"estados_financieros_{year}_Q{quarter}.xbrl"
     if not xbrl_path.exists():
-        xbrl_path = raw_dir / f"estados_financieros_{year}_Q{quarter}.xml"
+        xbrl_path = paths["raw_xbrl"] / f"estados_financieros_{year}_Q{quarter}.xml"
     xbrl_available = xbrl_path.exists()
 
-    # Find the Cuadro Resumen page
-    page_idx = find_cuadro_resumen_page(ar_path)
-    if page_idx is None:
-        logger.error("Could not find 'Cuadro Resumen de Costos' in Análisis Razonado")
-        return None
-
-    # Extract data from PDF
+    # Extract data from PDF using Nota 21 and Nota 22
     data = Sheet1Data(
         quarter=format_quarter_label(year, quarter),
         year=year,
@@ -1081,29 +1246,90 @@ def extract_sheet1_from_analisis_razonado(
         xbrl_available=xbrl_available,
     )
 
-    # Extract the table from PDF
-    with pdfplumber.open(ar_path) as pdf:
-        page = pdf.pages[page_idx]
-        tables = page.extract_tables()
+    # Extract Nota 21 (Costo de Venta) and Nota 22 (Gastos Admin)
+    nota_21 = extract_nota_21(ef_path)
+    nota_22 = extract_nota_22(ef_path)
 
-        if not tables:
-            logger.error(f"No tables found on page {page_idx + 1}")
-            return None
+    if nota_21 is None and nota_22 is None:
+        logger.error(f"Could not extract Nota 21 or 22 from {ef_path}")
+        return None
 
-        # Find the cost summary table
-        cost_table = _find_cost_summary_table(tables)
-        if cost_table is None:
-            logger.error("Could not identify cost summary table")
-            return None
+    # Map Nota 21 items to Sheet1Data
+    if nota_21:
+        data.total_costo_venta = nota_21.total_ytd_actual
+        for item in nota_21.items:
+            _map_nota21_item_to_sheet1(item, data)
 
-        # Parse the table into Sheet1Data
-        _parse_cost_summary_table(cost_table, data)
+    # Map Nota 22 items to Sheet1Data
+    if nota_22:
+        data.total_gasto_admin = nota_22.total_ytd_actual
+        for item in nota_22.items:
+            _map_nota22_item_to_sheet1(item, data)
 
     # Validate/supplement with XBRL if available
     if xbrl_available and validate_with_xbrl:
         _validate_sheet1_with_xbrl(data, xbrl_path)
 
     return data
+
+
+def _map_nota21_item_to_sheet1(item: LineItem, data: Sheet1Data) -> None:
+    """Map a Nota 21 line item to Sheet1Data fields.
+
+    Args:
+        item: LineItem from Nota 21
+        data: Sheet1Data to update
+    """
+    concepto = item.concepto.lower()
+    value = item.ytd_actual
+
+    if "gastos en personal" in concepto:
+        data.cv_gastos_personal = value
+    elif "materiales" in concepto and "repuestos" in concepto:
+        data.cv_materiales = value
+    elif "energía" in concepto or "energia" in concepto:
+        data.cv_energia = value
+    elif "servicios de terceros" in concepto:
+        data.cv_servicios_terceros = value
+    elif "depreciación" in concepto or "depreciacion" in concepto:
+        if "leasing" in concepto:
+            data.cv_deprec_leasing = value
+        elif "arrendamiento" in concepto:
+            data.cv_deprec_arrend = value
+        elif "amort" in concepto:
+            data.cv_depreciacion_amort = value
+    elif "servicios mineros" in concepto:
+        data.cv_serv_mineros = value
+    elif "fletes" in concepto:
+        data.cv_fletes = value
+    elif "gastos diferidos" in concepto or "ajustes existencias" in concepto:
+        data.cv_gastos_diferidos = value
+    elif "convenios" in concepto or "obligaciones" in concepto:
+        data.cv_convenios = value
+
+
+def _map_nota22_item_to_sheet1(item: LineItem, data: Sheet1Data) -> None:
+    """Map a Nota 22 line item to Sheet1Data fields.
+
+    Args:
+        item: LineItem from Nota 22
+        data: Sheet1Data to update
+    """
+    concepto = item.concepto.lower()
+    value = item.ytd_actual
+
+    if "gastos en personal" in concepto:
+        data.ga_gastos_personal = value
+    elif "materiales" in concepto and "repuestos" in concepto:
+        data.ga_materiales = value
+    elif "servicios de terceros" in concepto:
+        data.ga_servicios_terceros = value
+    elif "gratificación" in concepto or "gratificacion" in concepto:
+        data.ga_gratificacion = value
+    elif "comercialización" in concepto or "comercializacion" in concepto:
+        data.ga_comercializacion = value
+    elif "otros gastos" in concepto:
+        data.ga_otros = value
 
 
 def _validate_sheet1_with_xbrl(data: Sheet1Data, xbrl_path: Path) -> None:
@@ -1160,8 +1386,12 @@ def _validate_sheet1_with_xbrl(data: Sheet1Data, xbrl_path: Path) -> None:
 
             for fact in revenue_facts:
                 if fact.get("value"):
-                    data.ingresos_ordinarios = int(float(fact["value"]))
-                    logger.info(f"Using XBRL value for Ingresos: {data.ingresos_ordinarios:,}")
+                    raw_value = int(float(fact["value"]))
+                    # XBRL values are in full USD, scale to thousands (MUS$) to match PDF
+                    data.ingresos_ordinarios = raw_value // 1000
+                    logger.info(
+                        f"Using XBRL value for Ingresos: {data.ingresos_ordinarios:,} (scaled from {raw_value:,})"
+                    )
                     break
         except Exception as e:
             logger.debug(f"Could not extract Ingresos from XBRL: {e}")
@@ -1359,12 +1589,12 @@ def extract_sheet1_from_xbrl(year: int, quarter: int) -> Sheet1Data | None:
         Sheet1Data with totals only, or None if extraction fails
     """
     paths = get_period_paths(year, quarter)
-    raw_dir = paths["raw_pdf"]
+    raw_xbrl = paths["raw_xbrl"]
 
     # Find XBRL file
-    xbrl_path = raw_dir / f"estados_financieros_{year}_Q{quarter}.xbrl"
+    xbrl_path = raw_xbrl / f"estados_financieros_{year}_Q{quarter}.xbrl"
     if not xbrl_path.exists():
-        xbrl_path = raw_dir / f"estados_financieros_{year}_Q{quarter}.xml"
+        xbrl_path = raw_xbrl / f"estados_financieros_{year}_Q{quarter}.xml"
 
     if not xbrl_path.exists():
         logger.warning(f"XBRL file not found for {year} Q{quarter}")

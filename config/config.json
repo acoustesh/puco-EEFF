@@ -19,8 +19,14 @@
         "default_values": {
           "tipo": "C",
           "tipo_norma": "IFRS",
-          "_tipo_options": {"C": "Consolidado", "I": "Individual"},
-          "_tipo_norma_options": {"IFRS": "Estándar IFRS", "NCH": "Norma Chilena"}
+          "_tipo_options": {
+            "C": "Consolidado",
+            "I": "Individual"
+          },
+          "_tipo_norma_options": {
+            "IFRS": "Estándar IFRS",
+            "NCH": "Norma Chilena"
+          }
         },
         "month_to_quarter": {
           "03": 1,
@@ -93,12 +99,29 @@
         "sections": [
           {
             "name": "Ingresos",
-            "rows": [1],
-            "items": ["Ingresos de actividades ordinarias M USD"]
+            "rows": [
+              1
+            ],
+            "items": [
+              "Ingresos de actividades ordinarias M USD"
+            ]
           },
           {
             "name": "Costo de Venta",
-            "rows": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+            "rows": [
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14
+            ],
             "header_row": 2,
             "items": [
               "Gastos en personal",
@@ -119,7 +142,15 @@
           },
           {
             "name": "Gasto Adm. y Ventas",
-            "rows": [18, 19, 20, 21, 22, 23, 24],
+            "rows": [
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24
+            ],
             "header_row": 17,
             "items": [
               "Gastos en personal",
@@ -149,33 +180,142 @@
         }
       },
       "row_mapping": {
-        "1": {"field": "ingresos_ordinarios", "label": "Ingresos de actividades ordinarias M USD", "section": null},
-        "2": {"field": null, "label": "", "section": null},
-        "3": {"field": "costo_venta_header", "label": "Costo de Venta", "section": "header"},
-        "4": {"field": "cv_gastos_personal", "label": "Gastos en personal", "section": "costo_venta"},
-        "5": {"field": "cv_materiales", "label": "Materiales y repuestos", "section": "costo_venta"},
-        "6": {"field": "cv_energia", "label": "Energía eléctrica", "section": "costo_venta"},
-        "7": {"field": "cv_servicios_terceros", "label": "Servicios de terceros", "section": "costo_venta"},
-        "8": {"field": "cv_depreciacion_amort", "label": "Depreciación y amort del periodo", "section": "costo_venta"},
-        "9": {"field": "cv_deprec_leasing", "label": "Depreciación Activos en leasing -Nota 20", "section": "costo_venta"},
-        "10": {"field": "cv_deprec_arrend", "label": "Depreciación Arrendamientos -Nota 20", "section": "costo_venta"},
-        "11": {"field": "cv_serv_mineros", "label": "Servicios mineros de terceros", "section": "costo_venta"},
-        "12": {"field": "cv_fletes", "label": "Fletes y otros gastos operacionales", "section": "costo_venta"},
-        "13": {"field": "cv_gastos_diferidos", "label": "Gastos Diferidos, ajustes existencias y otros", "section": "costo_venta"},
-        "14": {"field": "cv_convenios", "label": "Obligaciones por convenios colectivos", "section": "costo_venta"},
-        "15": {"field": "total_costo_venta", "label": "Total Costo de Venta", "section": "costo_venta_total"},
-        "16": {"field": null, "label": "", "section": null},
-        "17": {"field": null, "label": "", "section": null},
-        "18": {"field": null, "label": "", "section": null},
-        "19": {"field": "gasto_admin_header", "label": "Gasto Adm, y Ventas", "section": "header"},
-        "20": {"field": "ga_gastos_personal", "label": "Gastos en personal", "section": "gasto_admin"},
-        "21": {"field": "ga_materiales", "label": "Materiales y repuestos", "section": "gasto_admin"},
-        "22": {"field": "ga_servicios_terceros", "label": "Servicios de terceros", "section": "gasto_admin"},
-        "23": {"field": "ga_gratificacion", "label": "Provision gratificacion legal y otros", "section": "gasto_admin"},
-        "24": {"field": "ga_comercializacion", "label": "Gastos comercializacion", "section": "gasto_admin"},
-        "25": {"field": "ga_otros", "label": "Otros gastos", "section": "gasto_admin"},
-        "26": {"field": null, "label": "", "section": null},
-        "27": {"field": "total_gasto_admin", "label": "Totales", "section": "gasto_admin_total", "_note": "This is the ONLY 'Totales' that should be in row 27"}
+        "1": {
+          "field": "ingresos_ordinarios",
+          "label": "Ingresos de actividades ordinarias M USD",
+          "section": null
+        },
+        "2": {
+          "field": null,
+          "label": "",
+          "section": null
+        },
+        "3": {
+          "field": "costo_venta_header",
+          "label": "Costo de Venta",
+          "section": "header"
+        },
+        "4": {
+          "field": "cv_gastos_personal",
+          "label": "Gastos en personal",
+          "section": "costo_venta"
+        },
+        "5": {
+          "field": "cv_materiales",
+          "label": "Materiales y repuestos",
+          "section": "costo_venta"
+        },
+        "6": {
+          "field": "cv_energia",
+          "label": "Energía eléctrica",
+          "section": "costo_venta"
+        },
+        "7": {
+          "field": "cv_servicios_terceros",
+          "label": "Servicios de terceros",
+          "section": "costo_venta"
+        },
+        "8": {
+          "field": "cv_depreciacion_amort",
+          "label": "Depreciación y amort del periodo",
+          "section": "costo_venta"
+        },
+        "9": {
+          "field": "cv_deprec_leasing",
+          "label": "Depreciación Activos en leasing -Nota 20",
+          "section": "costo_venta"
+        },
+        "10": {
+          "field": "cv_deprec_arrend",
+          "label": "Depreciación Arrendamientos -Nota 20",
+          "section": "costo_venta"
+        },
+        "11": {
+          "field": "cv_serv_mineros",
+          "label": "Servicios mineros de terceros",
+          "section": "costo_venta"
+        },
+        "12": {
+          "field": "cv_fletes",
+          "label": "Fletes y otros gastos operacionales",
+          "section": "costo_venta"
+        },
+        "13": {
+          "field": "cv_gastos_diferidos",
+          "label": "Gastos Diferidos, ajustes existencias y otros",
+          "section": "costo_venta"
+        },
+        "14": {
+          "field": "cv_convenios",
+          "label": "Obligaciones por convenios colectivos",
+          "section": "costo_venta"
+        },
+        "15": {
+          "field": "total_costo_venta",
+          "label": "Total Costo de Venta",
+          "section": "costo_venta_total"
+        },
+        "16": {
+          "field": null,
+          "label": "",
+          "section": null
+        },
+        "17": {
+          "field": null,
+          "label": "",
+          "section": null
+        },
+        "18": {
+          "field": null,
+          "label": "",
+          "section": null
+        },
+        "19": {
+          "field": "gasto_admin_header",
+          "label": "Gasto Adm, y Ventas",
+          "section": "header"
+        },
+        "20": {
+          "field": "ga_gastos_personal",
+          "label": "Gastos en personal",
+          "section": "gasto_admin"
+        },
+        "21": {
+          "field": "ga_materiales",
+          "label": "Materiales y repuestos",
+          "section": "gasto_admin"
+        },
+        "22": {
+          "field": "ga_servicios_terceros",
+          "label": "Servicios de terceros",
+          "section": "gasto_admin"
+        },
+        "23": {
+          "field": "ga_gratificacion",
+          "label": "Provision gratificacion legal y otros",
+          "section": "gasto_admin"
+        },
+        "24": {
+          "field": "ga_comercializacion",
+          "label": "Gastos comercializacion",
+          "section": "gasto_admin"
+        },
+        "25": {
+          "field": "ga_otros",
+          "label": "Otros gastos",
+          "section": "gasto_admin"
+        },
+        "26": {
+          "field": null,
+          "label": "",
+          "section": null
+        },
+        "27": {
+          "field": "total_gasto_admin",
+          "label": "Totales",
+          "section": "gasto_admin_total",
+          "_note": "This is the ONLY 'Totales' that should be in row 27"
+        }
       },
       "data": {
         "IQ2024": {
@@ -370,5 +510,29 @@
   "logging": {
     "format": "simple",
     "filename_pattern": "{date}_run.log"
+  },
+  "reference_values": {
+    "IIQ2024": {
+      "ingresos_ordinarios": 179165,
+      "cv_gastos_personal": -19721,
+      "cv_materiales": -23219,
+      "cv_energia": -9589,
+      "cv_servicios_terceros": -25063,
+      "cv_depreciacion_amort": -21694,
+      "cv_deprec_leasing": -881,
+      "cv_deprec_arrend": -1577,
+      "cv_serv_mineros": -10804,
+      "cv_fletes": -5405,
+      "cv_gastos_diferidos": -1587,
+      "cv_convenios": -6662,
+      "total_costo_venta": -126202,
+      "ga_gastos_personal": -3818,
+      "ga_materiales": -129,
+      "ga_servicios_terceros": -4239,
+      "ga_gratificacion": -639,
+      "ga_comercializacion": -2156,
+      "ga_otros": -651,
+      "total_gasto_admin": -11632
+    }
   }
 }

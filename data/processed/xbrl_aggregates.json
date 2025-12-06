@@ -1,1 +1,16 @@
-{}
+{
+  "source_file": "/home/alvaro/aa-ml/puco-EEFF/data/raw/xbrl/estados_financieros_2024_Q2.xbrl",
+  "period": {
+    "start": "2024-01-01",
+    "end": "2024-06-30"
+  },
+  "aggregates": {
+    "Revenue": 179165000,
+    "CostOfSales": 126202000,
+    "GrossProfit": 52963000,
+    "AdministrativeExpense": 11632000,
+    "SellingExpense": 126202000,
+    "ProfitLoss": 30079000,
+    "ProfitLossBeforeTax": 42052000
+  }
+}
