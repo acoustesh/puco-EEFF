@@ -49,11 +49,11 @@ pdf_path = paths["raw_pdf"] / f"EEFF_{year}_Q{quarter}.pdf"
 sections = find_section_in_pdf(pdf_path, "Estado de Situación Financiera")
 if sections:
     print(f"Found on pages: {[s['page'] for s in sections]}")
-    
+
     # Extract tables from those pages
     pages_to_extract = [s['page'] for s in sections]
     tables = extract_tables_from_pdf(pdf_path, pages=pages_to_extract)
-    
+
     for page, page_tables in tables.items():
         print(f"\nPage {page}: {len(page_tables)} tables found")
         for i, table in enumerate(page_tables):
@@ -68,11 +68,11 @@ from puco_eeff.extractor.ocr_fallback import ocr_with_fallback
 # If tables couldn't be extracted directly, use OCR
 if not tables or all(len(t) == 0 for t in tables.values()):
     print("Using OCR for extraction...")
-    
+
     # Create audit directory for this period
     audit_dir = paths["audit"]
     audit_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # OCR the PDF pages containing balance sheet
     ocr_result = ocr_with_fallback(
         pdf_path=pdf_path,
@@ -86,7 +86,7 @@ Include all line items for Activos, Pasivos, and Patrimonio.""",
         save_all_responses=True,
         audit_dir=audit_dir
     )
-    
+
     if ocr_result["success"]:
         print("OCR successful!")
         print(ocr_result["content"][:500])
@@ -102,7 +102,7 @@ from puco_eeff.transformer.normalizer import extract_tables_from_ocr_markdown
 if ocr_result.get("success"):
     # Extract tables from OCR markdown output
     ocr_tables = extract_tables_from_ocr_markdown(ocr_result["content"])
-    
+
     print(f"Extracted {len(ocr_tables)} tables from OCR")
     for i, df in enumerate(ocr_tables):
         print(f"\nTable {i+1}:")

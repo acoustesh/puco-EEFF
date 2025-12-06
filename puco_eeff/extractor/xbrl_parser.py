@@ -198,3 +198,86 @@ def extract_by_xpath(file_path: Path, xpath_expr: str) -> list[str]:
 
     logger.debug(f"XPath returned {len(values)} values")
     return values
+
+
+def get_facts_by_name(
+    data: dict[str, Any],
+    name_pattern: str,
+    exact: bool = False,
+) -> list[dict[str, Any]]:
+    """Get facts matching a name pattern.
+
+    Args:
+        data: Parsed XBRL data from parse_xbrl_file()
+        name_pattern: Fact name or pattern to search for
+        exact: If True, match exactly; if False, match substring (case-insensitive)
+
+    Returns:
+        List of matching facts with context information
+    """
+    matching_facts = []
+    contexts = data.get("contexts", {})
+
+    for fact in data.get("facts", []):
+        fact_name = fact.get("name", "")
+
+        if exact:
+            matches = fact_name == name_pattern
+        else:
+            matches = name_pattern.lower() in fact_name.lower()
+
+        if matches:
+            # Enrich fact with context information
+            enriched_fact = dict(fact)
+            context_ref = fact.get("context_ref")
+            if context_ref and context_ref in contexts:
+                enriched_fact["context"] = contexts[context_ref]
+            matching_facts.append(enriched_fact)
+
+    return matching_facts
+
+
+def get_units(data: dict[str, Any]) -> dict[str, str]:
+    """Extract unit definitions from parsed XBRL data.
+
+    Args:
+        data: Parsed XBRL data
+
+    Returns:
+        Dictionary mapping unit IDs to their descriptions
+    """
+    # Units are stored in the facts with unitRef attribute
+    units: dict[str, str] = {}
+
+    for fact in data.get("facts", []):
+        unit_ref = fact.get("unit_ref")
+        if unit_ref and unit_ref not in units:
+            # Try to infer unit type from the namespace
+            if "iso4217" in str(fact.get("namespace", "")):
+                units[unit_ref] = f"Currency: {unit_ref}"
+            else:
+                units[unit_ref] = unit_ref
+
+    return units
+
+
+def summarize_facts(data: dict[str, Any]) -> dict[str, int]:
+    """Summarize the facts by category.
+
+    Args:
+        data: Parsed XBRL data
+
+    Returns:
+        Dictionary mapping category/prefix to count
+    """
+    categories: dict[str, int] = {}
+
+    for fact in data.get("facts", []):
+        name = fact.get("name", "Other")
+        # Extract category from CamelCase name (take first capital-starting word)
+        import re
+        parts = re.findall(r'[A-Z][a-z]*', name)
+        category = parts[0] if parts else "Other"
+        categories[category] = categories.get(category, 0) + 1
+
+    return dict(sorted(categories.items(), key=lambda x: -x[1]))

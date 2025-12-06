@@ -1,0 +1,26 @@
+2025-12-06 00:46:51,577 - puco_eeff.scraper.cmf_downloader - INFO - Downloading all documents for 2024 Q3
+2025-12-06 00:46:51,577 - puco_eeff.scraper.cmf_downloader - DEBUG - Filters: tipo=Consolidado, tipo_norma=Estándar IFRS
+2025-12-06 00:46:52,650 - puco_eeff.scraper.cmf_downloader - DEBUG - Navigating to: https://www.cmfchile.cl/institucional/mercados/entidad.php?mercado=V&rut=96561560&grupo=&tipoentidad=RVEMI&row=&vig=VI&control=svs&pestania=3
+2025-12-06 00:46:53,594 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting month: 09
+2025-12-06 00:46:53,613 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting year: 2024
+2025-12-06 00:46:53,618 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting tipo: Consolidado
+2025-12-06 00:46:53,622 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting tipo_norma: Estándar IFRS
+2025-12-06 00:46:53,625 - puco_eeff.scraper.cmf_downloader - DEBUG - Clicking Consultar button
+2025-12-06 00:46:59,180 - puco_eeff.scraper.cmf_downloader - INFO - Successfully filtered for 2024 Q3
+2025-12-06 00:46:59,180 - puco_eeff.scraper.cmf_downloader - DEBUG - Looking for link: Análisis Razonado
+2025-12-06 00:46:59,351 - puco_eeff.scraper.cmf_downloader - INFO - Downloaded: analisis_razonado_2024_Q3.pdf (211,211 bytes)
+2025-12-06 00:46:59,351 - puco_eeff.scraper.cmf_downloader - DEBUG - Looking for link: Estados financieros (PDF)
+2025-12-06 00:46:59,533 - puco_eeff.scraper.cmf_downloader - INFO - Downloaded: estados_financieros_2024_Q3.pdf (762,710 bytes)
+2025-12-06 00:46:59,533 - puco_eeff.scraper.cmf_downloader - DEBUG - Looking for link: Estados financieros (XBRL)
+2025-12-06 00:46:59,645 - puco_eeff.scraper.cmf_downloader - INFO - Downloaded: estados_financieros_2024_Q3_xbrl.zip (53,106 bytes)
+2025-12-06 00:46:59,717 - puco_eeff.scraper.cmf_downloader - DEBUG - Files in ZIP: ['96561560_2024-11-12_C_dimension.xsd', '96561560_202409_C.xbrl', '96561560_202409_C_shell.xsd', '96561560_2024-11-12_C_dim_definicion.xml', '96561560_2024-11-12_C_dim_label.xml']
+2025-12-06 00:46:59,717 - puco_eeff.scraper.cmf_downloader - DEBUG - Extracting: 96561560_202409_C.xbrl
+2025-12-06 00:46:59,719 - puco_eeff.scraper.cmf_downloader - INFO - Extracted XBRL to: /home/alvaro/aa-ml/puco-EEFF/data/raw/pdf/estados_financieros_2024_Q3.xml (690,827 bytes)
+2025-12-06 00:49:40,957 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /home/alvaro/aa-ml/puco-EEFF/data/raw/pdf/estados_financieros_2024_Q3.xml
+2025-12-06 00:49:40,961 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full', 'cl-ci', 'cl-ci-i', 'ifrs-mc', 'iso4217', 'ref', 'tx', 'xbrldi', 'xsd', 'xsi']
+2025-12-06 00:49:40,964 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 1930 facts from XBRL
+2025-12-06 00:49:40,969 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 369 contexts
+2025-12-06 00:50:12,123 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /home/alvaro/aa-ml/puco-EEFF/data/raw/pdf/estados_financieros_2024_Q3.xml
+2025-12-06 00:50:12,126 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full', 'cl-ci', 'cl-ci-i', 'ifrs-mc', 'iso4217', 'ref', 'tx', 'xbrldi', 'xsd', 'xsi']
+2025-12-06 00:50:12,129 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 1930 facts from XBRL
+2025-12-06 00:50:12,133 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 369 contexts

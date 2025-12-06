@@ -53,34 +53,34 @@ standard_structure = [
     {"concepto": "Deudores comerciales y otras cuentas por cobrar", "nivel": 2, "tipo": "item"},
     {"concepto": "Inventarios", "nivel": 2, "tipo": "item"},
     {"concepto": "Total activos corrientes", "nivel": 1, "tipo": "total"},
-    
+
     {"concepto": "Activos no corrientes", "nivel": 1, "tipo": "subtotal"},
     {"concepto": "Propiedades, planta y equipo", "nivel": 2, "tipo": "item"},
     {"concepto": "Activos intangibles", "nivel": 2, "tipo": "item"},
     {"concepto": "Total activos no corrientes", "nivel": 1, "tipo": "total"},
-    
+
     {"concepto": "TOTAL ACTIVOS", "nivel": 0, "tipo": "grand_total"},
-    
+
     # Pasivos
     {"concepto": "PASIVOS", "nivel": 0, "tipo": "header"},
     {"concepto": "Pasivos corrientes", "nivel": 1, "tipo": "subtotal"},
     {"concepto": "Otros pasivos financieros corrientes", "nivel": 2, "tipo": "item"},
     {"concepto": "Cuentas por pagar comerciales", "nivel": 2, "tipo": "item"},
     {"concepto": "Total pasivos corrientes", "nivel": 1, "tipo": "total"},
-    
+
     {"concepto": "Pasivos no corrientes", "nivel": 1, "tipo": "subtotal"},
     {"concepto": "Otros pasivos financieros no corrientes", "nivel": 2, "tipo": "item"},
     {"concepto": "Total pasivos no corrientes", "nivel": 1, "tipo": "total"},
-    
+
     {"concepto": "TOTAL PASIVOS", "nivel": 0, "tipo": "grand_total"},
-    
+
     # Patrimonio
     {"concepto": "PATRIMONIO", "nivel": 0, "tipo": "header"},
     {"concepto": "Capital emitido", "nivel": 1, "tipo": "item"},
     {"concepto": "Ganancias acumuladas", "nivel": 1, "tipo": "item"},
     {"concepto": "Otras reservas", "nivel": 1, "tipo": "item"},
     {"concepto": "TOTAL PATRIMONIO", "nivel": 0, "tipo": "grand_total"},
-    
+
     {"concepto": "TOTAL PASIVOS Y PATRIMONIO", "nivel": 0, "tipo": "grand_total"},
 ]
 ```
@@ -91,20 +91,20 @@ standard_structure = [
 def map_to_structure(extracted_df, structure):
     """Map extracted values to standard structure."""
     result = []
-    
+
     for item in structure:
         row = item.copy()
         # Try to find matching value in extracted data
         concepto_lower = item["concepto"].lower()
-        
+
         for _, extracted_row in extracted_df.iterrows():
             if concepto_lower in str(extracted_row.get("concepto", "")).lower():
                 row["valor_actual"] = extracted_row.get("valor")
                 row["valor_anterior"] = extracted_row.get("valor_anterior")
                 break
-        
+
         result.append(row)
-    
+
     return pd.DataFrame(result)
 
 formatted_df = map_to_structure(df_normalized, standard_structure)
@@ -135,22 +135,22 @@ formatted_df["valor_display"] = formatted_df["valor_actual"].apply(format_curren
 def validate_balance_sheet(df):
     """Validate balance sheet totals."""
     errors = []
-    
+
     # Get key totals
     total_activos = df[df["concepto"] == "TOTAL ACTIVOS"]["valor_actual"].values
     total_pasivos = df[df["concepto"] == "TOTAL PASIVOS"]["valor_actual"].values
     total_patrimonio = df[df["concepto"] == "TOTAL PATRIMONIO"]["valor_actual"].values
-    
+
     if len(total_activos) > 0 and len(total_pasivos) > 0 and len(total_patrimonio) > 0:
         activos = float(total_activos[0] or 0)
         pasivos = float(total_pasivos[0] or 0)
         patrimonio = float(total_patrimonio[0] or 0)
-        
+
         # Check: Activos = Pasivos + Patrimonio
         diff = abs(activos - (pasivos + patrimonio))
         if diff > 1:  # Allow small rounding differences
             errors.append(f"Balance check failed: {activos} != {pasivos} + {patrimonio} (diff: {diff})")
-    
+
     return errors
 
 validation_errors = validate_balance_sheet(formatted_df)

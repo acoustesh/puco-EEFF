@@ -30,7 +30,7 @@ data = parse_xbrl_file(xml_path)
 fact_names = set(f["name"] for f in data["facts"])
 
 # Look for income statement facts
-income_keywords = ["Revenue", "Profit", "Loss", "Income", "Expense", "Cost", 
+income_keywords = ["Revenue", "Profit", "Loss", "Income", "Expense", "Cost",
                    "Ingreso", "Gasto", "Costo", "Resultado", "Utilidad"]
 income_facts = [n for n in fact_names if any(k.lower() in n.lower() for k in income_keywords)]
 

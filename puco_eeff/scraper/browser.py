@@ -53,14 +53,14 @@ def create_browser_context(browser: Browser) -> BrowserContext:
 
 
 @contextmanager
-def browser_session(headless: bool = True) -> Generator[tuple[Browser, Page], None, None]:
+def browser_session(headless: bool = True) -> Generator[tuple[Browser, BrowserContext, Page], None, None]:
     """Context manager for a complete browser session.
 
     Args:
         headless: Run browser in headless mode
 
     Yields:
-        Tuple of (Browser, Page) for interaction
+        Tuple of (Browser, BrowserContext, Page) for interaction
     """
     with sync_playwright() as playwright:
         browser = create_browser(playwright, headless=headless)
@@ -68,7 +68,7 @@ def browser_session(headless: bool = True) -> Generator[tuple[Browser, Page], No
         page = context.new_page()
 
         try:
-            yield browser, page
+            yield browser, context, page
         finally:
             context.close()
             browser.close()

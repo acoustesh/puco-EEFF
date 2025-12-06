@@ -1,17 +1,54 @@
 {
   "sources": {
-    "pdf": {
-      "name": "Pucobre Estados Financieros",
-      "base_url": "https://www.pucobre.cl/OpenDocs/asp/pagDefault.asp?boton=Doc51&argInstanciaId=51&argCarpetaId=32&argTreeNodosAbiertos=(32)&argTreeNodoActual=32&argTreeNodoSel=32",
-      "description": "Portal de documentos públicos de Pucobre"
-    },
-    "xbrl": {
-      "name": "CMF Chile - XBRL",
+    "cmf_chile": {
+      "name": "CMF Chile - Pucobre EEFF",
       "base_url": "https://www.cmfchile.cl/institucional/mercados/entidad.php?mercado=V&rut=96561560&grupo=&tipoentidad=RVEMI&row=&vig=VI&control=svs&pestania=3",
-      "description": "Portal de información financiera CMF Chile",
+      "description": "Portal de información financiera CMF Chile - All downloads from single source",
+      "entity": {
+        "name": "Sociedad Punta del Cobre S.A.",
+        "rut": "96561560"
+      },
       "filters": {
-        "tipo_balance": "Consolidado",
-        "tipo_norma": "Estandar IFRS"
+        "selectors": {
+          "month": "select[name='mm']",
+          "year": "select[name='aa']",
+          "tipo": "select[name='tipo']",
+          "tipo_norma": "select[name='tipo_norma']",
+          "submit": "input[value='Consultar']"
+        },
+        "default_values": {
+          "tipo": "Consolidado",
+          "tipo_norma": "Estándar IFRS"
+        },
+        "month_to_quarter": {
+          "03": 1,
+          "06": 2,
+          "09": 3,
+          "12": 4
+        },
+        "quarter_to_month": {
+          "1": "03",
+          "2": "06",
+          "3": "09",
+          "4": "12"
+        }
+      },
+      "downloads": {
+        "analisis_razonado": {
+          "link_text": "Análisis Razonado",
+          "filename_pattern": "analisis_razonado_{year}_Q{quarter}.pdf",
+          "description": "Management Discussion and Analysis (MD&A)"
+        },
+        "estados_financieros_pdf": {
+          "link_text": "Estados financieros (PDF)",
+          "filename_pattern": "estados_financieros_{year}_Q{quarter}.pdf",
+          "description": "Financial Statements PDF"
+        },
+        "estados_financieros_xbrl": {
+          "link_text": "Estados financieros (XBRL)",
+          "filename_pattern": "estados_financieros_{year}_Q{quarter}_xbrl.zip",
+          "description": "Financial Statements XBRL/XML package"
+        }
       }
     }
   },
