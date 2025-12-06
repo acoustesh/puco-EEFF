@@ -129,16 +129,20 @@ class TestLineItem:
 
 
 # =============================================================================
-# Tests for CostBreakdown dataclass
+# Tests for SectionBreakdown dataclass (CostBreakdown is a deprecated alias)
 # =============================================================================
 
 
-class TestCostBreakdown:
-    """Tests for CostBreakdown dataclass."""
+class TestSectionBreakdown:
+    """Tests for SectionBreakdown dataclass.
+
+    Note: CostBreakdown is a deprecated alias for SectionBreakdown.
+    Tests use CostBreakdown to verify the alias works correctly.
+    """
 
     @pytest.fixture
     def sample_breakdown(self) -> CostBreakdown:
-        """Create a sample CostBreakdown for testing."""
+        """Create a sample SectionBreakdown for testing (via CostBreakdown alias)."""
         breakdown = CostBreakdown(
             section_id="nota_21",
             section_title="Costo de Venta",

@@ -1,7 +1,21 @@
 """Extract detailed cost breakdowns from PDF and validate against XBRL.
 
-This module extracts cost data from Estados Financieros PDF using
-configurable extraction specs, with Sheet1-specific config in config/sheet1/.
+This module provides generic PDF/XBRL extraction primitives with config-driven
+rules. Sheet1-specific config is in config/sheet1/.
+
+Key Classes:
+    SectionBreakdown: Generic container for extracted PDF section data.
+        Uses section_id/section_title. (CostBreakdown is a deprecated alias)
+    ExtractionResult: Complete extraction result with sections dict.
+        Provides backward-compat properties for nota_21/nota_22.
+    LineItem: Single line item with concepto and period values.
+
+Key Functions:
+    extract_pdf_section(): Generic config-driven PDF section extraction.
+        Preferred over deprecated extract_nota_21/extract_nota_22 wrappers.
+    find_section_page(): Find page containing a section.
+        Preferred over deprecated find_nota_page wrapper.
+    extract_sheet1(): Main entry point for Sheet1 extraction.
 
 Architecture:
 - General config (config/): File patterns, period types, sources, XBRL specs
@@ -57,7 +71,7 @@ from puco_eeff.sheets.sheet1 import (
 
 logger = setup_logging(__name__)
 
-# Re-exports for backward compatibility
+# Public API exports
 __all__ = [
     # Dataclasses
     "LineItem",
@@ -65,19 +79,34 @@ __all__ = [
     "CostBreakdown",  # Deprecated alias for SectionBreakdown
     "ValidationResult",
     "ExtractionResult",
-    # Generic extraction functions
+    # Generic extraction functions (preferred)
     "extract_pdf_section",
-    "extract_table_from_page",
     "find_section_page",
+    "extract_table_from_page",
     "parse_chilean_number",
+    # XBRL extraction
     "extract_xbrl_totals",
+    # High-level Sheet1 extraction
+    "extract_sheet1",
+    "extract_sheet1_from_xbrl",
+    "extract_sheet1_from_analisis_razonado",
     "extract_detailed_costs",
-    # Sheet1-specific functions (re-exported from puco_eeff.sheets.sheet1)
+    "extract_ingresos_from_pdf",
+    # Validation
+    "validate_extraction",
+    # Output functions
+    "save_extraction_result",
+    "print_extraction_report",
+    # Sheet1-specific (re-exported from puco_eeff.sheets.sheet1)
     "save_sheet1_data",
     "print_sheet1_report",
     # Config helpers
     "get_section_expected_labels",
     "get_all_field_labels",
+    # Period formatting
+    "quarter_to_roman",
+    "format_period_label",
+    "format_quarter_label",
 ]
 
 
@@ -503,7 +532,9 @@ def find_nota_page(
 ) -> int | None:
     """Find the page number where a Nota section exists.
 
-    Backward-compatible wrapper around find_section_page.
+    .. deprecated::
+        Use :func:`find_section_page` with section_name instead:
+        ``find_section_page(pdf_path, "nota_21")``
 
     Args:
         pdf_path: Path to the PDF file

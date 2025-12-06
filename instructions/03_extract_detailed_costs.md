@@ -558,10 +558,11 @@ This ensures:
 Check the `match_keywords` in extraction_specs.json. Debug by inspecting raw PDF items:
 
 ```python
-from puco_eeff.extractor.cost_extractor import extract_nota_21
+from puco_eeff.extractor.cost_extractor import extract_pdf_section
 
-breakdown = extract_nota_21(pdf_path)
-for item in breakdown.items:
+# Extract a specific section (nota_21 for Costo de Venta, nota_22 for Gasto Admin)
+section = extract_pdf_section(pdf_path, "nota_21")
+for item in section.items:
     print(f'"{item.concepto}" = {item.ytd_actual}')
 ```
 
