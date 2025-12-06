@@ -5,14 +5,12 @@ rules. Sheet1-specific config is in config/sheet1/.
 
 Key Classes:
     SectionBreakdown: Generic container for extracted PDF section data.
-        Uses section_id/section_title. (CostBreakdown is a deprecated alias)
+        Uses section_id/section_title.
     ExtractionResult: Complete extraction result with sections dict.
-        Provides backward-compat properties for nota_21/nota_22.
     LineItem: Single line item with concepto and period values.
 
 Key Functions:
     extract_pdf_section(): Generic config-driven PDF section extraction.
-        Preferred over deprecated extract_nota_21/extract_nota_22 wrappers.
     find_text_page(): Generic PDF page finder - searches for required text strings.
     find_section_page(): Config-driven wrapper using find_text_page.
     extract_sheet1(): Main entry point for Sheet1 extraction.
@@ -76,7 +74,6 @@ __all__ = [
     # Dataclasses
     "LineItem",
     "SectionBreakdown",
-    "CostBreakdown",  # Deprecated alias for SectionBreakdown
     "ValidationResult",
     "ExtractionResult",
     # Generic extraction functions (preferred)
@@ -240,32 +237,6 @@ def _get_extraction_labels(
     return section1_items, section2_items, field_labels
 
 
-def load_sheet1_config(config: dict | None = None) -> dict[str, Any]:
-    """Load sheet1 configuration.
-
-    DEPRECATED: This function is kept only for backward compatibility.
-    Sheet1 config is now in config/sheet1/ directory.
-    Use functions from puco_eeff.sheets.sheet1 instead.
-
-    Args:
-        config: Configuration dict (ignored)
-
-    Returns:
-        Empty dict (sheet1 config moved to dedicated directory)
-
-    .. deprecated::
-        Use :func:`puco_eeff.sheets.sheet1.get_sheet1_fields` instead.
-    """
-    import warnings
-
-    warnings.warn(
-        "load_sheet1_config is deprecated. Use functions from puco_eeff.sheets.sheet1 instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return {}
-
-
 @dataclass
 class LineItem:
     """A single line item from the cost breakdown."""
@@ -306,10 +277,6 @@ class SectionBreakdown:
         return calculated_sum == self.total_ytd_actual
 
 
-# Backward compatibility alias (deprecated)
-CostBreakdown = SectionBreakdown
-
-
 @dataclass
 class ValidationResult:
     """Result of cross-validation between PDF and XBRL."""
@@ -338,8 +305,7 @@ class ValidationResult:
 class ExtractionResult:
     """Complete extraction result with optional validation.
 
-    Uses sections dict for generic section access. For backward compatibility,
-    nota_21 and nota_22 properties are provided.
+    Uses sections dict for generic section access.
     """
 
     year: int
@@ -351,49 +317,6 @@ class ExtractionResult:
     source: str = "cmf"  # "cmf" or "pucobre.cl"
     pdf_path: Path | None = None
     xbrl_path: Path | None = None
-
-    # Backward compatibility properties
-    @property
-    def nota_21(self) -> SectionBreakdown | None:
-        """Backward compatible access to nota_21 section."""
-        return self.sections.get("nota_21")
-
-    @nota_21.setter
-    def nota_21(self, value: SectionBreakdown | None) -> None:
-        if value is not None:
-            self.sections["nota_21"] = value
-        elif "nota_21" in self.sections:
-            del self.sections["nota_21"]
-
-    @property
-    def nota_22(self) -> SectionBreakdown | None:
-        """Backward compatible access to nota_22 section."""
-        return self.sections.get("nota_22")
-
-    @nota_22.setter
-    def nota_22(self, value: SectionBreakdown | None) -> None:
-        if value is not None:
-            self.sections["nota_22"] = value
-        elif "nota_22" in self.sections:
-            del self.sections["nota_22"]
-
-    @property
-    def xbrl_cost_of_sales(self) -> int | None:
-        """Backward compatible access to XBRL cost_of_sales."""
-        return self.xbrl_totals.get("cost_of_sales")
-
-    @xbrl_cost_of_sales.setter
-    def xbrl_cost_of_sales(self, value: int | None) -> None:
-        self.xbrl_totals["cost_of_sales"] = value
-
-    @property
-    def xbrl_admin_expense(self) -> int | None:
-        """Backward compatible access to XBRL admin_expense."""
-        return self.xbrl_totals.get("admin_expense")
-
-    @xbrl_admin_expense.setter
-    def xbrl_admin_expense(self, value: int | None) -> None:
-        self.xbrl_totals["admin_expense"] = value
 
     def get_section(self, section_id: str) -> SectionBreakdown | None:
         """Get a section by its ID."""
@@ -851,7 +774,7 @@ def extract_pdf_section(
     """Extract a section from PDF using config-driven rules.
 
     Generic extraction function that works with any section defined in
-    config/<sheet>/extraction.json. Replaces extract_nota_21 and extract_nota_22.
+    config/<sheet>/extraction.json.
 
     Args:
         pdf_path: Path to Estados Financieros PDF
@@ -929,36 +852,6 @@ def extract_pdf_section(
 
     logger.info(f"Extracted {len(breakdown.items)} items from section '{section_name}'")
     return breakdown
-
-
-def extract_nota_21(pdf_path: Path, config: dict | None = None) -> SectionBreakdown | None:
-    """Extract Nota 21 - Costo de Venta from PDF.
-
-    DEPRECATED: Use extract_pdf_section(pdf_path, "nota_21") instead.
-
-    Args:
-        pdf_path: Path to Estados Financieros PDF
-        config: Configuration dict (ignored, kept for backward compat)
-
-    Returns:
-        SectionBreakdown object or None if extraction fails
-    """
-    return extract_pdf_section(pdf_path, "nota_21")
-
-
-def extract_nota_22(pdf_path: Path, config: dict | None = None) -> SectionBreakdown | None:
-    """Extract Nota 22 - Gastos de Administración y Ventas from PDF.
-
-    DEPRECATED: Use extract_pdf_section(pdf_path, "nota_22") instead.
-
-    Args:
-        pdf_path: Path to Estados Financieros PDF
-        config: Configuration dict (ignored, kept for backward compat)
-
-    Returns:
-        SectionBreakdown object or None if extraction fails
-    """
-    return extract_pdf_section(pdf_path, "nota_22")
 
 
 def extract_ingresos_from_pdf(pdf_path: Path) -> int | None:
@@ -1116,8 +1009,8 @@ def extract_xbrl_totals(xbrl_path: Path) -> dict[str, int | None]:
 
 
 def validate_extraction(
-    pdf_nota_21: CostBreakdown | None,
-    pdf_nota_22: CostBreakdown | None,
+    pdf_nota_21: SectionBreakdown | None,
+    pdf_nota_22: SectionBreakdown | None,
     xbrl_totals: dict[str, int | None] | None,
 ) -> list[ValidationResult]:
     """Cross-validate PDF extraction against XBRL totals.
@@ -1265,8 +1158,12 @@ def extract_detailed_costs(
     )
 
     # Extract from PDF
-    result.nota_21 = extract_nota_21(pdf_path)
-    result.nota_22 = extract_nota_22(pdf_path)
+    nota_21 = extract_pdf_section(pdf_path, "nota_21")
+    nota_22 = extract_pdf_section(pdf_path, "nota_22")
+    if nota_21 is not None:
+        result.sections["nota_21"] = nota_21
+    if nota_22 is not None:
+        result.sections["nota_22"] = nota_22
 
     # Check for XBRL using config patterns
     xbrl_dir = paths["raw_xbrl"]
@@ -1280,12 +1177,12 @@ def extract_detailed_costs(
 
         if validate:
             xbrl_totals = extract_xbrl_totals(xbrl_path)
-            result.xbrl_cost_of_sales = xbrl_totals.get("cost_of_sales")
-            result.xbrl_admin_expense = xbrl_totals.get("admin_expense")
+            result.xbrl_totals["cost_of_sales"] = xbrl_totals.get("cost_of_sales")
+            result.xbrl_totals["admin_expense"] = xbrl_totals.get("admin_expense")
 
             result.validations = validate_extraction(
-                result.nota_21,
-                result.nota_22,
+                result.sections.get("nota_21"),
+                result.sections.get("nota_22"),
                 xbrl_totals,
             )
     else:
@@ -1295,8 +1192,8 @@ def extract_detailed_costs(
         if validate:
             # Still perform PDF-only validation
             result.validations = validate_extraction(
-                result.nota_21,
-                result.nota_22,
+                result.sections.get("nota_21"),
+                result.sections.get("nota_22"),
                 None,
             )
 
@@ -1321,14 +1218,16 @@ def save_extraction_result(result: ExtractionResult, output_dir: Path | None = N
     output_path = output_dir / "detailed_costs.json"
 
     # Convert to serializable dict
+    nota_21 = result.sections.get("nota_21")
+    nota_22 = result.sections.get("nota_22")
     data = {
         "period": f"{result.year}_Q{result.quarter}",
         "source": result.source,
         "pdf_path": str(result.pdf_path) if result.pdf_path else None,
         "xbrl_path": str(result.xbrl_path) if result.xbrl_path else None,
         "xbrl_available": result.xbrl_available,
-        "nota_21": _breakdown_to_dict(result.nota_21) if result.nota_21 else None,
-        "nota_22": _breakdown_to_dict(result.nota_22) if result.nota_22 else None,
+        "nota_21": _breakdown_to_dict(nota_21) if nota_21 else None,
+        "nota_22": _breakdown_to_dict(nota_22) if nota_22 else None,
         "validations": [
             {
                 "field": v.field_name,
@@ -1384,26 +1283,28 @@ def print_extraction_report(result: ExtractionResult) -> None:
     print(f"Source: {result.source}")
     print(f"XBRL Available: {'Yes' if result.xbrl_available else 'No'}")
 
-    if result.nota_21:
-        print(f"\n--- Nota 21: {result.nota_21.section_title} ---")
-        print(f"Page: {result.nota_21.page_number}")
-        print(f"Items extracted: {len(result.nota_21.items)}")
-        for item in result.nota_21.items:
+    nota_21 = result.sections.get("nota_21")
+    if nota_21:
+        print(f"\n--- Nota 21: {nota_21.section_title} ---")
+        print(f"Page: {nota_21.page_number}")
+        print(f"Items extracted: {len(nota_21.items)}")
+        for item in nota_21.items:
             val = f"{item.ytd_actual:,}" if item.ytd_actual else "N/A"
             print(f"  {item.concepto}: {val}")
-        total = f"{result.nota_21.total_ytd_actual:,}" if result.nota_21.total_ytd_actual else "N/A"
+        total = f"{nota_21.total_ytd_actual:,}" if nota_21.total_ytd_actual else "N/A"
         print(f"  TOTAL: {total}")
     else:
         print("\n--- Nota 21: EXTRACTION FAILED ---")
 
-    if result.nota_22:
-        print(f"\n--- Nota 22: {result.nota_22.section_title} ---")
-        print(f"Page: {result.nota_22.page_number}")
-        print(f"Items extracted: {len(result.nota_22.items)}")
-        for item in result.nota_22.items:
+    nota_22 = result.sections.get("nota_22")
+    if nota_22:
+        print(f"\n--- Nota 22: {nota_22.section_title} ---")
+        print(f"Page: {nota_22.page_number}")
+        print(f"Items extracted: {len(nota_22.items)}")
+        for item in nota_22.items:
             val = f"{item.ytd_actual:,}" if item.ytd_actual else "N/A"
             print(f"  {item.concepto}: {val}")
-        total = f"{result.nota_22.total_ytd_actual:,}" if result.nota_22.total_ytd_actual else "N/A"
+        total = f"{nota_22.total_ytd_actual:,}" if nota_22.total_ytd_actual else "N/A"
         print(f"  TOTAL: {total}")
     else:
         print("\n--- Nota 22: EXTRACTION FAILED ---")
@@ -1552,8 +1453,8 @@ def extract_sheet1_from_analisis_razonado(
     )
 
     # Extract Nota 21 (Costo de Venta) and Nota 22 (Gastos Admin)
-    nota_21 = extract_nota_21(ef_path)
-    nota_22 = extract_nota_22(ef_path)
+    nota_21 = extract_pdf_section(ef_path, "nota_21")
+    nota_22 = extract_pdf_section(ef_path, "nota_22")
 
     if nota_21 is None and nota_22 is None:
         logger.error(f"Could not extract Nota 21 or 22 from {ef_path}")

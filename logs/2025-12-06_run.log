@@ -1412,3 +1412,17 @@
 2025-12-06 12:38:30,216 - puco_eeff.extractor.cost_extractor - INFO - No XBRL available, extracting Ingresos from Estado de Resultados
 2025-12-06 12:38:30,216 - puco_eeff.extractor.cost_extractor - INFO - Set Ingresos from PDF: 80,767
 2025-12-06 12:38:30,913 - puco_eeff.transformer.formatter - WARNING - No reference data found for period: IQ2030
+2025-12-06 13:40:55,632 - puco_eeff.extractor.cost_extractor - INFO - No XBRL available for 2024 Q1 - using PDF only
+2025-12-06 13:40:55,635 - puco_eeff.extractor.cost_extractor - INFO - Saved extraction result to: /tmp/pytest-of-alvaro/pytest-43/test_save_creates_json0/detailed_costs.json
+2025-12-06 13:40:55,640 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
+2025-12-06 13:40:55,640 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
+2025-12-06 13:40:55,640 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Total Costo de Venta: -126,202
+2025-12-06 13:40:55,640 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Total Gasto Admin: -11,632
+2025-12-06 13:40:55,642 - puco_eeff.extractor.cost_extractor - INFO - PDF extraction failed, trying XBRL for 2024 Q2
+2025-12-06 13:40:55,645 - puco_eeff.extractor.cost_extractor - DEBUG - Found text match on page 5
+2025-12-06 13:40:55,645 - puco_eeff.extractor.cost_extractor - INFO - Found section 'ingresos' with details on page 5
+2025-12-06 13:40:55,645 - puco_eeff.extractor.cost_extractor - INFO - Extracted Ingresos from PDF page 5: 80,767
+2025-12-06 13:40:55,647 - puco_eeff.extractor.cost_extractor - WARNING - Could not find Estado de Resultados page for Ingresos extraction
+2025-12-06 13:40:55,648 - puco_eeff.extractor.cost_extractor - INFO - No XBRL available, extracting Ingresos from Estado de Resultados
+2025-12-06 13:40:55,648 - puco_eeff.extractor.cost_extractor - INFO - Set Ingresos from PDF: 80,767
+2025-12-06 13:40:56,566 - puco_eeff.transformer.formatter - WARNING - No reference data found for period: IQ2030

@@ -1,13 +1,12 @@
 """Extractor module for parsing PDFs and XBRL, with OCR capabilities.
 
 Key exports:
-    SectionBreakdown: Generic container for PDF section data (CostBreakdown is alias)
+    SectionBreakdown: Generic container for PDF section data
     extract_pdf_section: Generic config-driven PDF section extraction
     extract_sheet1: Main entry point for Sheet1 extraction
 """
 
 from puco_eeff.extractor.cost_extractor import (
-    CostBreakdown,  # Deprecated alias for SectionBreakdown
     ExtractionResult,
     LineItem,
     SectionBreakdown,
@@ -37,7 +36,6 @@ from puco_eeff.extractor.xbrl_parser import get_facts_by_name, parse_xbrl_file
 __all__ = [
     # Dataclasses
     "SectionBreakdown",
-    "CostBreakdown",  # Deprecated alias for SectionBreakdown
     "ExtractionResult",
     "LineItem",
     "Sheet1Data",

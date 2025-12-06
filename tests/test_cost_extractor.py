@@ -2,7 +2,7 @@
 
 Tests cover:
 1. Number parsing (Chilean format)
-2. ExtractionResult and CostBreakdown dataclasses
+2. ExtractionResult and SectionBreakdown dataclasses
 3. Validation logic between PDF and XBRL
 4. Full extraction scenarios (mock-based)
 """
@@ -16,9 +16,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from puco_eeff.extractor.cost_extractor import (
-    CostBreakdown,
     ExtractionResult,
     LineItem,
+    SectionBreakdown,
     ValidationResult,
     parse_chilean_number,
     validate_extraction,
@@ -129,21 +129,17 @@ class TestLineItem:
 
 
 # =============================================================================
-# Tests for SectionBreakdown dataclass (CostBreakdown is a deprecated alias)
+# Tests for SectionBreakdown dataclass
 # =============================================================================
 
 
 class TestSectionBreakdown:
-    """Tests for SectionBreakdown dataclass.
-
-    Note: CostBreakdown is a deprecated alias for SectionBreakdown.
-    Tests use CostBreakdown to verify the alias works correctly.
-    """
+    """Tests for SectionBreakdown dataclass."""
 
     @pytest.fixture
-    def sample_breakdown(self) -> CostBreakdown:
-        """Create a sample SectionBreakdown for testing (via CostBreakdown alias)."""
-        breakdown = CostBreakdown(
+    def sample_breakdown(self) -> SectionBreakdown:
+        """Create a sample SectionBreakdown for testing."""
+        breakdown = SectionBreakdown(
             section_id="nota_21",
             section_title="Costo de Venta",
             page_number=71,
@@ -156,23 +152,23 @@ class TestSectionBreakdown:
         breakdown.total_ytd_actual = -82273  # Sum of items
         return breakdown
 
-    def test_sum_items_ytd_actual(self, sample_breakdown: CostBreakdown) -> None:
+    def test_sum_items_ytd_actual(self, sample_breakdown: SectionBreakdown) -> None:
         """Sum of YTD actual should match total."""
         expected_sum = -30294 + -37269 + -14710
         assert sample_breakdown.sum_items_ytd_actual() == expected_sum
 
-    def test_is_valid_when_sum_matches(self, sample_breakdown: CostBreakdown) -> None:
+    def test_is_valid_when_sum_matches(self, sample_breakdown: SectionBreakdown) -> None:
         """Should be valid when sum matches total."""
         assert sample_breakdown.is_valid() is True
 
-    def test_is_valid_when_sum_mismatch(self, sample_breakdown: CostBreakdown) -> None:
+    def test_is_valid_when_sum_mismatch(self, sample_breakdown: SectionBreakdown) -> None:
         """Should be invalid when sum doesn't match total."""
         sample_breakdown.total_ytd_actual = -999999  # Wrong total
         assert sample_breakdown.is_valid() is False
 
     def test_is_valid_with_none_total(self) -> None:
         """Should be invalid when total is None."""
-        breakdown = CostBreakdown(
+        breakdown = SectionBreakdown(
             section_id="nota_21",
             section_title="Test",
         )
@@ -248,9 +244,9 @@ class TestExtractionResult:
             year=2024,
             quarter=1,
         )
-        # Use property setters to populate sections dict
-        result.nota_21 = CostBreakdown(section_id="nota_21", section_title="Costo de Venta")
-        result.nota_22 = CostBreakdown(section_id="nota_22", section_title="Gastos Admin")
+        # Use sections dict to populate
+        result.sections["nota_21"] = SectionBreakdown(section_id="nota_21", section_title="Costo de Venta")
+        result.sections["nota_22"] = SectionBreakdown(section_id="nota_22", section_title="Gastos Admin")
         assert result.is_valid() is True
 
     def test_is_valid_missing_nota(self) -> None:
@@ -259,7 +255,7 @@ class TestExtractionResult:
             year=2024,
             quarter=1,
         )
-        result.nota_21 = CostBreakdown(section_id="nota_21", section_title="Costo de Venta")
+        result.sections["nota_21"] = SectionBreakdown(section_id="nota_21", section_title="Costo de Venta")
         # nota_22 is not set - should still be in sections dict but is_valid should fail
         # Actually, we need one section to be missing. Let's use the generic is_valid check.
         assert result.is_valid() is True  # Actually valid since at least one section exists
@@ -307,20 +303,20 @@ class TestValidateExtraction:
     """Tests for the validate_extraction function."""
 
     @pytest.fixture
-    def nota_21(self) -> CostBreakdown:
+    def nota_21(self) -> SectionBreakdown:
         """Sample Nota 21 breakdown."""
-        breakdown = CostBreakdown(section_id="nota_21", section_title="Costo de Venta")
+        breakdown = SectionBreakdown(section_id="nota_21", section_title="Costo de Venta")
         breakdown.total_ytd_actual = -170862
         return breakdown
 
     @pytest.fixture
-    def nota_22(self) -> CostBreakdown:
+    def nota_22(self) -> SectionBreakdown:
         """Sample Nota 22 breakdown."""
-        breakdown = CostBreakdown(section_id="nota_22", section_title="Gastos Admin")
+        breakdown = SectionBreakdown(section_id="nota_22", section_title="Gastos Admin")
         breakdown.total_ytd_actual = -17363
         return breakdown
 
-    def test_both_sources_match(self, nota_21: CostBreakdown, nota_22: CostBreakdown) -> None:
+    def test_both_sources_match(self, nota_21: SectionBreakdown, nota_22: SectionBreakdown) -> None:
         """Both PDF and XBRL values match."""
         xbrl_totals = {
             "cost_of_sales": -170862,
@@ -333,7 +329,7 @@ class TestValidateExtraction:
         assert all(v.match for v in validations)
         assert all(v.source == "both" for v in validations)
 
-    def test_sign_difference_should_match(self, nota_21: CostBreakdown, nota_22: CostBreakdown) -> None:
+    def test_sign_difference_should_match(self, nota_21: SectionBreakdown, nota_22: SectionBreakdown) -> None:
         """Absolute values should match even with sign difference."""
         xbrl_totals = {
             "cost_of_sales": 170862,  # Positive vs PDF negative
@@ -345,7 +341,7 @@ class TestValidateExtraction:
         # Should match because we compare absolute values
         assert all(v.match for v in validations)
 
-    def test_pdf_only_no_xbrl(self, nota_21: CostBreakdown, nota_22: CostBreakdown) -> None:
+    def test_pdf_only_no_xbrl(self, nota_21: SectionBreakdown, nota_22: SectionBreakdown) -> None:
         """PDF-only extraction when no XBRL available."""
         validations = validate_extraction(nota_21, nota_22, None)
 
@@ -366,7 +362,7 @@ class TestValidateExtraction:
         assert all(v.source == "xbrl_only" for v in validations)
         assert all(not v.match for v in validations)
 
-    def test_mismatch_shows_difference(self, nota_21: CostBreakdown) -> None:
+    def test_mismatch_shows_difference(self, nota_21: SectionBreakdown) -> None:
         """Mismatch should include difference value."""
         nota_21.total_ytd_actual = -100000
         xbrl_totals = {
@@ -406,12 +402,10 @@ class TestExtractDetailedCostsMocked:
         }
 
     @patch("puco_eeff.extractor.cost_extractor.get_period_paths")
-    @patch("puco_eeff.extractor.cost_extractor.extract_nota_21")
-    @patch("puco_eeff.extractor.cost_extractor.extract_nota_22")
+    @patch("puco_eeff.extractor.cost_extractor.extract_pdf_section")
     def test_extraction_without_xbrl(
         self,
-        mock_nota_22: MagicMock,
-        mock_nota_21: MagicMock,
+        mock_extract_pdf_section: MagicMock,
         mock_paths_fn: MagicMock,
         mock_paths: dict[str, Path],
     ) -> None:
@@ -429,14 +423,19 @@ class TestExtractDetailedCostsMocked:
         combined_path = mock_paths["raw_pdf"] / "pucobre_combined_2024_Q1.pdf"
         combined_path.write_text("combined pdf")
 
-        # Mock extraction results
-        nota_21_mock = CostBreakdown(section_id="nota_21", section_title="Costo de Venta")
-        nota_21_mock.total_ytd_actual = -54000
-        mock_nota_21.return_value = nota_21_mock
+        # Mock extraction results based on section_name argument
+        def extract_section_side_effect(path, section_name):
+            if section_name == "nota_21":
+                breakdown = SectionBreakdown(section_id="nota_21", section_title="Costo de Venta")
+                breakdown.total_ytd_actual = -54000
+                return breakdown
+            elif section_name == "nota_22":
+                breakdown = SectionBreakdown(section_id="nota_22", section_title="Gastos Admin")
+                breakdown.total_ytd_actual = -12000
+                return breakdown
+            return None
 
-        nota_22_mock = CostBreakdown(section_id="nota_22", section_title="Gastos Admin")
-        nota_22_mock.total_ytd_actual = -12000
-        mock_nota_22.return_value = nota_22_mock
+        mock_extract_pdf_section.side_effect = extract_section_side_effect
 
         # Run extraction
         result = extract_detailed_costs(2024, 1)
@@ -444,19 +443,17 @@ class TestExtractDetailedCostsMocked:
         # Verify
         assert result.source == "pucobre.cl"
         assert result.xbrl_available is False
-        assert result.nota_21 is not None
-        assert result.nota_22 is not None
+        assert result.sections.get("nota_21") is not None
+        assert result.sections.get("nota_22") is not None
         assert all(v.source == "pdf_only" for v in result.validations)
 
     @patch("puco_eeff.extractor.cost_extractor.get_period_paths")
-    @patch("puco_eeff.extractor.cost_extractor.extract_nota_21")
-    @patch("puco_eeff.extractor.cost_extractor.extract_nota_22")
+    @patch("puco_eeff.extractor.cost_extractor.extract_pdf_section")
     @patch("puco_eeff.extractor.cost_extractor.extract_xbrl_totals")
     def test_extraction_with_xbrl_validation(
         self,
         mock_xbrl: MagicMock,
-        mock_nota_22: MagicMock,
-        mock_nota_21: MagicMock,
+        mock_extract_pdf_section: MagicMock,
         mock_paths_fn: MagicMock,
         mock_paths: dict[str, Path],
     ) -> None:
@@ -476,14 +473,19 @@ class TestExtractDetailedCostsMocked:
         xbrl_path = xbrl_dir / "estados_financieros_2024_Q2.xbrl"
         xbrl_path.write_text("fake xbrl content")
 
-        # Mock extraction results
-        nota_21_mock = CostBreakdown(section_id="nota_21", section_title="Costo de Venta")
-        nota_21_mock.total_ytd_actual = -170862
-        mock_nota_21.return_value = nota_21_mock
+        # Mock extraction results based on section_name argument
+        def extract_section_side_effect(path, section_name):
+            if section_name == "nota_21":
+                breakdown = SectionBreakdown(section_id="nota_21", section_title="Costo de Venta")
+                breakdown.total_ytd_actual = -170862
+                return breakdown
+            elif section_name == "nota_22":
+                breakdown = SectionBreakdown(section_id="nota_22", section_title="Gastos Admin")
+                breakdown.total_ytd_actual = -17363
+                return breakdown
+            return None
 
-        nota_22_mock = CostBreakdown(section_id="nota_22", section_title="Gastos Admin")
-        nota_22_mock.total_ytd_actual = -17363
-        mock_nota_22.return_value = nota_22_mock
+        mock_extract_pdf_section.side_effect = extract_section_side_effect
 
         mock_xbrl.return_value = {
             "cost_of_sales": -170862,
@@ -518,9 +520,10 @@ class TestSaveExtractionResult:
             source="pucobre.cl",
             xbrl_available=False,
         )
-        result.nota_21 = CostBreakdown(section_id="nota_21", section_title="Costo de Venta")
-        result.nota_21.total_ytd_actual = -50000
-        result.nota_21.items = [LineItem("Test", ytd_actual=-50000)]
+        nota_21 = SectionBreakdown(section_id="nota_21", section_title="Costo de Venta")
+        nota_21.total_ytd_actual = -50000
+        nota_21.items = [LineItem("Test", ytd_actual=-50000)]
+        result.sections["nota_21"] = nota_21
 
         output_path = save_extraction_result(result, tmp_path)
 
@@ -944,28 +947,33 @@ class TestIngresosPDFFallback:
 
                 mock_find.side_effect = find_side_effect
 
-                with patch("puco_eeff.extractor.cost_extractor.extract_nota_21") as mock_n21:
-                    mock_n21.return_value = CostBreakdown(
-                        section_id="nota_21",
-                        section_title="Costo de Venta",
-                        total_ytd_actual=-62982,
-                    )
+                with patch("puco_eeff.extractor.cost_extractor.extract_pdf_section") as mock_extract:
 
-                    with patch("puco_eeff.extractor.cost_extractor.extract_nota_22") as mock_n22:
-                        mock_n22.return_value = CostBreakdown(
-                            section_id="nota_22",
-                            section_title="Gastos Admin",
-                            total_ytd_actual=-5137,
-                        )
+                    def extract_section_side_effect(path, section_name):
+                        if section_name == "nota_21":
+                            return SectionBreakdown(
+                                section_id="nota_21",
+                                section_title="Costo de Venta",
+                                total_ytd_actual=-62982,
+                            )
+                        elif section_name == "nota_22":
+                            return SectionBreakdown(
+                                section_id="nota_22",
+                                section_title="Gastos Admin",
+                                total_ytd_actual=-5137,
+                            )
+                        return None
 
-                        with patch("puco_eeff.extractor.cost_extractor.extract_ingresos_from_pdf") as mock_ingresos:
-                            mock_ingresos.return_value = 80767
+                    mock_extract.side_effect = extract_section_side_effect
 
-                            result = extract_sheet1_from_analisis_razonado(2024, 1)
+                    with patch("puco_eeff.extractor.cost_extractor.extract_ingresos_from_pdf") as mock_ingresos:
+                        mock_ingresos.return_value = 80767
 
-                            assert result is not None
-                            assert result.ingresos_ordinarios == 80767
-                            assert result.total_costo_venta == -62982
-                            assert result.total_gasto_admin == -5137
-                            assert result.xbrl_available is False
-                            mock_ingresos.assert_called_once()
+                        result = extract_sheet1_from_analisis_razonado(2024, 1)
+
+                        assert result is not None
+                        assert result.ingresos_ordinarios == 80767
+                        assert result.total_costo_venta == -62982
+                        assert result.total_gasto_admin == -5137
+                        assert result.xbrl_available is False
+                        mock_ingresos.assert_called_once()
