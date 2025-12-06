@@ -59,12 +59,14 @@ def get_standard_structure(sheet_name: str = "sheet1", config: dict | None = Non
     structure = []
     for row_num in sorted(row_mapping.keys(), key=int):
         row_def = row_mapping[row_num]
-        structure.append({
-            "row": int(row_num),
-            "field": row_def.get("field"),
-            "label": row_def.get("label", ""),
-            "section": row_def.get("section"),
-        })
+        structure.append(
+            {
+                "row": int(row_num),
+                "field": row_def.get("field"),
+                "label": row_def.get("label", ""),
+                "section": row_def.get("section"),
+            }
+        )
 
     return structure
 

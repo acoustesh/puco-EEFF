@@ -271,13 +271,15 @@ def list_available_sheets(
         if year is not None and file_year != year:
             continue
 
-        results.append({
-            "sheet_name": file_sheet_name,
-            "year": file_year,
-            "quarter": file_quarter,
-            "period": file_period,
-            "filepath": filepath,
-        })
+        results.append(
+            {
+                "sheet_name": file_sheet_name,
+                "year": file_year,
+                "quarter": file_quarter,
+                "period": file_period,
+                "filepath": filepath,
+            }
+        )
 
     # Sort by sheet name, then year, then quarter
     results.sort(key=lambda x: (x["sheet_name"], x["year"], x["quarter"]))

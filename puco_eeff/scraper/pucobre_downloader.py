@@ -435,7 +435,9 @@ def list_pucobre_periods(headless: bool = True, config: dict | None = None) -> l
     return periods
 
 
-def check_pucobre_availability(year: int, quarter: int, headless: bool = True, config: dict | None = None) -> bool:
+def check_pucobre_availability(
+    year: int, quarter: int, headless: bool = True, config: dict | None = None
+) -> bool:
     """Check if a specific period is available on Pucobre.cl.
 
     Args:

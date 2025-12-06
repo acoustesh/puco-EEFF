@@ -1,19 +1,22 @@
 """Extract detailed cost breakdowns from PDF and validate against XBRL.
 
 This module extracts cost data from Estados Financieros PDF using
-configurable extraction specs from config/extraction_specs.json.
+configurable extraction specs, with Sheet1-specific config in config/sheet1/.
 
-The module is designed to be general and reusable:
-- All field mappings come from config files
-- Sheet1Data structure is generated from config at runtime
-- File patterns are configurable
-- XBRL validation is optional and configured separately
+Architecture:
+- General config (config/): File patterns, period types, sources, XBRL specs
+- Sheet-specific config (config/sheet1/): Field definitions, extraction rules,
+  XBRL mappings, reference data
+- Sheet1Data class and config loaders are in puco_eeff.sheets.sheet1
 
 Configuration Files:
-- config/config.json: File patterns, period types, sources
-- config/extraction_specs.json: PDF extraction rules, field mappings
-- config/xbrl_specs.json: XBRL fact names, validation rules, scaling
-- config/reference_data.json: Known-good values for validation
+- config/config.json: File patterns, period types, sources, OCR settings
+- config/extraction_specs.json: General PDF extraction settings (number format)
+- config/xbrl_specs.json: XBRL namespaces, scaling factor, period filters
+- config/sheet1/fields.json: Sheet1 field definitions, row mapping (27 rows)
+- config/sheet1/extraction.json: Sheet1 sections (nota_21, nota_22, ingresos)
+- config/sheet1/xbrl_mappings.json: Sheet1 XBRL fact mappings
+- config/sheet1/reference_data.json: Known-good values for validation
 """
 
 from __future__ import annotations
@@ -33,34 +36,62 @@ from puco_eeff.config import (
     format_filename,
     format_period_display,
     get_config,
-    get_extraction_sections,
     get_period_paths,
-    get_section_expected_items,
-    get_section_field_mappings,
-    get_section_spec,
-    get_sheet1_row_mapping,
-    get_sheet1_value_fields,
-    get_sum_tolerance,
-    get_xbrl_fact_mapping,
     get_xbrl_scaling_factor,
-    match_concepto_to_field,
     setup_logging,
 )
 from puco_eeff.extractor.xbrl_parser import get_facts_by_name, parse_xbrl_file
+from puco_eeff.sheets.sheet1 import (
+    Sheet1Data,
+    get_sheet1_extraction_sections,
+    get_sheet1_section_expected_items,
+    get_sheet1_section_field_mappings,
+    get_sheet1_section_spec,
+    get_sheet1_sum_tolerance,
+    get_sheet1_xbrl_fact_mapping,
+    match_concepto_to_field,
+    # Re-exported for backward compatibility - canonical location is puco_eeff.sheets.sheet1
+    print_sheet1_report,
+    save_sheet1_data,
+)
 
 logger = setup_logging(__name__)
 
+# Re-exports for backward compatibility
+__all__ = [
+    # Dataclasses
+    "LineItem",
+    "SectionBreakdown",
+    "CostBreakdown",  # Deprecated alias for SectionBreakdown
+    "ValidationResult",
+    "ExtractionResult",
+    # Generic extraction functions
+    "extract_pdf_section",
+    "extract_table_from_page",
+    "find_section_page",
+    "parse_chilean_number",
+    "extract_xbrl_totals",
+    "extract_detailed_costs",
+    # Sheet1-specific functions (re-exported from puco_eeff.sheets.sheet1)
+    "save_sheet1_data",
+    "print_sheet1_report",
+    # Config helpers
+    "get_section_expected_labels",
+    "get_all_field_labels",
+]
+
 
 # =============================================================================
-# Generic Section Extraction (Config-Driven)
+# Sheet1 Section Extraction (Config-Driven)
 # =============================================================================
 
 
-def get_section_expected_labels(section_name: str) -> list[str]:
+def get_section_expected_labels(section_name: str, sheet_name: str = "sheet1") -> list[str]:
     """Get expected PDF labels for a section from config.
 
     Args:
-        section_name: Section key from extraction_specs.json
+        section_name: Section key from config/<sheet>/extraction.json
+        sheet_name: Sheet name for config lookup (default: "sheet1")
 
     Returns:
         List of expected label strings for line items.
@@ -68,11 +99,17 @@ def get_section_expected_labels(section_name: str) -> list[str]:
     Raises:
         ValueError: If section not found in config.
     """
-    return get_section_expected_items(section_name)
+    # Currently only sheet1 is implemented
+    if sheet_name != "sheet1":
+        raise ValueError(f"Sheet '{sheet_name}' not yet implemented. Only 'sheet1' is supported.")
+    return get_sheet1_section_expected_items(section_name)
 
 
-def get_all_field_labels() -> dict[str, str]:
+def get_all_field_labels(sheet_name: str = "sheet1") -> dict[str, str]:
     """Get all field labels from all sections in config.
+
+    Args:
+        sheet_name: Sheet name for config lookup (default: "sheet1")
 
     Returns:
         Dictionary mapping field names to their primary PDF labels.
@@ -80,9 +117,13 @@ def get_all_field_labels() -> dict[str, str]:
     Raises:
         ValueError: If sections not found in config.
     """
+    # Currently only sheet1 is implemented
+    if sheet_name != "sheet1":
+        raise ValueError(f"Sheet '{sheet_name}' not yet implemented. Only 'sheet1' is supported.")
+
     field_labels = {}
-    for section_name in get_extraction_sections():
-        field_mappings = get_section_field_mappings(section_name)
+    for section_name in get_sheet1_extraction_sections():
+        field_mappings = get_sheet1_section_field_mappings(section_name)
         for field_name, field_spec in field_mappings.items():
             labels = field_spec.get("pdf_labels", [])
             if labels:
@@ -121,24 +162,26 @@ def _get_table_identifiers(section_spec: dict[str, Any]) -> tuple[list[str], lis
     )
 
 
-def _get_extraction_labels(config: dict | None = None) -> tuple[list[str], list[str], dict[str, str]]:
-    """Get extraction labels from extraction_specs.json.
+def _get_extraction_labels(
+    config: dict | None = None,
+) -> tuple[list[str], list[str], dict[str, str]]:
+    """Get extraction labels from config/sheet1/extraction.json.
 
-    This function loads labels from extraction_specs.json for all configured
-    sections. It is designed to be generic and driven entirely by config.
+    This function loads labels from the Sheet1 extraction config for all
+    configured sections. Returns labels for nota_21, nota_22, and all fields.
 
     Args:
         config: Configuration dict (ignored, kept for backward compat)
 
     Returns:
-        Tuple of (section1_items, section2_items, field_labels)
-        where section1 and section2 are the first two cost sections defined
+        Tuple of (costo_venta_items, gasto_admin_items, field_labels)
+        where costo_venta_items are from nota_21 and gasto_admin_items from nota_22
 
     Raises:
         ValueError: If config loading fails
     """
     # Get all extraction sections from config
-    sections = get_extraction_sections()
+    sections = get_sheet1_extraction_sections()
     if len(sections) < 2:
         raise ValueError(f"Expected at least 2 extraction sections in config, got {len(sections)}")
 
@@ -148,7 +191,7 @@ def _get_extraction_labels(config: dict | None = None) -> tuple[list[str], list[
     field_labels = {}
 
     for i, section_name in enumerate(sections):
-        section_spec = get_section_spec(section_name)
+        section_spec = get_sheet1_section_spec(section_name)
         field_mappings = section_spec.get("field_mappings", {})
 
         for field_name, field_spec in field_mappings.items():
@@ -168,17 +211,29 @@ def _get_extraction_labels(config: dict | None = None) -> tuple[list[str], list[
 
 
 def load_sheet1_config(config: dict | None = None) -> dict[str, Any]:
-    """Load sheet1 configuration from config.json.
+    """Load sheet1 configuration.
+
+    DEPRECATED: This function is kept only for backward compatibility.
+    Sheet1 config is now in config/sheet1/ directory.
+    Use functions from puco_eeff.sheets.sheet1 instead.
 
     Args:
-        config: Configuration dict, or None to load from file
+        config: Configuration dict (ignored)
 
     Returns:
-        Sheet1 configuration dictionary
+        Empty dict (sheet1 config moved to dedicated directory)
+
+    .. deprecated::
+        Use :func:`puco_eeff.sheets.sheet1.get_sheet1_fields` instead.
     """
-    if config is None:
-        config = get_config()
-    return config.get("sheets", {}).get("sheet1", {})
+    import warnings
+
+    warnings.warn(
+        "load_sheet1_config is deprecated. Use functions from puco_eeff.sheets.sheet1 instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return {}
 
 
 @dataclass
@@ -193,11 +248,15 @@ class LineItem:
 
 
 @dataclass
-class CostBreakdown:
-    """Cost breakdown from a Nota section."""
+class SectionBreakdown:
+    """Breakdown from a PDF section (e.g., nota_21, nota_22, ingresos).
 
-    nota_number: int
-    nota_title: str
+    Generic container for extracted table data from any section defined
+    in config/sheet1/extraction.json.
+    """
+
+    section_id: str  # e.g., "nota_21", "nota_22", "ingresos"
+    section_title: str  # e.g., "Costo de Venta", "Gastos de Administración"
     items: list[LineItem] = field(default_factory=list)
     total_ytd_actual: int | None = None
     total_ytd_anterior: int | None = None
@@ -215,6 +274,10 @@ class CostBreakdown:
             return False
         calculated_sum = self.sum_items_ytd_actual()
         return calculated_sum == self.total_ytd_actual
+
+
+# Backward compatibility alias (deprecated)
+CostBreakdown = SectionBreakdown
 
 
 @dataclass
@@ -243,25 +306,74 @@ class ValidationResult:
 
 @dataclass
 class ExtractionResult:
-    """Complete extraction result with optional validation."""
+    """Complete extraction result with optional validation.
+
+    Uses sections dict for generic section access. For backward compatibility,
+    nota_21 and nota_22 properties are provided.
+    """
 
     year: int
     quarter: int
-    nota_21: CostBreakdown | None = None
-    nota_22: CostBreakdown | None = None
+    sections: dict[str, SectionBreakdown] = field(default_factory=dict)
     xbrl_available: bool = False
-    xbrl_cost_of_sales: int | None = None
-    xbrl_admin_expense: int | None = None
+    xbrl_totals: dict[str, int | None] = field(default_factory=dict)
     validations: list[ValidationResult] = field(default_factory=list)
     source: str = "cmf"  # "cmf" or "pucobre.cl"
     pdf_path: Path | None = None
     xbrl_path: Path | None = None
 
+    # Backward compatibility properties
+    @property
+    def nota_21(self) -> SectionBreakdown | None:
+        """Backward compatible access to nota_21 section."""
+        return self.sections.get("nota_21")
+
+    @nota_21.setter
+    def nota_21(self, value: SectionBreakdown | None) -> None:
+        if value is not None:
+            self.sections["nota_21"] = value
+        elif "nota_21" in self.sections:
+            del self.sections["nota_21"]
+
+    @property
+    def nota_22(self) -> SectionBreakdown | None:
+        """Backward compatible access to nota_22 section."""
+        return self.sections.get("nota_22")
+
+    @nota_22.setter
+    def nota_22(self, value: SectionBreakdown | None) -> None:
+        if value is not None:
+            self.sections["nota_22"] = value
+        elif "nota_22" in self.sections:
+            del self.sections["nota_22"]
+
+    @property
+    def xbrl_cost_of_sales(self) -> int | None:
+        """Backward compatible access to XBRL cost_of_sales."""
+        return self.xbrl_totals.get("cost_of_sales")
+
+    @xbrl_cost_of_sales.setter
+    def xbrl_cost_of_sales(self, value: int | None) -> None:
+        self.xbrl_totals["cost_of_sales"] = value
+
+    @property
+    def xbrl_admin_expense(self) -> int | None:
+        """Backward compatible access to XBRL admin_expense."""
+        return self.xbrl_totals.get("admin_expense")
+
+    @xbrl_admin_expense.setter
+    def xbrl_admin_expense(self, value: int | None) -> None:
+        self.xbrl_totals["admin_expense"] = value
+
+    def get_section(self, section_id: str) -> SectionBreakdown | None:
+        """Get a section by its ID."""
+        return self.sections.get(section_id)
+
     def is_valid(self) -> bool:
         """Check if all validations passed."""
         if not self.validations:
             # No validations performed (PDF-only extraction)
-            return self.nota_21 is not None and self.nota_22 is not None
+            return len(self.sections) > 0 and all(s is not None for s in self.sections.values())
         return all(v.match for v in self.validations)
 
 
@@ -311,26 +423,26 @@ def find_section_page(
 ) -> int | None:
     """Find the page number where a section with detailed breakdown exists.
 
-    Uses extraction_specs.json to get search patterns and unique identifiers.
+    Uses config/sheet1/extraction.json to get search patterns and unique identifiers.
     Works with any section: nota_21, nota_22, ingresos, etc.
 
     Args:
         pdf_path: Path to the PDF file
-        section_name: Section name from extraction_specs.json (e.g., "nota_21", "ingresos")
+        section_name: Section name from config/sheet1/extraction.json (e.g., "nota_21", "ingresos")
         year: Optional year for period-specific specs
         quarter: Optional quarter for period-specific specs
 
     Returns:
         0-indexed page number or None if not found
     """
-    section_spec = get_section_spec(section_name)
+    section_spec = get_sheet1_section_spec(section_name)
 
     # Get unique items for this section (used to identify correct page)
     unique_items, _ = _get_table_identifiers(section_spec)
 
     if not unique_items:
         raise ValueError(
-            f"No unique_items defined in extraction_specs.json for section '{section_name}'. "
+            f"No unique_items defined in config/sheet1/extraction.json for section '{section_name}'. "
             "Please add table_identifiers.unique_items to the section spec."
         )
 
@@ -352,7 +464,7 @@ def find_section_page(
         search_patterns = pdf_fallback.get("search_patterns", [])
     if not search_patterns:
         raise ValueError(
-            f"No search_patterns defined in extraction_specs.json for section '{section_name}'. "
+            f"No search_patterns defined in config/sheet1/extraction.json for section '{section_name}'. "
             "Please add search_patterns to the section spec or pdf_fallback."
         )
 
@@ -416,14 +528,14 @@ def extract_table_from_page(
 ) -> list[dict[str, Any]]:
     """Extract cost table data from a specific page.
 
-    Uses extraction_specs.json to get table identifiers for scoring.
+    Uses config/sheet1/extraction.json to get table identifiers for scoring.
 
     Args:
         pdf_path: Path to the PDF file
         page_index: 0-indexed page number
         expected_items: List of expected line item names
         nota_number: Nota number (21 or 22) to help select correct table (deprecated, use section_name)
-        section_name: Section name from extraction_specs.json (preferred over nota_number)
+        section_name: Section name from config/sheet1/extraction.json (preferred over nota_number)
         year: Optional year for period-specific specs
         quarter: Optional quarter for period-specific specs
 
@@ -434,7 +546,7 @@ def extract_table_from_page(
     if not section_name and nota_number:
         section_name = f"nota_{nota_number}"
     if section_name:
-        section_spec = get_section_spec(section_name)
+        section_spec = get_sheet1_section_spec(section_name)
         unique_items, exclude_items = _get_table_identifiers(section_spec)
     else:
         unique_items, exclude_items = [], []
@@ -654,36 +766,70 @@ def _parse_cost_table(table: list[list[str | None]], expected_items: list[str]) 
     return parsed_rows
 
 
-def extract_nota_21(pdf_path: Path, config: dict | None = None) -> CostBreakdown | None:
-    """Extract Nota 21 - Costo de Venta from PDF.
+def extract_pdf_section(
+    pdf_path: Path,
+    section_name: str,
+    sheet_name: str = "sheet1",
+    year: int | None = None,
+    quarter: int | None = None,
+) -> SectionBreakdown | None:
+    """Extract a section from PDF using config-driven rules.
+
+    Generic extraction function that works with any section defined in
+    config/<sheet>/extraction.json. Replaces extract_nota_21 and extract_nota_22.
 
     Args:
         pdf_path: Path to Estados Financieros PDF
-        config: Configuration dict, or None to load from file
+        section_name: Section key from config (e.g., "nota_21", "nota_22")
+        sheet_name: Sheet name for config lookup (default: "sheet1")
+        year: Optional year for period-specific specs
+        quarter: Optional quarter for period-specific specs
 
     Returns:
-        CostBreakdown object or None if extraction fails
+        SectionBreakdown object or None if extraction fails
     """
-    costo_venta_items, _, _ = _get_extraction_labels(config)
+    # Get section spec from config
+    section_spec = get_sheet1_section_spec(section_name)
+    section_title = section_spec.get("title", section_name)
 
-    page_idx = find_nota_page(pdf_path, 21)
+    # Get expected items for this section
+    expected_items = get_section_expected_labels(section_name, sheet_name)
+
+    # Find the page
+    page_idx = find_section_page(pdf_path, section_name, year, quarter)
+
     if page_idx is None:
-        logger.error("Could not find Nota 21 in PDF")
+        # Try fallback: some sections share pages
+        fallback_sections = {
+            "nota_22": "nota_21",  # Nota 22 often on same page as Nota 21
+        }
+        if section_name in fallback_sections:
+            fallback = fallback_sections[section_name]
+            page_idx = find_section_page(pdf_path, fallback, year, quarter)
+
+    if page_idx is None:
+        logger.error(f"Could not find section '{section_name}' in PDF")
         return None
 
-    rows = extract_table_from_page(pdf_path, page_idx, costo_venta_items, nota_number=21)
+    # Extract table from page
+    rows = extract_table_from_page(
+        pdf_path, page_idx, expected_items, section_name=section_name, year=year, quarter=quarter
+    )
 
     if not rows:
         # Try next page (table might span pages)
-        rows = extract_table_from_page(pdf_path, page_idx + 1, costo_venta_items, nota_number=21)
+        rows = extract_table_from_page(
+            pdf_path, page_idx + 1, expected_items, section_name=section_name, year=year, quarter=quarter
+        )
 
     if not rows:
-        logger.error("Could not extract Nota 21 table")
+        logger.error(f"Could not extract table for section '{section_name}'")
         return None
 
-    breakdown = CostBreakdown(
-        nota_number=21,
-        nota_title="Costo de Venta",
+    # Build SectionBreakdown
+    breakdown = SectionBreakdown(
+        section_id=section_name,
+        section_title=section_title,
         page_number=page_idx + 1,
     )
 
@@ -691,7 +837,7 @@ def extract_nota_21(pdf_path: Path, config: dict | None = None) -> CostBreakdown
         concepto = row["concepto"]
         values = row.get("values", [])
 
-        if concepto.lower() == "totales":
+        if concepto.lower() in ("totales", "total"):
             breakdown.total_ytd_actual = values[0] if len(values) > 0 else None
             breakdown.total_ytd_anterior = values[1] if len(values) > 1 else None
             breakdown.total_quarter_actual = values[2] if len(values) > 2 else None
@@ -706,67 +852,38 @@ def extract_nota_21(pdf_path: Path, config: dict | None = None) -> CostBreakdown
             )
             breakdown.items.append(item)
 
-    logger.info(f"Extracted {len(breakdown.items)} items from Nota 21")
+    logger.info(f"Extracted {len(breakdown.items)} items from section '{section_name}'")
     return breakdown
 
 
-def extract_nota_22(pdf_path: Path, config: dict | None = None) -> CostBreakdown | None:
-    """Extract Nota 22 - Gastos de Administración y Ventas from PDF.
+def extract_nota_21(pdf_path: Path, config: dict | None = None) -> SectionBreakdown | None:
+    """Extract Nota 21 - Costo de Venta from PDF.
+
+    DEPRECATED: Use extract_pdf_section(pdf_path, "nota_21") instead.
 
     Args:
         pdf_path: Path to Estados Financieros PDF
-        config: Configuration dict, or None to load from file
+        config: Configuration dict (ignored, kept for backward compat)
 
     Returns:
-        CostBreakdown object or None if extraction fails
+        SectionBreakdown object or None if extraction fails
     """
-    _, gasto_admin_items, _ = _get_extraction_labels(config)
+    return extract_pdf_section(pdf_path, "nota_21")
 
-    page_idx = find_nota_page(pdf_path, 22)
-    if page_idx is None:
-        # Nota 22 is often on the same page as Nota 21
-        page_idx = find_nota_page(pdf_path, 21)
-        if page_idx is None:
-            logger.error("Could not find Nota 22 in PDF")
-            return None
 
-    rows = extract_table_from_page(pdf_path, page_idx, gasto_admin_items, nota_number=22)
+def extract_nota_22(pdf_path: Path, config: dict | None = None) -> SectionBreakdown | None:
+    """Extract Nota 22 - Gastos de Administración y Ventas from PDF.
 
-    if not rows:
-        # Try next page
-        rows = extract_table_from_page(pdf_path, page_idx + 1, gasto_admin_items, nota_number=22)
+    DEPRECATED: Use extract_pdf_section(pdf_path, "nota_22") instead.
 
-    if not rows:
-        logger.error("Could not extract Nota 22 table")
-        return None
+    Args:
+        pdf_path: Path to Estados Financieros PDF
+        config: Configuration dict (ignored, kept for backward compat)
 
-    breakdown = CostBreakdown(
-        nota_number=22,
-        nota_title="Gastos de Administración y Ventas",
-        page_number=page_idx + 1,
-    )
-
-    for row in rows:
-        concepto = row["concepto"]
-        values = row.get("values", [])
-
-        if concepto.lower() == "totales":
-            breakdown.total_ytd_actual = values[0] if len(values) > 0 else None
-            breakdown.total_ytd_anterior = values[1] if len(values) > 1 else None
-            breakdown.total_quarter_actual = values[2] if len(values) > 2 else None
-            breakdown.total_quarter_anterior = values[3] if len(values) > 3 else None
-        else:
-            item = LineItem(
-                concepto=concepto,
-                ytd_actual=values[0] if len(values) > 0 else None,
-                ytd_anterior=values[1] if len(values) > 1 else None,
-                quarter_actual=values[2] if len(values) > 2 else None,
-                quarter_anterior=values[3] if len(values) > 3 else None,
-            )
-            breakdown.items.append(item)
-
-    logger.info(f"Extracted {len(breakdown.items)} items from Nota 22")
-    return breakdown
+    Returns:
+        SectionBreakdown object or None if extraction fails
+    """
+    return extract_pdf_section(pdf_path, "nota_22")
 
 
 def extract_ingresos_from_pdf(pdf_path: Path) -> int | None:
@@ -783,7 +900,7 @@ def extract_ingresos_from_pdf(pdf_path: Path) -> int | None:
         Ingresos value in thousands USD, or None if extraction fails
     """
     # Get ingresos section spec from config
-    ingresos_spec = get_section_spec("ingresos")
+    ingresos_spec = get_sheet1_section_spec("ingresos")
     field_mappings = ingresos_spec.get("field_mappings", {})
     ingresos_mapping = field_mappings.get("ingresos_ordinarios", {})
     match_keywords = ingresos_mapping.get("match_keywords", ["ingresos", "actividades ordinarias"])
@@ -853,7 +970,7 @@ def extract_ingresos_from_pdf(pdf_path: Path) -> int | None:
 def extract_xbrl_totals(xbrl_path: Path) -> dict[str, int | None]:
     """Extract relevant totals from XBRL file using config-driven fact names.
 
-    Uses fact_mappings from config/xbrl_specs.json to look up the correct
+    Uses fact_mappings from config/sheet1/xbrl_mappings.json to look up the correct
     XBRL fact names for each field.
 
     Args:
@@ -884,7 +1001,7 @@ def extract_xbrl_totals(xbrl_path: Path) -> dict[str, int | None]:
     }
 
     for field_name, result_key in field_to_result.items():
-        fact_mapping = get_xbrl_fact_mapping(field_name)
+        fact_mapping = get_sheet1_xbrl_fact_mapping(field_name)
         if not fact_mapping:
             logger.debug(f"No XBRL mapping found for field: {field_name}")
             continue
@@ -1157,11 +1274,11 @@ def save_extraction_result(result: ExtractionResult, output_dir: Path | None = N
     return output_path
 
 
-def _breakdown_to_dict(breakdown: CostBreakdown) -> dict[str, Any]:
-    """Convert CostBreakdown to dictionary."""
+def _breakdown_to_dict(breakdown: SectionBreakdown) -> dict[str, Any]:
+    """Convert SectionBreakdown to dictionary."""
     return {
-        "nota_number": breakdown.nota_number,
-        "nota_title": breakdown.nota_title,
+        "section_id": breakdown.section_id,
+        "section_title": breakdown.section_title,
         "page_number": breakdown.page_number,
         "items": [
             {
@@ -1193,7 +1310,7 @@ def print_extraction_report(result: ExtractionResult) -> None:
     print(f"XBRL Available: {'Yes' if result.xbrl_available else 'No'}")
 
     if result.nota_21:
-        print(f"\n--- Nota 21: {result.nota_21.nota_title} ---")
+        print(f"\n--- Nota 21: {result.nota_21.section_title} ---")
         print(f"Page: {result.nota_21.page_number}")
         print(f"Items extracted: {len(result.nota_21.items)}")
         for item in result.nota_21.items:
@@ -1205,7 +1322,7 @@ def print_extraction_report(result: ExtractionResult) -> None:
         print("\n--- Nota 21: EXTRACTION FAILED ---")
 
     if result.nota_22:
-        print(f"\n--- Nota 22: {result.nota_22.nota_title} ---")
+        print(f"\n--- Nota 22: {result.nota_22.section_title} ---")
         print(f"Page: {result.nota_22.page_number}")
         print(f"Items extracted: {len(result.nota_22.items)}")
         for item in result.nota_22.items:
@@ -1230,171 +1347,8 @@ def print_extraction_report(result: ExtractionResult) -> None:
 
 
 # =============================================================================
-# Sheet1 Data Structure (27 rows as per config.json)
+# Sheet1 Period Formatting (uses config from puco_eeff.sheets.sheet1)
 # =============================================================================
-
-
-@dataclass
-class Sheet1Data:
-    """Data structure for Sheet1 - Ingresos y Costos.
-
-    This follows the 27-row structure defined in config/extraction_specs.json.
-    Field definitions are loaded from the sheet1_fields section.
-
-    The dataclass fields are kept for IDE autocomplete, but the config
-    is the source of truth for field definitions and row mappings.
-    """
-
-    quarter: str  # e.g., "IIQ2024", "06-2024", "FY2024"
-    year: int
-    quarter_num: int  # Period number (1-4 for quarterly, 1-12 for monthly, 1 for yearly)
-    period_type: str = "quarterly"  # "quarterly", "monthly", "yearly"
-    source: str = "cmf"  # "cmf" or "pucobre.cl"
-    xbrl_available: bool = False
-
-    # Row 1: Ingresos
-    ingresos_ordinarios: int | None = None
-
-    # Rows 4-14: Costo de Venta breakdown
-    cv_gastos_personal: int | None = None
-    cv_materiales: int | None = None
-    cv_energia: int | None = None
-    cv_servicios_terceros: int | None = None
-    cv_depreciacion_amort: int | None = None
-    cv_deprec_leasing: int | None = None
-    cv_deprec_arrend: int | None = None
-    cv_serv_mineros: int | None = None
-    cv_fletes: int | None = None
-    cv_gastos_diferidos: int | None = None
-    cv_convenios: int | None = None
-
-    # Row 15: Total Costo de Venta
-    total_costo_venta: int | None = None
-
-    # Rows 20-25: Gasto Admin breakdown
-    ga_gastos_personal: int | None = None
-    ga_materiales: int | None = None
-    ga_servicios_terceros: int | None = None
-    ga_gratificacion: int | None = None
-    ga_comercializacion: int | None = None
-    ga_otros: int | None = None
-
-    # Row 27: Totales (specifically Gasto Admin total, NOT Costo de Venta)
-    total_gasto_admin: int | None = None
-
-    def get_value(self, field_name: str) -> int | None:
-        """Get a field value by name (config-driven access).
-
-        Args:
-            field_name: Field name from config (e.g., "cv_gastos_personal")
-
-        Returns:
-            Field value or None if not found.
-        """
-        return getattr(self, field_name, None)
-
-    def set_value(self, field_name: str, value: int | None) -> None:
-        """Set a field value by name (config-driven access).
-
-        Args:
-            field_name: Field name from config
-            value: Value to set
-        """
-        if hasattr(self, field_name):
-            setattr(self, field_name, value)
-        else:
-            logger.warning(f"Unknown field name: {field_name}")
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary matching config row_mapping."""
-        return {
-            "quarter": self.quarter,
-            "year": self.year,
-            "quarter_num": self.quarter_num,
-            "period_type": self.period_type,
-            "source": self.source,
-            "xbrl_available": self.xbrl_available,
-            "ingresos_ordinarios": self.ingresos_ordinarios,
-            "cv_gastos_personal": self.cv_gastos_personal,
-            "cv_materiales": self.cv_materiales,
-            "cv_energia": self.cv_energia,
-            "cv_servicios_terceros": self.cv_servicios_terceros,
-            "cv_depreciacion_amort": self.cv_depreciacion_amort,
-            "cv_deprec_leasing": self.cv_deprec_leasing,
-            "cv_deprec_arrend": self.cv_deprec_arrend,
-            "cv_serv_mineros": self.cv_serv_mineros,
-            "cv_fletes": self.cv_fletes,
-            "cv_gastos_diferidos": self.cv_gastos_diferidos,
-            "cv_convenios": self.cv_convenios,
-            "total_costo_venta": self.total_costo_venta,
-            "ga_gastos_personal": self.ga_gastos_personal,
-            "ga_materiales": self.ga_materiales,
-            "ga_servicios_terceros": self.ga_servicios_terceros,
-            "ga_gratificacion": self.ga_gratificacion,
-            "ga_comercializacion": self.ga_comercializacion,
-            "ga_otros": self.ga_otros,
-            "total_gasto_admin": self.total_gasto_admin,
-        }
-
-    def to_row_list(self) -> list[tuple[int, str, int | None]]:
-        """Convert to list of (row_number, label, value) tuples.
-
-        Uses config/config.json row_mapping and config/extraction_specs.json
-        sheet1_fields for row definitions. Raises error if config unavailable.
-
-        Returns:
-            List of (row_number, label, value) tuples for all 27 rows.
-
-        Raises:
-            ValueError: If required config is not available.
-        """
-        value_fields = get_sheet1_value_fields()
-        if not value_fields:
-            raise ValueError(
-                "sheet1_fields.value_fields not found in config/extraction_specs.json. "
-                "Config is the single source of truth - no hardcoded fallback."
-            )
-
-        row_mapping = get_sheet1_row_mapping()
-        if not row_mapping:
-            raise ValueError(
-                "row_mapping not found in config/config.json sheets.sheet1. "
-                "Config is the single source of truth - no hardcoded fallback."
-            )
-
-        return self._to_row_list_from_config(value_fields, row_mapping)
-
-    def _to_row_list_from_config(
-        self,
-        value_fields: dict[str, Any],
-        row_mapping: dict[str, dict[str, Any]],
-    ) -> list[tuple[int, str, int | None]]:
-        """Generate row list from config field definitions.
-
-        Args:
-            value_fields: Field definitions from extraction_specs.json
-            row_mapping: Row mapping from config.json
-
-        Returns:
-            List of (row_number, label, value) tuples.
-        """
-        result = []
-
-        for row_num in range(1, 28):
-            row_key = str(row_num)
-            row_def = row_mapping.get(row_key, {})
-            field_name = row_def.get("field")
-            label = row_def.get("label", "")
-
-            if field_name and field_name not in ("costo_venta_header", "gasto_admin_header"):
-                # Data field - get value
-                value = self.get_value(field_name)
-                result.append((row_num, label, value))
-            else:
-                # Header or blank row - no value
-                result.append((row_num, label, None))
-
-        return result
 
 
 def quarter_to_roman(quarter: int) -> str:
@@ -1461,33 +1415,6 @@ def format_quarter_label(year: int, quarter: int) -> str:
         Formatted string like "IIQ2024"
     """
     return format_period_label(year, quarter, "quarterly")
-
-
-def find_cuadro_resumen_page(pdf_path: Path) -> int | None:
-    """Find the page containing 'Cuadro Resumen de Costos' in Análisis Razonado.
-
-    Args:
-        pdf_path: Path to Análisis Razonado PDF
-
-    Returns:
-        0-indexed page number or None if not found
-    """
-    search_patterns = [
-        "CUADRO RESUMEN DE COSTOS",
-        "RESUMEN DE COSTOS",
-        "Cuadro Resumen de Costos",
-    ]
-
-    with pdfplumber.open(pdf_path) as pdf:
-        for page_idx, page in enumerate(pdf.pages):
-            text = (page.extract_text() or "").upper()
-
-            for pattern in search_patterns:
-                if pattern.upper() in text:
-                    logger.info(f"Found 'Cuadro Resumen de Costos' on page {page_idx + 1}")
-                    return page_idx
-
-    return None
 
 
 def extract_sheet1_from_analisis_razonado(
@@ -1588,7 +1515,7 @@ def extract_sheet1_from_analisis_razonado(
 def _map_nota_item_to_sheet1(item: LineItem, data: Sheet1Data, section_name: str) -> None:
     """Map a Nota line item to Sheet1Data fields using config-driven matching.
 
-    Uses match_keywords and exclude_keywords from extraction_specs.json
+    Uses match_keywords and exclude_keywords from config/sheet1/extraction.json
     to determine which field a line item belongs to.
 
     Args:
@@ -1632,14 +1559,14 @@ def _validate_sheet1_with_xbrl(data: Sheet1Data, xbrl_path: Path) -> None:
     1. Log validation results (match/mismatch)
     2. Use XBRL values if PDF extraction failed for totals
 
-    Uses validation_rules from config/xbrl_specs.json for tolerance settings.
+    Uses sum_tolerance from config/sheet1/xbrl_mappings.json for tolerance settings.
 
     Args:
         data: Sheet1Data populated from PDF
         xbrl_path: Path to XBRL file
     """
     xbrl_totals = extract_xbrl_totals(xbrl_path)
-    tolerance = get_sum_tolerance()
+    tolerance = get_sheet1_sum_tolerance()
 
     # Define validations: (field_name, xbrl_key, display_name)
     validations = [
@@ -1668,184 +1595,15 @@ def _validate_sheet1_with_xbrl(data: Sheet1Data, xbrl_path: Path) -> None:
                 data.set_value(field_name, xbrl_value)
 
 
-def _find_cost_summary_table(tables: list[list[list[str | None]]]) -> list[list[str | None]] | None:
-    """Find the cost summary table among extracted tables.
-
-    The cost summary table should contain:
-    - "Ingresos" or "actividades ordinarias"
-    - "Costo de Venta"
-    - "Gasto" and "Admin" or "Ventas"
-
-    Args:
-        tables: List of tables extracted from page
-
-    Returns:
-        The cost summary table or None
-    """
-    for table in tables:
-        if not table:
-            continue
-
-        table_text = str(table).lower()
-
-        has_ingresos = "ingresos" in table_text or "actividades ordinarias" in table_text
-        has_costo = "costo" in table_text and "venta" in table_text
-        has_gasto = "gasto" in table_text and ("admin" in table_text or "ventas" in table_text)
-
-        if has_ingresos and has_costo and has_gasto:
-            return table
-
-    return None
-
-
-def _parse_cost_summary_table(table: list[list[str | None]], data: Sheet1Data) -> None:
-    """Parse cost summary table and populate Sheet1Data.
-
-    The table has sections:
-    1. Ingresos row
-    2. Costo de Venta section (header + 11 items + total)
-    3. Gasto Admin section (header + 6 items + Totales)
-
-    Important: "Totales" at the end is specifically Gasto Admin total (row 27),
-    not to be confused with "Total Costo de Venta".
-
-    Args:
-        table: Raw table data
-        data: Sheet1Data object to populate
-    """
-    current_section = None  # None, "costo_venta", "gasto_admin"
-
-    for row in table:
-        if not row or not any(row):
-            continue
-
-        row_text = str(row[0] or "").strip().lower()
-
-        # Detect section headers
-        if "costo" in row_text and "venta" in row_text and "total" not in row_text:
-            current_section = "costo_venta"
-            continue
-        elif "gasto" in row_text and ("admin" in row_text or "ventas" in row_text):
-            current_section = "gasto_admin"
-            continue
-
-        # Extract first numeric value from row
-        value = None
-        for cell in row[1:]:
-            if cell:
-                parsed = parse_chilean_number(str(cell))
-                if parsed is not None:
-                    value = parsed
-                    break
-
-        # Map row to data field based on content and current section
-        _map_row_to_field(row_text, value, current_section, data)
-
-
-def _map_row_to_field(
-    row_text: str,
-    value: int | None,
-    section: str | None,
-    data: Sheet1Data,
-) -> None:
-    """Map a table row to the appropriate Sheet1Data field.
-
-    Uses section context to disambiguate items that appear in both sections
-    (e.g., "Gastos en personal" appears in both Costo de Venta and Gasto Admin).
-
-    Args:
-        row_text: Lowercase text from the row's first cell
-        value: Parsed numeric value
-        section: Current section ("costo_venta", "gasto_admin", or None)
-        data: Sheet1Data object to update
-    """
-    # Ingresos (no section context needed)
-    if "ingresos" in row_text and "ordinarias" in row_text:
-        data.ingresos_ordinarios = value
-        return
-
-    # Total Costo de Venta (explicit match to avoid confusion with "Totales")
-    if "total" in row_text and "costo" in row_text and "venta" in row_text:
-        data.total_costo_venta = value
-        return
-
-    # Totales at end = Gasto Admin total (row 27)
-    # This is the ONLY "Totales" without "Costo" or "Venta" qualification
-    if row_text == "totales" or (row_text.startswith("totales") and "costo" not in row_text):
-        if section == "gasto_admin":
-            data.total_gasto_admin = value
-        return
-
-    # Section-specific items
-    if section == "costo_venta":
-        if "gastos en personal" in row_text or row_text == "gastos en personal":
-            data.cv_gastos_personal = value
-        elif "materiales" in row_text and "repuestos" in row_text:
-            data.cv_materiales = value
-        elif "energía" in row_text or "energia" in row_text:
-            data.cv_energia = value
-        elif "servicios de terceros" in row_text:
-            data.cv_servicios_terceros = value
-        elif "depreciación" in row_text or "depreciacion" in row_text:
-            if "leasing" in row_text:
-                data.cv_deprec_leasing = value
-            elif "arrendamiento" in row_text:
-                data.cv_deprec_arrend = value
-            else:
-                data.cv_depreciacion_amort = value
-        elif "servicios mineros" in row_text:
-            data.cv_serv_mineros = value
-        elif "fletes" in row_text:
-            data.cv_fletes = value
-        elif "gastos diferidos" in row_text or "ajustes existencias" in row_text:
-            data.cv_gastos_diferidos = value
-        elif "convenios" in row_text or "obligaciones" in row_text:
-            data.cv_convenios = value
-
-    elif section == "gasto_admin":
-        if "gastos en personal" in row_text or row_text == "gastos en personal":
-            data.ga_gastos_personal = value
-        elif "materiales" in row_text and "repuestos" in row_text:
-            data.ga_materiales = value
-        elif "servicios de terceros" in row_text:
-            data.ga_servicios_terceros = value
-        elif "gratificacion" in row_text or "gratificación" in row_text:
-            data.ga_gratificacion = value
-        elif "comercializacion" in row_text or "comercialización" in row_text:
-            data.ga_comercializacion = value
-        elif "otros gastos" in row_text:
-            data.ga_otros = value
-
-
-def save_sheet1_data(data: Sheet1Data, output_dir: Path | None = None) -> Path:
-    """Save Sheet1 data to JSON file.
-
-    Args:
-        data: Sheet1Data to save
-        output_dir: Output directory (defaults to processed dir)
-
-    Returns:
-        Path to saved file
-    """
-    if output_dir is None:
-        paths = get_period_paths(data.year, data.quarter_num)
-        output_dir = paths["processed"]
-
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / f"sheet1_{data.quarter}.json"
-
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(data.to_dict(), f, indent=2, ensure_ascii=False)
-
-    logger.info(f"Saved Sheet1 data to: {output_path}")
-    return output_path
+# save_sheet1_data and print_sheet1_report are re-exported from puco_eeff.sheets.sheet1
+# for backward compatibility. They are imported at the top of this file.
 
 
 def extract_sheet1_from_xbrl(year: int, quarter: int) -> Sheet1Data | None:
     """Extract Sheet1 totals directly from XBRL file.
 
     This extracts only the totals available in XBRL using fact_mappings
-    from config/xbrl_specs.json:
+    from config/sheet1/xbrl_mappings.json:
     - Ingresos (Revenue)
     - Total Costo de Venta (CostOfSales)
     - Total Gasto Admin (AdministrativeExpense)
@@ -1898,7 +1656,7 @@ def extract_sheet1_from_xbrl(year: int, quarter: int) -> Sheet1Data | None:
     xbrl_fields = ["ingresos_ordinarios", "total_costo_venta", "total_gasto_admin"]
 
     for field_name in xbrl_fields:
-        fact_mapping = get_xbrl_fact_mapping(field_name)
+        fact_mapping = get_sheet1_xbrl_fact_mapping(field_name)
         if not fact_mapping:
             continue
 
@@ -2032,28 +1790,4 @@ def _merge_pdf_into_xbrl_data(pdf_data: Sheet1Data, xbrl_data: Sheet1Data) -> No
             setattr(xbrl_data, field_name, pdf_value)
 
 
-def print_sheet1_report(data: Sheet1Data) -> None:
-    """Print a formatted Sheet1 report.
-
-    Args:
-        data: Sheet1Data to report
-    """
-    print(f"\n{'=' * 60}")
-    print(f"Sheet1 Report: {data.quarter}")
-    print(f"{'=' * 60}")
-    print(f"Source: {data.source}")
-    print(f"XBRL Available: {'Yes' if data.xbrl_available else 'No'}")
-
-    print(f"\n{'Row':<4} {'Label':<45} {'Value':>12}")
-    print("-" * 65)
-
-    for row_num, label, value in data.to_row_list():
-        if value is not None:
-            val_str = f"{value:,}"
-        elif label:
-            val_str = ""
-        else:
-            val_str = ""
-        print(f"{row_num:<4} {label:<45} {val_str:>12}")
-
-    print(f"\n{'=' * 60}\n")
+# print_sheet1_report is re-exported from puco_eeff.sheets.sheet1 (imported at top of file)

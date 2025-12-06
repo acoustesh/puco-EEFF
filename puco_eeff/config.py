@@ -167,7 +167,7 @@ def get_extraction_specs() -> dict[str, Any]:
     """Load extraction specifications from extraction_specs.json.
 
     Returns:
-        Dictionary with default template and per-quarter specs.
+        Dictionary with general extraction settings (number_format, search_strategy, document_structure).
     """
     specs_path = CONFIG_DIR / "extraction_specs.json"
     if not specs_path.exists():
@@ -175,68 +175,6 @@ def get_extraction_specs() -> dict[str, Any]:
 
     with open(specs_path, encoding="utf-8") as f:
         return json.load(f)  # type: ignore[no-any-return]
-
-
-def get_reference_data() -> dict[str, Any]:
-    """Load reference data from reference_data.json.
-
-    Returns:
-        Dictionary with reference values for validation.
-    """
-    ref_path = CONFIG_DIR / "reference_data.json"
-    if not ref_path.exists():
-        raise FileNotFoundError(f"Reference data not found: {ref_path}")
-
-    with open(ref_path, encoding="utf-8") as f:
-        return json.load(f)  # type: ignore[no-any-return]
-
-
-def get_period_specs(year: int, quarter: int) -> dict[str, Any]:
-    """Get extraction specs for a specific period, merging default with deviations.
-
-    Args:
-        year: Year of the financial statement
-        quarter: Quarter (1-4)
-
-    Returns:
-        Merged extraction specs (default + period-specific deviations)
-    """
-    specs = get_extraction_specs()
-    default = specs.get("default", {})
-
-    # Look for period-specific specs
-    period_key = f"{year}_Q{quarter}"
-    period_specs = specs.get(period_key, {})
-
-    # Deep merge: start with default, overlay period-specific deviations
-    merged = _deep_merge(default.copy(), period_specs.get("deviations", {}))
-
-    # Add period metadata
-    merged["_period"] = period_key
-    merged["_verified"] = period_specs.get("verified", False)
-    merged["_page_numbers"] = period_specs.get("page_numbers", {})
-
-    return merged
-
-
-def get_reference_values(year: int, quarter: int) -> dict[str, int] | None:
-    """Get reference values for a specific period.
-
-    Args:
-        year: Year of the financial statement
-        quarter: Quarter (1-4)
-
-    Returns:
-        Dictionary of reference values, or None if not available.
-    """
-    ref_data = get_reference_data()
-    period_key = f"{year}_Q{quarter}"
-
-    period_data = ref_data.get(period_key, {})
-    if period_data.get("verified") and period_data.get("values"):
-        return period_data["values"]
-
-    return None
 
 
 # =============================================================================
@@ -248,7 +186,8 @@ def get_xbrl_specs() -> dict[str, Any]:
     """Load XBRL specifications from xbrl_specs.json.
 
     Returns:
-        Dictionary with XBRL fact mappings, validation rules, and namespaces.
+        Dictionary with general XBRL config (scaling_factor, namespaces, period_filter).
+        Sheet-specific fact mappings are in config/<sheet_name>/xbrl_mappings.json.
     """
     xbrl_path = CONFIG_DIR / "xbrl_specs.json"
     if not xbrl_path.exists():
@@ -256,19 +195,6 @@ def get_xbrl_specs() -> dict[str, Any]:
 
     with open(xbrl_path, encoding="utf-8") as f:
         return json.load(f)  # type: ignore[no-any-return]
-
-
-def get_xbrl_fact_mapping(field_name: str) -> dict[str, Any] | None:
-    """Get XBRL fact mapping for a specific field.
-
-    Args:
-        field_name: Field name (e.g., "ingresos_ordinarios", "total_costo_venta")
-
-    Returns:
-        Dictionary with primary, fallbacks, and other XBRL info, or None.
-    """
-    xbrl_specs = get_xbrl_specs()
-    return xbrl_specs.get("fact_mappings", {}).get(field_name)
 
 
 def get_xbrl_scaling_factor() -> int:
@@ -281,24 +207,14 @@ def get_xbrl_scaling_factor() -> int:
     return xbrl_specs.get("scaling_factor", 1000)
 
 
-def get_validation_rules() -> dict[str, Any]:
-    """Get validation rules from XBRL specs.
+def get_xbrl_namespaces() -> dict[str, str]:
+    """Get XBRL namespace definitions.
 
     Returns:
-        Dictionary with sum_tolerance, total_validations, cross_validations.
+        Dictionary mapping namespace prefixes to URIs.
     """
     xbrl_specs = get_xbrl_specs()
-    return xbrl_specs.get("validation_rules", {})
-
-
-def get_sum_tolerance() -> int:
-    """Get sum tolerance for validation (allows for rounding differences).
-
-    Returns:
-        Tolerance value (default 1).
-    """
-    rules = get_validation_rules()
-    return rules.get("sum_tolerance", 1)
+    return xbrl_specs.get("namespaces", {})
 
 
 # =============================================================================
@@ -505,201 +421,6 @@ def find_file_with_alternatives(
     return None
 
 
-# =============================================================================
-# Sheet1 Field Configuration
-# =============================================================================
-
-
-def get_sheet1_fields() -> dict[str, Any]:
-    """Get Sheet1 field definitions from extraction_specs.json.
-
-    Returns:
-        Dictionary with metadata_fields and value_fields.
-    """
-    specs = get_extraction_specs()
-    return specs.get("sheet1_fields", {})
-
-
-def get_sheet1_value_fields() -> dict[str, dict[str, Any]]:
-    """Get Sheet1 value field definitions.
-
-    Returns:
-        Dictionary mapping field names to their definitions.
-    """
-    fields = get_sheet1_fields()
-    return fields.get("value_fields", {})
-
-
-def get_sheet1_metadata_fields() -> list[str]:
-    """Get Sheet1 metadata field names.
-
-    Returns:
-        List of metadata field names.
-
-    Raises:
-        ValueError: If metadata_fields not found in config.
-    """
-    fields = get_sheet1_fields()
-    metadata = fields.get("metadata_fields")
-    if metadata is None:
-        raise ValueError("metadata_fields not found in extraction_specs.json sheet1_fields")
-    return metadata
-
-
-def get_sheet1_row_mapping() -> dict[str, dict[str, Any]]:
-    """Get Sheet1 row mapping from config.json.
-
-    Returns the row_mapping from config.json sheets.sheet1.row_mapping,
-    which defines all 27 rows with field names, labels, and sections.
-
-    Returns:
-        Dictionary mapping row numbers (as strings) to row definitions.
-
-    Raises:
-        ValueError: If row_mapping not found in config.
-    """
-    config = get_config()
-    sheets = config.get("sheets", {})
-    sheet1 = sheets.get("sheet1", {})
-    row_mapping = sheet1.get("row_mapping")
-    if row_mapping is None:
-        raise ValueError("row_mapping not found in config.json sheets.sheet1")
-    return row_mapping
-
-
-def get_fields_for_section(section_name: str) -> list[str]:
-    """Get field names belonging to a specific section.
-
-    Args:
-        section_name: Section key from extraction_specs.json sections
-
-    Returns:
-        List of field names in that section.
-    """
-    value_fields = get_sheet1_value_fields()
-    return [field_name for field_name, field_def in value_fields.items() if field_def.get("section") == section_name]
-
-
-def get_extraction_sections() -> list[str]:
-    """Get list of all extraction section keys from config.
-
-    Returns:
-        List of section keys (e.g., ["nota_21", "nota_22", "ingresos"])
-
-    Raises:
-        ValueError: If sections not found in config.
-    """
-    specs = get_extraction_specs()
-    default = specs.get("default", {})
-    sections = default.get("sections")
-    if sections is None:
-        raise ValueError("sections not found in extraction_specs.json default")
-    return list(sections.keys())
-
-
-def get_section_spec(section_name: str, year: int | None = None, quarter: int | None = None) -> dict[str, Any]:
-    """Get full specification for a section, merging defaults with period deviations.
-
-    Args:
-        section_name: Section key from extraction_specs.json
-        year: Optional year for period-specific overrides
-        quarter: Optional quarter for period-specific overrides
-
-    Returns:
-        Section specification dictionary.
-
-    Raises:
-        ValueError: If section not found in config.
-    """
-    specs = get_period_specs(year, quarter) if year and quarter else get_extraction_specs().get("default", {})
-    sections = specs.get("sections", {})
-    section = sections.get(section_name)
-    if section is None:
-        raise ValueError(f"Section '{section_name}' not found in extraction_specs.json")
-    return section
-
-
-def get_section_title(section_name: str) -> str:
-    """Get the display title for a section.
-
-    Args:
-        section_name: Section key from extraction_specs.json
-
-    Returns:
-        Section title string.
-    """
-    section = get_section_spec(section_name)
-    return section.get("title", section_name)
-
-
-def get_section_search_patterns(section_name: str) -> list[str]:
-    """Get search patterns for finding a section in PDF.
-
-    Args:
-        section_name: Section key from extraction_specs.json
-
-    Returns:
-        List of search pattern strings.
-
-    Raises:
-        ValueError: If search_patterns not found for section.
-    """
-    section = get_section_spec(section_name)
-    patterns = section.get("search_patterns")
-    if patterns is None:
-        raise ValueError(f"search_patterns not found for section '{section_name}' in extraction_specs.json")
-    return patterns
-
-
-def get_section_table_identifiers(section_name: str) -> tuple[list[str], list[str]]:
-    """Get unique and exclude items for identifying a section's table.
-
-    Args:
-        section_name: Section key from extraction_specs.json
-
-    Returns:
-        Tuple of (unique_items, exclude_items) lists.
-    """
-    section = get_section_spec(section_name)
-    identifiers = section.get("table_identifiers", {})
-    return (
-        identifiers.get("unique_items", []),
-        identifiers.get("exclude_items", []),
-    )
-
-
-def get_section_validation_rules(section_name: str) -> dict[str, Any]:
-    """Get validation rules for a section.
-
-    Args:
-        section_name: Section key from extraction_specs.json
-
-    Returns:
-        Validation rules dictionary with keys like 'has_totales_row', 'min_detail_items'.
-    """
-    section = get_section_spec(section_name)
-    return section.get("validation", {})
-
-
-def get_section_expected_items(section_name: str) -> list[str]:
-    """Get list of expected PDF labels for a section's line items.
-
-    Extracts pdf_labels from field_mappings for the section.
-
-    Args:
-        section_name: Section key from extraction_specs.json
-
-    Returns:
-        List of expected item label strings.
-    """
-    field_mappings = get_section_field_mappings(section_name)
-    items = []
-    for mapping in field_mappings.values():
-        pdf_labels = mapping.get("pdf_labels", [])
-        items.extend(pdf_labels)
-    return items
-
-
 def get_total_row_markers() -> list[str]:
     """Get markers that identify total rows in tables.
 
@@ -707,61 +428,9 @@ def get_total_row_markers() -> list[str]:
         List of marker strings (e.g., ["Totales", "Total"]).
     """
     specs = get_extraction_specs()
-    default = specs.get("default", {})
-    doc_structure = default.get("document_structure", {})
+    doc_structure = specs.get("document_structure", {})
     markers = doc_structure.get("section_markers", {})
     return markers.get("table_end_markers", ["Totales", "Total"])
-
-
-def get_section_field_mappings(section_name: str) -> dict[str, dict[str, Any]]:
-    """Get field mappings for a specific section from extraction_specs.json.
-
-    Args:
-        section_name: Section name ("nota_21", "nota_22", "ingresos")
-
-    Returns:
-        Dictionary of field mappings with match_keywords, exclude_keywords, etc.
-    """
-    specs = get_extraction_specs()
-    default = specs.get("default", {})
-    sections = default.get("sections", {})
-    section = sections.get(section_name, {})
-    return section.get("field_mappings", {})
-
-
-def match_concepto_to_field(
-    concepto: str,
-    section_name: str,
-) -> str | None:
-    """Match a concepto string to a Sheet1 field using config-driven keywords.
-
-    Uses match_keywords (all must match) and exclude_keywords (none can match)
-    from extraction_specs.json to determine which field a concepto belongs to.
-
-    Args:
-        concepto: The concepto string from the PDF (will be lowercased)
-        section_name: Section name ("nota_21", "nota_22", "ingresos")
-
-    Returns:
-        Field name if matched, None otherwise.
-    """
-    concepto_lower = concepto.lower()
-    field_mappings = get_section_field_mappings(section_name)
-
-    for field_name, mapping in field_mappings.items():
-        match_keywords = mapping.get("match_keywords", [])
-        exclude_keywords = mapping.get("exclude_keywords", [])
-
-        # Check exclude keywords first - if any match, skip this field
-        if exclude_keywords and any(kw.lower() in concepto_lower for kw in exclude_keywords):
-            continue
-
-        # Check match keywords - at least one must match
-        # (for compound keywords like "materiales, repuestos", ANY of them matching is sufficient)
-        if match_keywords and any(kw.lower() in concepto_lower for kw in match_keywords):
-            return mapping.get("sheet1_field", field_name)
-
-    return None
 
 
 def _deep_merge(base: dict, overlay: dict) -> dict:

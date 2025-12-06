@@ -1,0 +1,182 @@
+{
+  "_description": "PDF extraction rules for Sheet1 data (Nota 21, Nota 22, Ingresos sections).",
+
+  "sections": {
+    "nota_21": {
+      "title": "Costo de Venta",
+      "search_patterns": [
+        "21. costo",
+        "21 costo",
+        "nota 21"
+      ],
+      "expected_position": {
+        "after_nota": 20,
+        "before_nota": 22,
+        "typical_page_range": [70, 80]
+      },
+      "table_identifiers": {
+        "unique_items": ["energía eléctrica", "energia electrica", "servicios mineros", "fletes"],
+        "exclude_items": ["gratificación", "gratificacion", "comercialización", "comercializacion"]
+      },
+      "validation": {
+        "has_totales_row": true,
+        "min_detail_items": 3
+      },
+      "field_mappings": {
+        "cv_gastos_personal": {
+          "pdf_labels": ["Gastos en personal"],
+          "match_keywords": ["gastos en personal"]
+        },
+        "cv_materiales": {
+          "pdf_labels": ["Materiales y repuestos"],
+          "match_keywords": ["materiales", "repuestos"]
+        },
+        "cv_energia": {
+          "pdf_labels": ["Energía eléctrica", "Energia electrica"],
+          "match_keywords": ["energía", "energia", "eléctrica", "electrica"]
+        },
+        "cv_servicios_terceros": {
+          "pdf_labels": ["Servicios de terceros"],
+          "match_keywords": ["servicios de terceros"]
+        },
+        "cv_depreciacion_amort": {
+          "pdf_labels": ["Depreciación y amort del periodo", "Depreciacion y amort del periodo"],
+          "match_keywords": ["amort"],
+          "exclude_keywords": ["leasing", "arrendamiento"]
+        },
+        "cv_deprec_leasing": {
+          "pdf_labels": ["Depreciación Activos en leasing", "Depreciacion Activos en leasing"],
+          "match_keywords": ["leasing"]
+        },
+        "cv_deprec_arrend": {
+          "pdf_labels": ["Depreciación Arrendamientos", "Depreciacion Arrendamientos"],
+          "match_keywords": ["arrendamiento"]
+        },
+        "cv_serv_mineros": {
+          "pdf_labels": ["Servicios mineros de terceros"],
+          "match_keywords": ["servicios mineros"]
+        },
+        "cv_fletes": {
+          "pdf_labels": ["Fletes y otros gastos operacionales"],
+          "match_keywords": ["fletes"]
+        },
+        "cv_gastos_diferidos": {
+          "pdf_labels": ["Gastos Diferidos, ajustes existencias y otros", "Gastos Diferidos"],
+          "match_keywords": ["gastos diferidos", "ajustes existencias"]
+        },
+        "cv_convenios": {
+          "pdf_labels": ["Obligaciones por convenios colectivos"],
+          "match_keywords": ["convenios", "obligaciones"]
+        },
+        "total_costo_venta": {
+          "pdf_labels": ["Totales", "Total"],
+          "match_keywords": ["totales", "total"]
+        }
+      }
+    },
+
+    "nota_22": {
+      "title": "Gastos de Administración y Ventas",
+      "search_patterns": [
+        "22. gastos",
+        "22 gastos",
+        "nota 22"
+      ],
+      "expected_position": {
+        "after_nota": 21,
+        "before_nota": 23,
+        "typical_page_range": [70, 80]
+      },
+      "table_identifiers": {
+        "unique_items": ["gratificación", "gratificacion", "comercialización", "comercializacion"],
+        "exclude_items": ["energía", "energia", "servicios mineros", "fletes"]
+      },
+      "validation": {
+        "has_totales_row": true,
+        "min_detail_items": 3
+      },
+      "field_mappings": {
+        "ga_gastos_personal": {
+          "pdf_labels": ["Gastos en personal"],
+          "match_keywords": ["gastos en personal"]
+        },
+        "ga_materiales": {
+          "pdf_labels": ["Materiales y repuestos"],
+          "match_keywords": ["materiales", "repuestos"]
+        },
+        "ga_servicios_terceros": {
+          "pdf_labels": ["Servicios de terceros"],
+          "match_keywords": ["servicios de terceros"]
+        },
+        "ga_gratificacion": {
+          "pdf_labels": ["Provision gratificacion legal y otros", "Provisión gratificación legal y otros"],
+          "match_keywords": ["gratificación", "gratificacion"]
+        },
+        "ga_comercializacion": {
+          "pdf_labels": ["Gastos comercializacion", "Gastos comercialización"],
+          "match_keywords": ["comercialización", "comercializacion"]
+        },
+        "ga_otros": {
+          "pdf_labels": ["Otros gastos"],
+          "match_keywords": ["otros gastos"]
+        },
+        "total_gasto_admin": {
+          "pdf_labels": ["Totales", "Total"],
+          "match_keywords": ["totales", "total"]
+        }
+      }
+    },
+
+    "ingresos": {
+      "title": "Ingresos de actividades ordinarias",
+      "source": "xbrl_preferred",
+      "pdf_fallback": {
+        "page_type": "estado_de_resultados",
+        "search_patterns": [
+          "estados de resultados",
+          "estado de resultados",
+          "ingresos de actividades ordinarias"
+        ],
+        "typical_page_range": [3, 10]
+      },
+      "table_identifiers": {
+        "unique_items": ["ingresos de actividades ordinarias", "costo de ventas", "ganancia bruta"],
+        "exclude_items": []
+      },
+      "validation": {
+        "has_totales_row": false,
+        "min_detail_items": 1
+      },
+      "field_mappings": {
+        "ingresos_ordinarios": {
+          "pdf_labels": ["Ingresos de actividades ordinarias"],
+          "match_keywords": ["ingresos", "actividades ordinarias"]
+        }
+      }
+    }
+  },
+
+  "period_overrides": {
+    "2024_Q2": {
+      "_comment": "Q2 2024 - First successfully extracted quarter. No deviations from default needed.",
+      "verified": true,
+      "verified_date": "2024-12-06",
+      "page_numbers": {
+        "nota_21": 72,
+        "nota_22": 72
+      }
+    },
+    "2024_Q3": {
+      "_comment": "Q3 2024 - Placeholder for future extraction",
+      "verified": false,
+      "deviations": {}
+    },
+    "2024_Q1": {
+      "_comment": "Q1 2024 - From pucobre.cl, no XBRL available",
+      "verified": false,
+      "source_document": "estados_financieros",
+      "xbrl_available": false,
+      "deviations": {}
+    }
+  }
+}

@@ -52,7 +52,7 @@ def test_config_loads() -> None:
     config = get_config()
     assert "sources" in config
     assert "ocr" in config
-    assert "sheets" in config
+    assert "period_types" in config  # General config, not sheet-specific
 
 
 def test_data_directories_exist() -> None:

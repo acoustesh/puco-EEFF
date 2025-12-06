@@ -1,5 +1,5 @@
 {
-  "_description": "XBRL-specific configuration for Pucobre financial statements. Separate from extraction_specs to allow PDF-only operation.",
+  "_description": "General XBRL parsing configuration. Sheet-specific XBRL mappings are in config/<sheet_name>/xbrl_mappings.json.",
 
   "enabled": true,
   "scaling_factor": 1000,
@@ -11,98 +11,6 @@
     "xlink": "http://www.w3.org/1999/xlink",
     "ifrs-full": "http://xbrl.ifrs.org/taxonomy/2023-03-23/ifrs-full"
   },
-
-  "fact_mappings": {
-    "ingresos_ordinarios": {
-      "primary": "RevenueFromContractsWithCustomers",
-      "fallbacks": ["Revenue", "IngresosPorActividadesOrdinarias"],
-      "context_type": "duration",
-      "apply_scaling": true
-    },
-    "total_costo_venta": {
-      "primary": "CostOfSales",
-      "fallbacks": ["CostoDeVentas"],
-      "context_type": "duration",
-      "apply_scaling": true,
-      "_note": "XBRL values in full USD, scale to MUS$ (thousands)"
-    },
-    "total_gasto_admin": {
-      "primary": "AdministrativeExpense",
-      "fallbacks": ["GastosDeAdministracion", "GastosDeAdministracionYVentas"],
-      "context_type": "duration",
-      "apply_scaling": true
-    },
-    "gross_profit": {
-      "primary": "GrossProfit",
-      "fallbacks": ["GananciaBruta"],
-      "context_type": "duration",
-      "apply_scaling": true
-    },
-    "profit_loss": {
-      "primary": "ProfitLoss",
-      "fallbacks": ["GananciaPerdida"],
-      "context_type": "duration",
-      "apply_scaling": true
-    }
-  },
-
-  "validation_rules": {
-    "sum_tolerance": 1,
-    "_sum_tolerance_note": "Allow ±1 difference due to rounding",
-
-    "total_validations": [
-      {
-        "total_field": "total_costo_venta",
-        "sum_fields": [
-          "cv_gastos_personal",
-          "cv_materiales",
-          "cv_energia",
-          "cv_servicios_terceros",
-          "cv_depreciacion_amort",
-          "cv_deprec_leasing",
-          "cv_deprec_arrend",
-          "cv_serv_mineros",
-          "cv_fletes",
-          "cv_gastos_diferidos",
-          "cv_convenios"
-        ],
-        "xbrl_fact": "CostOfSales",
-        "description": "Nota 21 - Costo de Venta"
-      },
-      {
-        "total_field": "total_gasto_admin",
-        "sum_fields": [
-          "ga_gastos_personal",
-          "ga_materiales",
-          "ga_servicios_terceros",
-          "ga_gratificacion",
-          "ga_comercializacion",
-          "ga_otros"
-        ],
-        "xbrl_fact": "AdministrativeExpense",
-        "description": "Nota 22 - Gastos de Administración y Ventas"
-      }
-    ],
-
-    "cross_validations": [
-      {
-        "description": "Gross Profit = Revenue - Cost of Sales",
-        "formula": "gross_profit == ingresos_ordinarios - abs(total_costo_venta)",
-        "tolerance": 1
-      }
-    ]
-  },
-
-  "aggregate_facts": [
-    "RevenueFromContractsWithCustomers",
-    "Revenue",
-    "CostOfSales",
-    "GrossProfit",
-    "AdministrativeExpense",
-    "SellingExpense",
-    "ProfitLoss",
-    "ProfitLossBeforeTax"
-  ],
 
   "period_filter": {
     "type": "duration",

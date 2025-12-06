@@ -1,5 +1,5 @@
 {
-  "_description": "Reference values for validation. These are known correct values from verified extractions. May not be available for all quarters.",
+  "_description": "Reference values for Sheet1 validation. Known correct values from verified extractions.",
 
   "2024_Q2": {
     "_comment": "Q2 2024 - Verified values from manual review of PDF and XBRL cross-validation",

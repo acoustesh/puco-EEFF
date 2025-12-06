@@ -108,7 +108,9 @@ def download_all_documents(
                 results.append(result)
 
             # Check if we got the main PDF
-            pdf_result = next((r for r in results if r.document_type == "estados_financieros_pdf"), None)
+            pdf_result = next(
+                (r for r in results if r.document_type == "estados_financieros_pdf"), None
+            )
             cmf_success = pdf_result is not None and pdf_result.success
 
     # Fallback to Pucobre.cl if CMF Chile failed and fallback is enabled
@@ -165,7 +167,9 @@ def _download_with_pucobre_fallback(
         (i for i, r in enumerate(existing_results) if r.document_type == "estados_financieros_pdf"),
         None,
     )
-    ar_idx = next((i for i, r in enumerate(existing_results) if r.document_type == "analisis_razonado"), None)
+    ar_idx = next(
+        (i for i, r in enumerate(existing_results) if r.document_type == "analisis_razonado"), None
+    )
 
     if pucobre_result.success:
         # Estados Financieros PDF
@@ -182,7 +186,9 @@ def _download_with_pucobre_fallback(
         else:
             existing_results.append(eeff_result)
 
-        logger.info(f"Successfully downloaded Estados Financieros from Pucobre.cl: {pucobre_result.file_path}")
+        logger.info(
+            f"Successfully downloaded Estados Financieros from Pucobre.cl: {pucobre_result.file_path}"
+        )
 
         # Análisis Razonado (if split was successful)
         if pucobre_result.analisis_razonado_path is not None:
@@ -204,7 +210,9 @@ def _download_with_pucobre_fallback(
             )
         else:
             # Análisis Razonado not extracted (split failed or not available)
-            if not any(r.document_type == "analisis_razonado" and r.success for r in existing_results):
+            if not any(
+                r.document_type == "analisis_razonado" and r.success for r in existing_results
+            ):
                 ar_result = DownloadResult(
                     document_type="analisis_razonado",
                     success=False,
@@ -505,7 +513,9 @@ def _download_single_document(
         )
 
 
-def _extract_xbrl_zip(zip_path: Path | None, xbrl_dir: Path, year: int, quarter: int) -> Path | None:
+def _extract_xbrl_zip(
+    zip_path: Path | None, xbrl_dir: Path, year: int, quarter: int
+) -> Path | None:
     """Extract XBRL instance document from downloaded ZIP file.
 
     The ZIP typically contains multiple files:
@@ -598,7 +608,9 @@ def list_available_periods(headless: bool = True) -> list[dict]:
         year_select = page.query_selector("select[name='aa']")
         if year_select:
             year_options = year_select.query_selector_all("option")
-            years = [opt.get_attribute("value") for opt in year_options if opt.get_attribute("value")]
+            years = [
+                opt.get_attribute("value") for opt in year_options if opt.get_attribute("value")
+            ]
             logger.debug(f"Available years: {years}")
 
             # Get available months
@@ -617,10 +629,12 @@ def list_available_periods(headless: bool = True) -> list[dict]:
                         if year and month:
                             quarter = month_to_quarter.get(month)
                             if quarter:
-                                periods.append({
-                                    "year": int(year),
-                                    "month": month,
-                                    "quarter": quarter,
-                                })
+                                periods.append(
+                                    {
+                                        "year": int(year),
+                                        "month": month,
+                                        "quarter": quarter,
+                                    }
+                                )
 
     return periods
