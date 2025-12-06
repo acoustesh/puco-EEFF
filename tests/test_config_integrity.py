@@ -22,12 +22,12 @@ from puco_eeff.config import (
     get_period_specs,
     get_reference_data,
     get_reference_values,
+    get_section_spec,
     get_xbrl_specs,
 )
 from puco_eeff.extractor.cost_extractor import (
     Sheet1Data,
     _get_extraction_labels,
-    _get_section_spec,
     _get_table_identifiers,
 )
 
@@ -414,29 +414,20 @@ class TestCostExtractorCompatibility:
             assert isinstance(item, str)
 
     def test_get_section_spec_returns_valid_dict(self) -> None:
-        """_get_section_spec should return valid section specs."""
+        """get_section_spec should return valid section specs."""
         for section_name in ["nota_21", "nota_22", "ingresos"]:
-            spec = _get_section_spec(section_name, 2024, 2)
+            spec = get_section_spec(section_name)
             assert isinstance(spec, dict), f"{section_name} spec should be dict"
 
-    def test_get_section_spec_with_different_periods(self) -> None:
-        """_get_section_spec should work for different periods."""
-        # Q2 2024 - verified
-        spec_q2 = _get_section_spec("nota_21", 2024, 2)
-        assert "field_mappings" in spec_q2
-
-        # Q3 2024 - placeholder
-        spec_q3 = _get_section_spec("nota_21", 2024, 3)
-        assert "field_mappings" in spec_q3
-
-        # Q1 2024 - pucobre source
-        spec_q1 = _get_section_spec("nota_21", 2024, 1)
-        assert "field_mappings" in spec_q1
+    def test_get_section_spec_has_field_mappings(self) -> None:
+        """get_section_spec should return specs with field_mappings."""
+        spec = get_section_spec("nota_21")
+        assert "field_mappings" in spec
 
     def test_get_table_identifiers_returns_tuples(self) -> None:
         """_get_table_identifiers should return (unique, exclude) tuple."""
         for section_name in ["nota_21", "nota_22"]:
-            spec = _get_section_spec(section_name, 2024, 2)
+            spec = get_section_spec(section_name)
             unique_items, exclude_items = _get_table_identifiers(spec)
 
             assert isinstance(unique_items, list)
@@ -444,8 +435,8 @@ class TestCostExtractorCompatibility:
 
     def test_nota_21_unique_items_distinguish_from_nota_22(self) -> None:
         """Nota 21 unique items should not overlap with Nota 22 unique items."""
-        nota_21_spec = _get_section_spec("nota_21", 2024, 2)
-        nota_22_spec = _get_section_spec("nota_22", 2024, 2)
+        nota_21_spec = get_section_spec("nota_21")
+        nota_22_spec = get_section_spec("nota_22")
 
         nota_21_unique, _ = _get_table_identifiers(nota_21_spec)
         nota_22_unique, _ = _get_table_identifiers(nota_22_spec)

@@ -44,8 +44,38 @@
   },
 
   "2024_Q1": {
-    "_comment": "Q1 2024 - Reference values not yet available (pucobre.cl source)",
-    "verified": false,
-    "values": null
+    "_comment": "Q1 2024 - Values from Estados Financieros PDF (pucobre.cl source, no XBRL)",
+    "verified": true,
+    "verified_date": "2024-12-06",
+    "source": "Estados Financieros PDF - Estado de Resultados + Nota 21/22",
+
+    "values": {
+      "ingresos_ordinarios": 80767,
+      "cv_gastos_personal": -9857,
+      "cv_materiales": -10986,
+      "cv_energia": -4727,
+      "cv_servicios_terceros": -11723,
+      "cv_depreciacion_amort": -10834,
+      "cv_deprec_leasing": -485,
+      "cv_deprec_arrend": -711,
+      "cv_serv_mineros": -3675,
+      "cv_fletes": -2489,
+      "cv_gastos_diferidos": -875,
+      "cv_convenios": -6620,
+      "total_costo_venta": -62982,
+      "ga_gastos_personal": -1831,
+      "ga_materiales": -56,
+      "ga_servicios_terceros": -1250,
+      "ga_gratificacion": -966,
+      "ga_comercializacion": -805,
+      "ga_otros": -229,
+      "total_gasto_admin": -5137
+    },
+
+    "internal_checks": {
+      "_comment": "Validation: Estado de Resultados totals should match Nota 21/22 totals",
+      "estado_resultados_costo_ventas_matches_nota21": true,
+      "estado_resultados_gastos_admin_matches_nota22": true
+    }
   }
 }

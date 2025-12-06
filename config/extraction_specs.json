@@ -189,6 +189,23 @@
       "ingresos": {
         "title": "Ingresos de actividades ordinarias",
         "source": "xbrl_preferred",
+        "pdf_fallback": {
+          "page_type": "estado_de_resultados",
+          "search_patterns": [
+            "estados de resultados",
+            "estado de resultados",
+            "ingresos de actividades ordinarias"
+          ],
+          "typical_page_range": [3, 10]
+        },
+        "table_identifiers": {
+          "unique_items": ["ingresos de actividades ordinarias", "costo de ventas", "ganancia bruta"],
+          "exclude_items": []
+        },
+        "validation": {
+          "has_totales_row": false,
+          "min_detail_items": 1
+        },
         "field_mappings": {
           "ingresos_ordinarios": {
             "pdf_labels": ["Ingresos de actividades ordinarias"],

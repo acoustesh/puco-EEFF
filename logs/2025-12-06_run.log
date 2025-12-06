@@ -966,3 +966,293 @@
 2025-12-06 09:53:06,604 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
 2025-12-06 09:53:06,605 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
 2025-12-06 09:53:06,605 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Ingresos Ordinarios: 179,165
+2025-12-06 10:11:41,375 - puco_eeff.extractor.cost_extractor - INFO - No XBRL available for 2024 Q1 - using PDF only
+2025-12-06 10:11:41,378 - puco_eeff.extractor.cost_extractor - INFO - Saved extraction result to: /tmp/pytest-of-alvaro/pytest-30/test_save_creates_json0/detailed_costs.json
+2025-12-06 10:11:41,382 - puco_eeff.extractor.cost_extractor - INFO - Saved Sheet1 data to: /tmp/pytest-of-alvaro/pytest-30/test_save_creates_json1/sheet1_IIQ2024.json
+2025-12-06 10:11:41,382 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
+2025-12-06 10:11:41,383 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
+2025-12-06 10:11:41,383 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Total Costo de Venta: -126,202
+2025-12-06 10:11:41,383 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Total Gasto Admin: -11,632
+2025-12-06 10:11:41,384 - puco_eeff.extractor.cost_extractor - INFO - PDF extraction failed, trying XBRL for 2024 Q2
+2025-12-06 10:11:42,301 - puco_eeff.transformer.formatter - WARNING - No reference data found for period: IQ2030
+2025-12-06 10:14:12,739 - puco_eeff.extractor.cost_extractor - INFO - Found Nota 21 with details on page 72
+2025-12-06 10:14:12,894 - puco_eeff.extractor.cost_extractor - INFO - Extracted 11 items from Nota 21
+2025-12-06 10:14:21,796 - puco_eeff.extractor.cost_extractor - INFO - Found Nota 21 with details on page 72
+2025-12-06 10:14:21,950 - puco_eeff.extractor.cost_extractor - INFO - Extracted 6 items from Nota 22
+2025-12-06 10:14:21,951 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos en personal' -> cv_gastos_personal = -19721
+2025-12-06 10:14:21,951 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Materiales y repuestos' -> cv_materiales = -23219
+2025-12-06 10:14:21,951 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Energía eléctrica' -> cv_energia = -9589
+2025-12-06 10:14:21,951 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Servicios de terceros' -> cv_servicios_terceros = -25063
+2025-12-06 10:14:21,951 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Depreciación y amort del periodo' -> cv_depreciacion_amort = -21694
+2025-12-06 10:14:21,951 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Depreciación Activos en leasing' -> cv_deprec_leasing = -881
+2025-12-06 10:14:21,951 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Depreciación Arrendamientos' -> cv_deprec_arrend = -1577
+2025-12-06 10:14:21,951 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Servicios mineros de terceros' -> cv_serv_mineros = -10804
+2025-12-06 10:14:21,951 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Fletes y otros gastos operacionales' -> cv_fletes = -5405
+2025-12-06 10:14:21,951 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos Diferidos, ajustes existencias y otros' -> cv_gastos_diferidos = -1587
+2025-12-06 10:14:21,951 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Obligaciones por convenios colectivos' -> cv_convenios = -6662
+2025-12-06 10:14:21,952 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos en personal' -> ga_gastos_personal = -3818
+2025-12-06 10:14:21,952 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Materiales y repuestos' -> ga_materiales = -129
+2025-12-06 10:14:21,952 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Servicios de terceros' -> ga_servicios_terceros = -4239
+2025-12-06 10:14:21,952 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Provision gratificacion legal y otros' -> ga_gratificacion = -639
+2025-12-06 10:14:21,952 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos comercializacion' -> ga_comercializacion = -2156
+2025-12-06 10:14:21,952 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Otros gastos' -> ga_otros = -651
+2025-12-06 10:14:21,952 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /home/alvaro/aa-ml/puco-EEFF/data/raw/xbrl/estados_financieros_2024_Q2.xbrl
+2025-12-06 10:14:21,956 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full', 'cl-ci', 'cl-ci-i', 'ifrs-mc', 'iso4217', 'ref', 'tx', 'xbrldi', 'xsd', 'xsi']
+2025-12-06 10:14:21,959 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 1931 facts from XBRL
+2025-12-06 10:14:21,964 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 364 contexts
+2025-12-06 10:14:21,965 - puco_eeff.extractor.cost_extractor - DEBUG - Scaled total_costo_venta: 126202000 -> 126202
+2025-12-06 10:14:21,965 - puco_eeff.extractor.cost_extractor - DEBUG - Scaled total_gasto_admin: 11632000 -> 11632
+2025-12-06 10:14:21,965 - puco_eeff.extractor.cost_extractor - DEBUG - Using fallback XBRL fact 'Revenue' for ingresos_ordinarios
+2025-12-06 10:14:21,965 - puco_eeff.extractor.cost_extractor - DEBUG - Scaled ingresos_ordinarios: 179165000 -> 179165
+2025-12-06 10:14:21,966 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
+2025-12-06 10:14:21,966 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
+2025-12-06 10:14:21,966 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Ingresos Ordinarios: 179,165
+2025-12-06 10:14:40,882 - puco_eeff.extractor.cost_extractor - INFO - Found Nota 21 with details on page 72
+2025-12-06 10:14:41,036 - puco_eeff.extractor.cost_extractor - INFO - Extracted 11 items from Nota 21
+2025-12-06 10:14:48,164 - puco_eeff.extractor.cost_extractor - INFO - Found Nota 21 with details on page 72
+2025-12-06 10:14:48,324 - puco_eeff.extractor.cost_extractor - INFO - Extracted 6 items from Nota 22
+2025-12-06 10:14:48,324 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos en personal' -> cv_gastos_personal = -19721
+2025-12-06 10:14:48,324 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Materiales y repuestos' -> cv_materiales = -23219
+2025-12-06 10:14:48,324 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Energía eléctrica' -> cv_energia = -9589
+2025-12-06 10:14:48,324 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Servicios de terceros' -> cv_servicios_terceros = -25063
+2025-12-06 10:14:48,324 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Depreciación y amort del periodo' -> cv_depreciacion_amort = -21694
+2025-12-06 10:14:48,325 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Depreciación Activos en leasing' -> cv_deprec_leasing = -881
+2025-12-06 10:14:48,325 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Depreciación Arrendamientos' -> cv_deprec_arrend = -1577
+2025-12-06 10:14:48,325 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Servicios mineros de terceros' -> cv_serv_mineros = -10804
+2025-12-06 10:14:48,325 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Fletes y otros gastos operacionales' -> cv_fletes = -5405
+2025-12-06 10:14:48,325 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos Diferidos, ajustes existencias y otros' -> cv_gastos_diferidos = -1587
+2025-12-06 10:14:48,325 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Obligaciones por convenios colectivos' -> cv_convenios = -6662
+2025-12-06 10:14:48,325 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos en personal' -> ga_gastos_personal = -3818
+2025-12-06 10:14:48,325 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Materiales y repuestos' -> ga_materiales = -129
+2025-12-06 10:14:48,325 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Servicios de terceros' -> ga_servicios_terceros = -4239
+2025-12-06 10:14:48,325 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Provision gratificacion legal y otros' -> ga_gratificacion = -639
+2025-12-06 10:14:48,325 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos comercializacion' -> ga_comercializacion = -2156
+2025-12-06 10:14:48,325 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Otros gastos' -> ga_otros = -651
+2025-12-06 10:14:48,325 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /home/alvaro/aa-ml/puco-EEFF/data/raw/xbrl/estados_financieros_2024_Q2.xbrl
+2025-12-06 10:14:48,328 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full', 'cl-ci', 'cl-ci-i', 'ifrs-mc', 'iso4217', 'ref', 'tx', 'xbrldi', 'xsd', 'xsi']
+2025-12-06 10:14:48,331 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 1931 facts from XBRL
+2025-12-06 10:14:48,336 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 364 contexts
+2025-12-06 10:14:48,337 - puco_eeff.extractor.cost_extractor - DEBUG - Scaled total_costo_venta: 126202000 -> 126202
+2025-12-06 10:14:48,337 - puco_eeff.extractor.cost_extractor - DEBUG - Scaled total_gasto_admin: 11632000 -> 11632
+2025-12-06 10:14:48,338 - puco_eeff.extractor.cost_extractor - DEBUG - Using fallback XBRL fact 'Revenue' for ingresos_ordinarios
+2025-12-06 10:14:48,338 - puco_eeff.extractor.cost_extractor - DEBUG - Scaled ingresos_ordinarios: 179165000 -> 179165
+2025-12-06 10:14:48,338 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
+2025-12-06 10:14:48,338 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
+2025-12-06 10:14:48,338 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Ingresos Ordinarios: 179,165
+2025-12-06 10:15:57,243 - puco_eeff.extractor.cost_extractor - WARNING - Estados Financieros PDF not found: /home/alvaro/aa-ml/puco-EEFF/data/raw/pdf/estados_financieros_2024_Q1.pdf
+2025-12-06 10:15:57,243 - puco_eeff.extractor.cost_extractor - INFO - PDF extraction failed, trying XBRL for 2024 Q1
+2025-12-06 10:15:57,243 - puco_eeff.extractor.cost_extractor - WARNING - XBRL file not found for 2024 Q1
+2025-12-06 10:15:57,243 - puco_eeff.extractor.cost_extractor - ERROR - Failed to extract Sheet1 from any source for 2024 Q1
+2025-12-06 10:16:57,137 - puco_eeff.scraper.cmf_downloader - INFO - Downloading all documents for 2024 Q1
+2025-12-06 10:16:57,137 - puco_eeff.scraper.cmf_downloader - DEBUG - Filters: tipo=C, tipo_norma=IFRS
+2025-12-06 10:16:58,402 - puco_eeff.scraper.cmf_downloader - DEBUG - Navigating to: https://www.cmfchile.cl/institucional/mercados/entidad.php?mercado=V&rut=96561560&grupo=&tipoentidad=RVEMI&row=&vig=VI&control=svs&pestania=3
+2025-12-06 10:16:59,590 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting month: 03
+2025-12-06 10:16:59,612 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting year: 2024
+2025-12-06 10:16:59,616 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting tipo: C
+2025-12-06 10:16:59,620 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting tipo_norma: IFRS
+2025-12-06 10:16:59,624 - puco_eeff.scraper.cmf_downloader - DEBUG - Clicking Consultar button
+2025-12-06 10:17:02,306 - puco_eeff.scraper.cmf_downloader - INFO - Successfully filtered for 2024 Q1
+2025-12-06 10:17:02,306 - puco_eeff.scraper.cmf_downloader - DEBUG - Looking for link: Análisis Razonado
+2025-12-06 10:17:02,317 - puco_eeff.scraper.cmf_downloader - WARNING - Link not found: Análisis Razonado
+2025-12-06 10:17:02,317 - puco_eeff.scraper.cmf_downloader - DEBUG - Looking for link: Estados financieros (PDF)
+2025-12-06 10:17:02,320 - puco_eeff.scraper.cmf_downloader - WARNING - Link not found: Estados financieros (PDF)
+2025-12-06 10:17:02,320 - puco_eeff.scraper.cmf_downloader - DEBUG - Looking for link: Estados financieros (XBRL)
+2025-12-06 10:17:02,322 - puco_eeff.scraper.cmf_downloader - WARNING - Link not found: Estados financieros (XBRL)
+2025-12-06 10:17:02,384 - puco_eeff.scraper.cmf_downloader - INFO - CMF Chile download failed, trying Pucobre.cl fallback...
+2025-12-06 10:17:02,385 - puco_eeff.scraper.pucobre_downloader - INFO - Attempting to download from Pucobre.cl: Estados Financieros 31-03-2024
+2025-12-06 10:17:02,556 - puco_eeff.scraper.pucobre_downloader - DEBUG - Navigating to: https://www.pucobre.cl/OpenDocs/asp/pagDefault.asp?boton=Doc51&argInstanciaId=51&argCarpetaId=32&argTreeNodosAbiertos=(32)&argTreeNodoActual=32&argTreeNodoSel=32
+2025-12-06 10:17:13,135 - puco_eeff.scraper.pucobre_downloader - DEBUG - PDF URL captured: https://www.pucobre.cl/common/asp/pagAtachadorVisualizador.asp?argCryptedData=GP1TkTXdhRJAS2Wp3v88hO%2BTX4LimcNxAaTC9s9%2FJWY%3D&argModo=&argOrigen=BD&argFlagYaGrabados=&argArchivoId=46472
+2025-12-06 10:17:14,563 - puco_eeff.scraper.pucobre_downloader - INFO - Downloaded combined PDF from Pucobre: pucobre_combined_2024_Q1.pdf (4,734,722 bytes)
+2025-12-06 10:17:14,984 - puco_eeff.scraper.pucobre_downloader - INFO - Found Análisis Razonado at page 96
+2025-12-06 10:17:14,995 - puco_eeff.scraper.pucobre_downloader - INFO - Split PDF: Estados Financieros (95 pages), Análisis Razonado (11 pages)
+2025-12-06 10:17:14,995 - puco_eeff.scraper.pucobre_downloader - INFO - Split into: estados_financieros_2024_Q1.pdf (4,320,171 bytes), analisis_razonado_2024_Q1.pdf (404,495 bytes)
+2025-12-06 10:17:15,059 - puco_eeff.scraper.cmf_downloader - INFO - Successfully downloaded Estados Financieros from Pucobre.cl: /home/alvaro/aa-ml/puco-EEFF/data/raw/pdf/estados_financieros_2024_Q1.pdf
+2025-12-06 10:17:15,059 - puco_eeff.scraper.cmf_downloader - INFO - Successfully extracted Análisis Razonado from Pucobre.cl: /home/alvaro/aa-ml/puco-EEFF/data/raw/pdf/analisis_razonado_2024_Q1.pdf
+2025-12-06 10:17:40,010 - puco_eeff.extractor.cost_extractor - INFO - Found Nota 21 with details on page 72
+2025-12-06 10:17:40,067 - puco_eeff.extractor.cost_extractor - INFO - Extracted 11 items from Nota 21
+2025-12-06 10:18:06,702 - puco_eeff.extractor.cost_extractor - INFO - Found Nota 21 with details on page 72
+2025-12-06 10:18:06,756 - puco_eeff.extractor.cost_extractor - INFO - Extracted 6 items from Nota 22
+2025-12-06 10:18:06,757 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos en personal' -> cv_gastos_personal = -9857
+2025-12-06 10:18:06,757 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Materiales y repuestos' -> cv_materiales = -10986
+2025-12-06 10:18:06,757 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Energía eléctrica' -> cv_energia = -4727
+2025-12-06 10:18:06,757 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Servicios de terceros' -> cv_servicios_terceros = -11723
+2025-12-06 10:18:06,757 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Depreciación y amort del periodo' -> cv_depreciacion_amort = -10834
+2025-12-06 10:18:06,757 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Depreciación Activos en leasing' -> cv_deprec_leasing = -485
+2025-12-06 10:18:06,757 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Depreciación Arrendamientos' -> cv_deprec_arrend = -711
+2025-12-06 10:18:06,757 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Servicios mineros de terceros' -> cv_serv_mineros = -3675
+2025-12-06 10:18:06,757 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Fletes y otros gastos operacionales' -> cv_fletes = -2489
+2025-12-06 10:18:06,757 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos Diferidos, ajustes existencias y otros' -> cv_gastos_diferidos = -875
+2025-12-06 10:18:06,757 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Obligaciones por convenios colectivos' -> cv_convenios = -6620
+2025-12-06 10:18:06,757 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos en personal' -> ga_gastos_personal = -1831
+2025-12-06 10:18:06,758 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Materiales y repuestos' -> ga_materiales = -56
+2025-12-06 10:18:06,758 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Servicios de terceros' -> ga_servicios_terceros = -1250
+2025-12-06 10:18:06,758 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Provision gratificacion legal y otros' -> ga_gratificacion = -966
+2025-12-06 10:18:06,758 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos comercializacion' -> ga_comercializacion = -805
+2025-12-06 10:18:06,758 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Otros gastos' -> ga_otros = -229
+2025-12-06 10:26:34,028 - puco_eeff.extractor.cost_extractor - INFO - Found Nota 21 with details on page 72
+2025-12-06 10:26:34,086 - puco_eeff.extractor.cost_extractor - INFO - Extracted 11 items from Nota 21
+2025-12-06 10:27:00,594 - puco_eeff.extractor.cost_extractor - INFO - Found Nota 21 with details on page 72
+2025-12-06 10:27:00,648 - puco_eeff.extractor.cost_extractor - INFO - Extracted 6 items from Nota 22
+2025-12-06 10:27:00,649 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos en personal' -> cv_gastos_personal = -9857
+2025-12-06 10:27:00,649 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Materiales y repuestos' -> cv_materiales = -10986
+2025-12-06 10:27:00,649 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Energía eléctrica' -> cv_energia = -4727
+2025-12-06 10:27:00,649 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Servicios de terceros' -> cv_servicios_terceros = -11723
+2025-12-06 10:27:00,649 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Depreciación y amort del periodo' -> cv_depreciacion_amort = -10834
+2025-12-06 10:27:00,649 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Depreciación Activos en leasing' -> cv_deprec_leasing = -485
+2025-12-06 10:27:00,649 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Depreciación Arrendamientos' -> cv_deprec_arrend = -711
+2025-12-06 10:27:00,649 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Servicios mineros de terceros' -> cv_serv_mineros = -3675
+2025-12-06 10:27:00,649 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Fletes y otros gastos operacionales' -> cv_fletes = -2489
+2025-12-06 10:27:00,649 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos Diferidos, ajustes existencias y otros' -> cv_gastos_diferidos = -875
+2025-12-06 10:27:00,649 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Obligaciones por convenios colectivos' -> cv_convenios = -6620
+2025-12-06 10:27:00,649 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos en personal' -> ga_gastos_personal = -1831
+2025-12-06 10:27:00,649 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Materiales y repuestos' -> ga_materiales = -56
+2025-12-06 10:27:00,650 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Servicios de terceros' -> ga_servicios_terceros = -1250
+2025-12-06 10:27:00,650 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Provision gratificacion legal y otros' -> ga_gratificacion = -966
+2025-12-06 10:27:00,650 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos comercializacion' -> ga_comercializacion = -805
+2025-12-06 10:27:00,650 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Otros gastos' -> ga_otros = -229
+2025-12-06 10:27:00,650 - puco_eeff.extractor.cost_extractor - INFO - No XBRL available, extracting Ingresos from Estado de Resultados
+2025-12-06 10:27:01,030 - puco_eeff.extractor.cost_extractor - INFO - Extracted Ingresos from PDF page 5: 21
+2025-12-06 10:27:01,032 - puco_eeff.extractor.cost_extractor - INFO - Set Ingresos from PDF: 21
+2025-12-06 10:27:58,467 - puco_eeff.extractor.cost_extractor - INFO - Found Nota 21 with details on page 72
+2025-12-06 10:27:58,524 - puco_eeff.extractor.cost_extractor - INFO - Extracted 11 items from Nota 21
+2025-12-06 10:28:25,206 - puco_eeff.extractor.cost_extractor - INFO - Found Nota 21 with details on page 72
+2025-12-06 10:28:25,257 - puco_eeff.extractor.cost_extractor - INFO - Extracted 6 items from Nota 22
+2025-12-06 10:28:25,258 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos en personal' -> cv_gastos_personal = -9857
+2025-12-06 10:28:25,258 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Materiales y repuestos' -> cv_materiales = -10986
+2025-12-06 10:28:25,258 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Energía eléctrica' -> cv_energia = -4727
+2025-12-06 10:28:25,258 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Servicios de terceros' -> cv_servicios_terceros = -11723
+2025-12-06 10:28:25,258 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Depreciación y amort del periodo' -> cv_depreciacion_amort = -10834
+2025-12-06 10:28:25,258 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Depreciación Activos en leasing' -> cv_deprec_leasing = -485
+2025-12-06 10:28:25,258 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Depreciación Arrendamientos' -> cv_deprec_arrend = -711
+2025-12-06 10:28:25,258 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Servicios mineros de terceros' -> cv_serv_mineros = -3675
+2025-12-06 10:28:25,258 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Fletes y otros gastos operacionales' -> cv_fletes = -2489
+2025-12-06 10:28:25,258 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos Diferidos, ajustes existencias y otros' -> cv_gastos_diferidos = -875
+2025-12-06 10:28:25,258 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Obligaciones por convenios colectivos' -> cv_convenios = -6620
+2025-12-06 10:28:25,259 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos en personal' -> ga_gastos_personal = -1831
+2025-12-06 10:28:25,259 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Materiales y repuestos' -> ga_materiales = -56
+2025-12-06 10:28:25,259 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Servicios de terceros' -> ga_servicios_terceros = -1250
+2025-12-06 10:28:25,259 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Provision gratificacion legal y otros' -> ga_gratificacion = -966
+2025-12-06 10:28:25,259 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos comercializacion' -> ga_comercializacion = -805
+2025-12-06 10:28:25,259 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Otros gastos' -> ga_otros = -229
+2025-12-06 10:28:25,259 - puco_eeff.extractor.cost_extractor - INFO - No XBRL available, extracting Ingresos from Estado de Resultados
+2025-12-06 10:28:26,562 - puco_eeff.extractor.cost_extractor - WARNING - Could not extract Ingresos from Estado de Resultados page
+2025-12-06 10:28:26,562 - puco_eeff.extractor.cost_extractor - WARNING - Could not extract Ingresos from PDF
+2025-12-06 10:29:37,702 - puco_eeff.extractor.cost_extractor - INFO - Found Nota 21 with details on page 72
+2025-12-06 10:29:37,759 - puco_eeff.extractor.cost_extractor - INFO - Extracted 11 items from Nota 21
+2025-12-06 10:30:04,323 - puco_eeff.extractor.cost_extractor - INFO - Found Nota 21 with details on page 72
+2025-12-06 10:30:04,377 - puco_eeff.extractor.cost_extractor - INFO - Extracted 6 items from Nota 22
+2025-12-06 10:30:04,377 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos en personal' -> cv_gastos_personal = -9857
+2025-12-06 10:30:04,377 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Materiales y repuestos' -> cv_materiales = -10986
+2025-12-06 10:30:04,377 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Energía eléctrica' -> cv_energia = -4727
+2025-12-06 10:30:04,377 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Servicios de terceros' -> cv_servicios_terceros = -11723
+2025-12-06 10:30:04,377 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Depreciación y amort del periodo' -> cv_depreciacion_amort = -10834
+2025-12-06 10:30:04,378 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Depreciación Activos en leasing' -> cv_deprec_leasing = -485
+2025-12-06 10:30:04,378 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Depreciación Arrendamientos' -> cv_deprec_arrend = -711
+2025-12-06 10:30:04,378 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Servicios mineros de terceros' -> cv_serv_mineros = -3675
+2025-12-06 10:30:04,378 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Fletes y otros gastos operacionales' -> cv_fletes = -2489
+2025-12-06 10:30:04,378 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos Diferidos, ajustes existencias y otros' -> cv_gastos_diferidos = -875
+2025-12-06 10:30:04,378 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Obligaciones por convenios colectivos' -> cv_convenios = -6620
+2025-12-06 10:30:04,378 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos en personal' -> ga_gastos_personal = -1831
+2025-12-06 10:30:04,378 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Materiales y repuestos' -> ga_materiales = -56
+2025-12-06 10:30:04,378 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Servicios de terceros' -> ga_servicios_terceros = -1250
+2025-12-06 10:30:04,378 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Provision gratificacion legal y otros' -> ga_gratificacion = -966
+2025-12-06 10:30:04,378 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos comercializacion' -> ga_comercializacion = -805
+2025-12-06 10:30:04,378 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Otros gastos' -> ga_otros = -229
+2025-12-06 10:30:04,378 - puco_eeff.extractor.cost_extractor - INFO - No XBRL available, extracting Ingresos from Estado de Resultados
+2025-12-06 10:30:04,753 - puco_eeff.extractor.cost_extractor - INFO - Extracted Ingresos from PDF page 5: 80,767
+2025-12-06 10:30:04,754 - puco_eeff.extractor.cost_extractor - INFO - Set Ingresos from PDF: 80,767
+2025-12-06 10:30:11,217 - puco_eeff.extractor.cost_extractor - INFO - No XBRL available for 2024 Q1 - using PDF only
+2025-12-06 10:30:11,220 - puco_eeff.extractor.cost_extractor - INFO - Saved extraction result to: /tmp/pytest-of-alvaro/pytest-31/test_save_creates_json0/detailed_costs.json
+2025-12-06 10:30:11,224 - puco_eeff.extractor.cost_extractor - INFO - Saved Sheet1 data to: /tmp/pytest-of-alvaro/pytest-31/test_save_creates_json1/sheet1_IIQ2024.json
+2025-12-06 10:30:11,224 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
+2025-12-06 10:30:11,225 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
+2025-12-06 10:30:11,225 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Total Costo de Venta: -126,202
+2025-12-06 10:30:11,225 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Total Gasto Admin: -11,632
+2025-12-06 10:30:11,226 - puco_eeff.extractor.cost_extractor - INFO - PDF extraction failed, trying XBRL for 2024 Q2
+2025-12-06 10:30:12,107 - puco_eeff.transformer.formatter - WARNING - No reference data found for period: IQ2030
+2025-12-06 10:32:00,804 - puco_eeff.extractor.cost_extractor - INFO - Extracted Ingresos from PDF page 5: 80,767
+2025-12-06 10:32:00,806 - puco_eeff.extractor.cost_extractor - WARNING - Could not extract Ingresos from Estado de Resultados page
+2025-12-06 10:32:00,807 - puco_eeff.extractor.cost_extractor - WARNING - Estados Financieros PDF not found: /fake/pdf/estados_financieros.pdf
+2025-12-06 10:32:25,612 - puco_eeff.extractor.cost_extractor - INFO - Extracted Ingresos from PDF page 5: 80,767
+2025-12-06 10:32:25,613 - puco_eeff.extractor.cost_extractor - WARNING - Could not extract Ingresos from Estado de Resultados page
+2025-12-06 10:32:25,615 - puco_eeff.extractor.cost_extractor - INFO - No XBRL available, extracting Ingresos from Estado de Resultados
+2025-12-06 10:32:25,615 - puco_eeff.extractor.cost_extractor - INFO - Set Ingresos from PDF: 80,767
+2025-12-06 10:32:31,807 - puco_eeff.extractor.cost_extractor - INFO - No XBRL available for 2024 Q1 - using PDF only
+2025-12-06 10:32:31,810 - puco_eeff.extractor.cost_extractor - INFO - Saved extraction result to: /tmp/pytest-of-alvaro/pytest-32/test_save_creates_json0/detailed_costs.json
+2025-12-06 10:32:31,815 - puco_eeff.extractor.cost_extractor - INFO - Saved Sheet1 data to: /tmp/pytest-of-alvaro/pytest-32/test_save_creates_json1/sheet1_IIQ2024.json
+2025-12-06 10:32:31,816 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
+2025-12-06 10:32:31,816 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
+2025-12-06 10:32:31,816 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Total Costo de Venta: -126,202
+2025-12-06 10:32:31,816 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Total Gasto Admin: -11,632
+2025-12-06 10:32:31,818 - puco_eeff.extractor.cost_extractor - INFO - PDF extraction failed, trying XBRL for 2024 Q2
+2025-12-06 10:32:31,820 - puco_eeff.extractor.cost_extractor - INFO - Extracted Ingresos from PDF page 5: 80,767
+2025-12-06 10:32:31,821 - puco_eeff.extractor.cost_extractor - WARNING - Could not extract Ingresos from Estado de Resultados page
+2025-12-06 10:32:31,823 - puco_eeff.extractor.cost_extractor - INFO - No XBRL available, extracting Ingresos from Estado de Resultados
+2025-12-06 10:32:31,823 - puco_eeff.extractor.cost_extractor - INFO - Set Ingresos from PDF: 80,767
+2025-12-06 10:32:32,413 - puco_eeff.transformer.formatter - WARNING - No reference data found for period: IQ2030
+2025-12-06 10:39:33,062 - puco_eeff.extractor.cost_extractor - INFO - No XBRL available for 2024 Q1 - using PDF only
+2025-12-06 10:39:33,064 - puco_eeff.extractor.cost_extractor - INFO - Saved extraction result to: /tmp/pytest-of-alvaro/pytest-33/test_save_creates_json0/detailed_costs.json
+2025-12-06 10:39:33,069 - puco_eeff.extractor.cost_extractor - INFO - Saved Sheet1 data to: /tmp/pytest-of-alvaro/pytest-33/test_save_creates_json1/sheet1_IIQ2024.json
+2025-12-06 10:39:33,070 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
+2025-12-06 10:39:33,070 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
+2025-12-06 10:39:33,070 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Total Costo de Venta: -126,202
+2025-12-06 10:39:33,070 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Total Gasto Admin: -11,632
+2025-12-06 10:39:33,072 - puco_eeff.extractor.cost_extractor - INFO - PDF extraction failed, trying XBRL for 2024 Q2
+2025-12-06 10:39:33,075 - puco_eeff.extractor.cost_extractor - INFO - Found section 'ingresos' with details on page 5
+2025-12-06 10:39:33,075 - puco_eeff.extractor.cost_extractor - WARNING - Could not extract Ingresos from Estado de Resultados page
+2025-12-06 10:39:33,088 - puco_eeff.extractor.cost_extractor - WARNING - Could not find Estado de Resultados page for Ingresos extraction
+2025-12-06 10:39:33,090 - puco_eeff.extractor.cost_extractor - INFO - No XBRL available, extracting Ingresos from Estado de Resultados
+2025-12-06 10:39:33,090 - puco_eeff.extractor.cost_extractor - INFO - Set Ingresos from PDF: 80,767
+2025-12-06 10:39:41,954 - puco_eeff.extractor.cost_extractor - INFO - Found section 'ingresos' with details on page 5
+2025-12-06 10:41:03,434 - puco_eeff.extractor.cost_extractor - INFO - No XBRL available for 2024 Q1 - using PDF only
+2025-12-06 10:41:03,437 - puco_eeff.extractor.cost_extractor - INFO - Saved extraction result to: /tmp/pytest-of-alvaro/pytest-34/test_save_creates_json0/detailed_costs.json
+2025-12-06 10:41:03,441 - puco_eeff.extractor.cost_extractor - INFO - Saved Sheet1 data to: /tmp/pytest-of-alvaro/pytest-34/test_save_creates_json1/sheet1_IIQ2024.json
+2025-12-06 10:41:03,442 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
+2025-12-06 10:41:03,442 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
+2025-12-06 10:41:03,442 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Total Costo de Venta: -126,202
+2025-12-06 10:41:03,442 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Total Gasto Admin: -11,632
+2025-12-06 10:41:03,444 - puco_eeff.extractor.cost_extractor - INFO - PDF extraction failed, trying XBRL for 2024 Q2
+2025-12-06 10:41:03,446 - puco_eeff.extractor.cost_extractor - INFO - Found section 'ingresos' with details on page 5
+2025-12-06 10:41:03,446 - puco_eeff.extractor.cost_extractor - INFO - Extracted Ingresos from PDF page 5: 80,767
+2025-12-06 10:41:03,448 - puco_eeff.extractor.cost_extractor - WARNING - Could not find Estado de Resultados page for Ingresos extraction
+2025-12-06 10:41:03,449 - puco_eeff.extractor.cost_extractor - INFO - No XBRL available, extracting Ingresos from Estado de Resultados
+2025-12-06 10:41:03,449 - puco_eeff.extractor.cost_extractor - INFO - Set Ingresos from PDF: 80,767
+2025-12-06 10:41:29,297 - puco_eeff.extractor.cost_extractor - INFO - Found section 'nota_21' with details on page 72
+2025-12-06 10:41:29,362 - puco_eeff.extractor.cost_extractor - INFO - Extracted 11 items from Nota 21
+2025-12-06 10:41:55,602 - puco_eeff.extractor.cost_extractor - INFO - Found section 'nota_21' with details on page 72
+2025-12-06 10:41:55,658 - puco_eeff.extractor.cost_extractor - INFO - Extracted 6 items from Nota 22
+2025-12-06 10:41:55,658 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos en personal' -> cv_gastos_personal = -9857
+2025-12-06 10:41:55,658 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Materiales y repuestos' -> cv_materiales = -10986
+2025-12-06 10:41:55,658 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Energía eléctrica' -> cv_energia = -4727
+2025-12-06 10:41:55,659 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Servicios de terceros' -> cv_servicios_terceros = -11723
+2025-12-06 10:41:55,659 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Depreciación y amort del periodo' -> cv_depreciacion_amort = -10834
+2025-12-06 10:41:55,659 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Depreciación Activos en leasing' -> cv_deprec_leasing = -485
+2025-12-06 10:41:55,659 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Depreciación Arrendamientos' -> cv_deprec_arrend = -711
+2025-12-06 10:41:55,659 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Servicios mineros de terceros' -> cv_serv_mineros = -3675
+2025-12-06 10:41:55,659 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Fletes y otros gastos operacionales' -> cv_fletes = -2489
+2025-12-06 10:41:55,659 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos Diferidos, ajustes existencias y otros' -> cv_gastos_diferidos = -875
+2025-12-06 10:41:55,659 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Obligaciones por convenios colectivos' -> cv_convenios = -6620
+2025-12-06 10:41:55,659 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos en personal' -> ga_gastos_personal = -1831
+2025-12-06 10:41:55,659 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Materiales y repuestos' -> ga_materiales = -56
+2025-12-06 10:41:55,659 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Servicios de terceros' -> ga_servicios_terceros = -1250
+2025-12-06 10:41:55,659 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Provision gratificacion legal y otros' -> ga_gratificacion = -966
+2025-12-06 10:41:55,659 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Gastos comercializacion' -> ga_comercializacion = -805
+2025-12-06 10:41:55,660 - puco_eeff.extractor.cost_extractor - DEBUG - Mapped 'Otros gastos' -> ga_otros = -229
+2025-12-06 10:41:55,660 - puco_eeff.extractor.cost_extractor - INFO - No XBRL available, extracting Ingresos from Estado de Resultados
+2025-12-06 10:41:56,203 - puco_eeff.extractor.cost_extractor - INFO - Found section 'ingresos' with details on page 5
+2025-12-06 10:41:56,272 - puco_eeff.extractor.cost_extractor - INFO - Extracted Ingresos from PDF page 5: 80,767
+2025-12-06 10:41:56,273 - puco_eeff.extractor.cost_extractor - INFO - Set Ingresos from PDF: 80,767
+2025-12-06 10:42:35,715 - puco_eeff.extractor.cost_extractor - INFO - No XBRL available for 2024 Q1 - using PDF only
+2025-12-06 10:42:35,718 - puco_eeff.extractor.cost_extractor - INFO - Saved extraction result to: /tmp/pytest-of-alvaro/pytest-35/test_save_creates_json0/detailed_costs.json
+2025-12-06 10:42:35,722 - puco_eeff.extractor.cost_extractor - INFO - Saved Sheet1 data to: /tmp/pytest-of-alvaro/pytest-35/test_save_creates_json1/sheet1_IIQ2024.json
+2025-12-06 10:42:35,723 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
+2025-12-06 10:42:35,723 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
+2025-12-06 10:42:35,724 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Total Costo de Venta: -126,202
+2025-12-06 10:42:35,724 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Total Gasto Admin: -11,632
+2025-12-06 10:42:35,725 - puco_eeff.extractor.cost_extractor - INFO - PDF extraction failed, trying XBRL for 2024 Q2
+2025-12-06 10:42:35,728 - puco_eeff.extractor.cost_extractor - INFO - Found section 'ingresos' with details on page 5
+2025-12-06 10:42:35,728 - puco_eeff.extractor.cost_extractor - INFO - Extracted Ingresos from PDF page 5: 80,767
+2025-12-06 10:42:35,729 - puco_eeff.extractor.cost_extractor - WARNING - Could not find Estado de Resultados page for Ingresos extraction
+2025-12-06 10:42:35,731 - puco_eeff.extractor.cost_extractor - INFO - No XBRL available, extracting Ingresos from Estado de Resultados
+2025-12-06 10:42:35,731 - puco_eeff.extractor.cost_extractor - INFO - Set Ingresos from PDF: 80,767
+2025-12-06 10:42:36,390 - puco_eeff.transformer.formatter - WARNING - No reference data found for period: IQ2030

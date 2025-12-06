@@ -571,13 +571,146 @@ def get_fields_for_section(section_name: str) -> list[str]:
     """Get field names belonging to a specific section.
 
     Args:
-        section_name: Section name ("nota_21", "nota_22", "ingresos")
+        section_name: Section key from extraction_specs.json sections
 
     Returns:
         List of field names in that section.
     """
     value_fields = get_sheet1_value_fields()
     return [field_name for field_name, field_def in value_fields.items() if field_def.get("section") == section_name]
+
+
+def get_extraction_sections() -> list[str]:
+    """Get list of all extraction section keys from config.
+
+    Returns:
+        List of section keys (e.g., ["nota_21", "nota_22", "ingresos"])
+
+    Raises:
+        ValueError: If sections not found in config.
+    """
+    specs = get_extraction_specs()
+    default = specs.get("default", {})
+    sections = default.get("sections")
+    if sections is None:
+        raise ValueError("sections not found in extraction_specs.json default")
+    return list(sections.keys())
+
+
+def get_section_spec(section_name: str, year: int | None = None, quarter: int | None = None) -> dict[str, Any]:
+    """Get full specification for a section, merging defaults with period deviations.
+
+    Args:
+        section_name: Section key from extraction_specs.json
+        year: Optional year for period-specific overrides
+        quarter: Optional quarter for period-specific overrides
+
+    Returns:
+        Section specification dictionary.
+
+    Raises:
+        ValueError: If section not found in config.
+    """
+    specs = get_period_specs(year, quarter) if year and quarter else get_extraction_specs().get("default", {})
+    sections = specs.get("sections", {})
+    section = sections.get(section_name)
+    if section is None:
+        raise ValueError(f"Section '{section_name}' not found in extraction_specs.json")
+    return section
+
+
+def get_section_title(section_name: str) -> str:
+    """Get the display title for a section.
+
+    Args:
+        section_name: Section key from extraction_specs.json
+
+    Returns:
+        Section title string.
+    """
+    section = get_section_spec(section_name)
+    return section.get("title", section_name)
+
+
+def get_section_search_patterns(section_name: str) -> list[str]:
+    """Get search patterns for finding a section in PDF.
+
+    Args:
+        section_name: Section key from extraction_specs.json
+
+    Returns:
+        List of search pattern strings.
+
+    Raises:
+        ValueError: If search_patterns not found for section.
+    """
+    section = get_section_spec(section_name)
+    patterns = section.get("search_patterns")
+    if patterns is None:
+        raise ValueError(f"search_patterns not found for section '{section_name}' in extraction_specs.json")
+    return patterns
+
+
+def get_section_table_identifiers(section_name: str) -> tuple[list[str], list[str]]:
+    """Get unique and exclude items for identifying a section's table.
+
+    Args:
+        section_name: Section key from extraction_specs.json
+
+    Returns:
+        Tuple of (unique_items, exclude_items) lists.
+    """
+    section = get_section_spec(section_name)
+    identifiers = section.get("table_identifiers", {})
+    return (
+        identifiers.get("unique_items", []),
+        identifiers.get("exclude_items", []),
+    )
+
+
+def get_section_validation_rules(section_name: str) -> dict[str, Any]:
+    """Get validation rules for a section.
+
+    Args:
+        section_name: Section key from extraction_specs.json
+
+    Returns:
+        Validation rules dictionary with keys like 'has_totales_row', 'min_detail_items'.
+    """
+    section = get_section_spec(section_name)
+    return section.get("validation", {})
+
+
+def get_section_expected_items(section_name: str) -> list[str]:
+    """Get list of expected PDF labels for a section's line items.
+
+    Extracts pdf_labels from field_mappings for the section.
+
+    Args:
+        section_name: Section key from extraction_specs.json
+
+    Returns:
+        List of expected item label strings.
+    """
+    field_mappings = get_section_field_mappings(section_name)
+    items = []
+    for mapping in field_mappings.values():
+        pdf_labels = mapping.get("pdf_labels", [])
+        items.extend(pdf_labels)
+    return items
+
+
+def get_total_row_markers() -> list[str]:
+    """Get markers that identify total rows in tables.
+
+    Returns:
+        List of marker strings (e.g., ["Totales", "Total"]).
+    """
+    specs = get_extraction_specs()
+    default = specs.get("default", {})
+    doc_structure = default.get("document_structure", {})
+    markers = doc_structure.get("section_markers", {})
+    return markers.get("table_end_markers", ["Totales", "Total"])
 
 
 def get_section_field_mappings(section_name: str) -> dict[str, dict[str, Any]]:

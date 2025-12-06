@@ -33,8 +33,11 @@ from puco_eeff.config import (
     format_filename,
     format_period_display,
     get_config,
+    get_extraction_sections,
     get_period_paths,
-    get_period_specs,
+    get_section_expected_items,
+    get_section_field_mappings,
+    get_section_spec,
     get_sheet1_row_mapping,
     get_sheet1_value_fields,
     get_sum_tolerance,
@@ -49,26 +52,42 @@ logger = setup_logging(__name__)
 
 
 # =============================================================================
-# Extraction Specs Loading
+# Generic Section Extraction (Config-Driven)
 # =============================================================================
 
 
-def _get_section_spec(section_name: str, year: int | None = None, quarter: int | None = None) -> dict[str, Any]:
-    """Get extraction specification for a section from extraction_specs.json.
-
-    Merges default specs with period-specific deviations.
+def get_section_expected_labels(section_name: str) -> list[str]:
+    """Get expected PDF labels for a section from config.
 
     Args:
-        section_name: Section name ("nota_21", "nota_22", or "ingresos")
-        year: Optional year for period-specific specs
-        quarter: Optional quarter for period-specific specs
+        section_name: Section key from extraction_specs.json
 
     Returns:
-        Section specification dictionary
+        List of expected label strings for line items.
+
+    Raises:
+        ValueError: If section not found in config.
     """
-    specs = get_period_specs(year, quarter) if year and quarter else get_period_specs(2024, 2)
-    sections = specs.get("sections", {})
-    return sections.get(section_name, {})
+    return get_section_expected_items(section_name)
+
+
+def get_all_field_labels() -> dict[str, str]:
+    """Get all field labels from all sections in config.
+
+    Returns:
+        Dictionary mapping field names to their primary PDF labels.
+
+    Raises:
+        ValueError: If sections not found in config.
+    """
+    field_labels = {}
+    for section_name in get_extraction_sections():
+        field_mappings = get_section_field_mappings(section_name)
+        for field_name, field_spec in field_mappings.items():
+            labels = field_spec.get("pdf_labels", [])
+            if labels:
+                field_labels[field_name] = labels[0]
+    return field_labels
 
 
 def _get_pdf_labels_for_field(section_spec: dict[str, Any], field_name: str) -> list[str]:
@@ -105,59 +124,47 @@ def _get_table_identifiers(section_spec: dict[str, Any]) -> tuple[list[str], lis
 def _get_extraction_labels(config: dict | None = None) -> tuple[list[str], list[str], dict[str, str]]:
     """Get extraction labels from extraction_specs.json.
 
-    This function loads labels from the new extraction_specs.json,
-    falling back to config.json for backward compatibility.
+    This function loads labels from extraction_specs.json for all configured
+    sections. It is designed to be generic and driven entirely by config.
 
     Args:
         config: Configuration dict (ignored, kept for backward compat)
 
     Returns:
-        Tuple of (costo_venta_items, gasto_admin_items, field_labels)
+        Tuple of (section1_items, section2_items, field_labels)
+        where section1 and section2 are the first two cost sections defined
+
+    Raises:
+        ValueError: If config loading fails
     """
-    try:
-        # Load from extraction_specs.json
-        nota_21_spec = _get_section_spec("nota_21")
-        nota_22_spec = _get_section_spec("nota_22")
+    # Get all extraction sections from config
+    sections = get_extraction_sections()
+    if len(sections) < 2:
+        raise ValueError(f"Expected at least 2 extraction sections in config, got {len(sections)}")
 
-        # Extract unique PDF labels for each section
-        costo_venta_items = []
-        for field_name, field_spec in nota_21_spec.get("field_mappings", {}).items():
-            if not field_name.startswith("total_"):
-                labels = field_spec.get("pdf_labels", [])
-                if labels:
-                    costo_venta_items.append(labels[0])  # Use primary label
+    # Build items lists for the first two cost sections
+    section1_items = []
+    section2_items = []
+    field_labels = {}
 
-        gasto_admin_items = []
-        for field_name, field_spec in nota_22_spec.get("field_mappings", {}).items():
-            if not field_name.startswith("total_"):
-                labels = field_spec.get("pdf_labels", [])
-                if labels:
-                    gasto_admin_items.append(labels[0])
+    for i, section_name in enumerate(sections):
+        section_spec = get_section_spec(section_name)
+        field_mappings = section_spec.get("field_mappings", {})
 
-        # Build field_labels mapping
-        field_labels = {}
-        ingresos_spec = _get_section_spec("ingresos")
-        for field_name, field_spec in ingresos_spec.get("field_mappings", {}).items():
+        for field_name, field_spec in field_mappings.items():
             labels = field_spec.get("pdf_labels", [])
             if labels:
+                # Build field_labels for all sections
                 field_labels[field_name] = labels[0]
 
-        for field_name, field_spec in nota_21_spec.get("field_mappings", {}).items():
-            labels = field_spec.get("pdf_labels", [])
-            if labels:
-                field_labels[field_name] = labels[0]
+                # Build items lists (excluding totals) for first two cost sections
+                if not field_name.startswith("total_"):
+                    if i == 0:
+                        section1_items.append(labels[0])
+                    elif i == 1:
+                        section2_items.append(labels[0])
 
-        for field_name, field_spec in nota_22_spec.get("field_mappings", {}).items():
-            labels = field_spec.get("pdf_labels", [])
-            if labels:
-                field_labels[field_name] = labels[0]
-
-        return costo_venta_items, gasto_admin_items, field_labels
-
-    except Exception as e:
-        logger.warning(f"Failed to load from extraction_specs.json, using fallback: {e}")
-        # Fallback to hardcoded defaults
-        return _get_extraction_labels_fallback()
+    return section1_items, section2_items, field_labels
 
 
 def load_sheet1_config(config: dict | None = None) -> dict[str, Any]:
@@ -172,68 +179,6 @@ def load_sheet1_config(config: dict | None = None) -> dict[str, Any]:
     if config is None:
         config = get_config()
     return config.get("sheets", {}).get("sheet1", {})
-
-
-# =============================================================================
-# Emergency Fallback Labels (used only when config files are unavailable)
-# =============================================================================
-
-
-def _get_extraction_labels_fallback() -> tuple[list[str], list[str], dict[str, str]]:
-    """Emergency fallback extraction labels when config files are unavailable.
-
-    This function should rarely be called. If it is called frequently,
-    it indicates a problem with config file loading.
-    """
-    logger.warning("FALLBACK: Using emergency hardcoded labels - config files may be unavailable")
-
-    costo_venta_items = [
-        "Gastos en personal",
-        "Materiales y repuestos",
-        "Energía eléctrica",
-        "Servicios de terceros",
-        "Depreciación y amort del periodo",
-        "Depreciación Activos en leasing",
-        "Depreciación Arrendamientos",
-        "Servicios mineros de terceros",
-        "Fletes y otros gastos operacionales",
-        "Gastos Diferidos, ajustes existencias y otros",
-        "Obligaciones por convenios colectivos",
-    ]
-
-    gasto_admin_items = [
-        "Gastos en personal",
-        "Materiales y repuestos",
-        "Servicios de terceros",
-        "Provision gratificacion legal y otros",
-        "Gastos comercializacion",
-        "Otros gastos",
-    ]
-
-    field_labels = {
-        "ingresos_ordinarios": "Ingresos de actividades ordinarias",
-        "cv_gastos_personal": "Gastos en personal",
-        "cv_materiales": "Materiales y repuestos",
-        "cv_energia": "Energía eléctrica",
-        "cv_servicios_terceros": "Servicios de terceros",
-        "cv_depreciacion_amort": "Depreciación y amort del periodo",
-        "cv_deprec_leasing": "Depreciación Activos en leasing",
-        "cv_deprec_arrend": "Depreciación Arrendamientos",
-        "cv_serv_mineros": "Servicios mineros de terceros",
-        "cv_fletes": "Fletes y otros gastos operacionales",
-        "cv_gastos_diferidos": "Gastos Diferidos, ajustes existencias y otros",
-        "cv_convenios": "Obligaciones por convenios colectivos",
-        "total_costo_venta": "Total Costo de Venta",
-        "ga_gastos_personal": "Gastos en personal",
-        "ga_materiales": "Materiales y repuestos",
-        "ga_servicios_terceros": "Servicios de terceros",
-        "ga_gratificacion": "Provision gratificacion legal y otros",
-        "ga_comercializacion": "Gastos comercializacion",
-        "ga_otros": "Otros gastos",
-        "total_gasto_admin": "Totales",
-    }
-
-    return costo_venta_items, gasto_admin_items, field_labels
 
 
 @dataclass
@@ -358,31 +303,36 @@ def parse_chilean_number(value: str | None) -> int | None:
         return None
 
 
-def find_nota_page(
+def find_section_page(
     pdf_path: Path,
-    nota_number: int,
+    section_name: str,
     year: int | None = None,
     quarter: int | None = None,
 ) -> int | None:
-    """Find the page number where a Nota section with detailed breakdown exists.
+    """Find the page number where a section with detailed breakdown exists.
 
     Uses extraction_specs.json to get search patterns and unique identifiers.
+    Works with any section: nota_21, nota_22, ingresos, etc.
 
     Args:
         pdf_path: Path to the PDF file
-        nota_number: Nota number to find (21 or 22)
+        section_name: Section name from extraction_specs.json (e.g., "nota_21", "ingresos")
         year: Optional year for period-specific specs
         quarter: Optional quarter for period-specific specs
 
     Returns:
         0-indexed page number or None if not found
     """
-    # Get section spec for table identifiers
-    section_name = f"nota_{nota_number}"
-    section_spec = _get_section_spec(section_name, year, quarter)
+    section_spec = get_section_spec(section_name)
 
     # Get unique items for this section (used to identify correct page)
     unique_items, _ = _get_table_identifiers(section_spec)
+
+    if not unique_items:
+        raise ValueError(
+            f"No unique_items defined in extraction_specs.json for section '{section_name}'. "
+            "Please add table_identifiers.unique_items to the section spec."
+        )
 
     # Build detail items list from unique identifiers
     # Add lowercase variations and accent-stripped versions
@@ -394,37 +344,17 @@ def find_nota_page(
         if normalized != item.lower():
             detail_items.append(normalized)
 
-    # Fallback to default patterns if no unique items in spec
-    if not detail_items:
-        if nota_number == 21:
-            detail_items = [
-                "gastos en personal",
-                "materiales",
-                "energía",
-                "energia",
-                "servicios de terceros",
-                "depreciación",
-                "depreciacion",
-            ]
-        else:
-            detail_items = [
-                "gastos en personal",
-                "materiales",
-                "servicios de terceros",
-                "gratificación",
-                "gratificacion",
-                "comercialización",
-                "comercializacion",
-            ]
-
-    # Get search patterns from spec
+    # Get search patterns from spec (check both top-level and pdf_fallback)
     search_patterns = section_spec.get("search_patterns", [])
     if not search_patterns:
-        # Fallback patterns
-        if nota_number == 21:
-            search_patterns = [f"{nota_number}. costo", f"{nota_number} costo"]
-        else:
-            search_patterns = [f"{nota_number}. gastos", f"{nota_number} gastos"]
+        # Fallback to pdf_fallback.search_patterns (used by ingresos section)
+        pdf_fallback = section_spec.get("pdf_fallback", {})
+        search_patterns = pdf_fallback.get("search_patterns", [])
+    if not search_patterns:
+        raise ValueError(
+            f"No search_patterns defined in extraction_specs.json for section '{section_name}'. "
+            "Please add search_patterns to the section spec or pdf_fallback."
+        )
 
     # Get validation requirements from spec
     validation = section_spec.get("validation", {})
@@ -447,10 +377,32 @@ def find_nota_page(
             totales_present = not has_totales or "totales" in text
 
             if detail_count >= min_detail_items and totales_present:
-                logger.info(f"Found Nota {nota_number} with details on page {page_idx + 1}")
+                logger.info(f"Found section '{section_name}' with details on page {page_idx + 1}")
                 return page_idx
 
     return None
+
+
+def find_nota_page(
+    pdf_path: Path,
+    nota_number: int,
+    year: int | None = None,
+    quarter: int | None = None,
+) -> int | None:
+    """Find the page number where a Nota section exists.
+
+    Backward-compatible wrapper around find_section_page.
+
+    Args:
+        pdf_path: Path to the PDF file
+        nota_number: Nota number to find (21 or 22)
+        year: Optional year for period-specific specs
+        quarter: Optional quarter for period-specific specs
+
+    Returns:
+        0-indexed page number or None if not found
+    """
+    return find_section_page(pdf_path, f"nota_{nota_number}", year, quarter)
 
 
 def extract_table_from_page(
@@ -458,6 +410,7 @@ def extract_table_from_page(
     page_index: int,
     expected_items: list[str],
     nota_number: int = 0,
+    section_name: str = "",
     year: int | None = None,
     quarter: int | None = None,
 ) -> list[dict[str, Any]]:
@@ -469,7 +422,8 @@ def extract_table_from_page(
         pdf_path: Path to the PDF file
         page_index: 0-indexed page number
         expected_items: List of expected line item names
-        nota_number: Nota number (21 or 22) to help select correct table
+        nota_number: Nota number (21 or 22) to help select correct table (deprecated, use section_name)
+        section_name: Section name from extraction_specs.json (preferred over nota_number)
         year: Optional year for period-specific specs
         quarter: Optional quarter for period-specific specs
 
@@ -477,9 +431,10 @@ def extract_table_from_page(
         List of dictionaries with concepto and value columns
     """
     # Get table identifiers from spec
-    section_name = f"nota_{nota_number}" if nota_number else ""
+    if not section_name and nota_number:
+        section_name = f"nota_{nota_number}"
     if section_name:
-        section_spec = _get_section_spec(section_name, year, quarter)
+        section_spec = get_section_spec(section_name)
         unique_items, exclude_items = _get_table_identifiers(section_spec)
     else:
         unique_items, exclude_items = [], []
@@ -812,6 +767,87 @@ def extract_nota_22(pdf_path: Path, config: dict | None = None) -> CostBreakdown
 
     logger.info(f"Extracted {len(breakdown.items)} items from Nota 22")
     return breakdown
+
+
+def extract_ingresos_from_pdf(pdf_path: Path) -> int | None:
+    """Extract Ingresos de actividades ordinarias from Estado de Resultados page.
+
+    This is a PDF fallback for when XBRL is not available. Uses the generic
+    find_section_page for page location, then extracts the Ingresos value directly
+    from the table (Estado de Resultados has a different structure than Nota tables).
+
+    Args:
+        pdf_path: Path to Estados Financieros PDF
+
+    Returns:
+        Ingresos value in thousands USD, or None if extraction fails
+    """
+    # Get ingresos section spec from config
+    ingresos_spec = get_section_spec("ingresos")
+    field_mappings = ingresos_spec.get("field_mappings", {})
+    ingresos_mapping = field_mappings.get("ingresos_ordinarios", {})
+    match_keywords = ingresos_mapping.get("match_keywords", ["ingresos", "actividades ordinarias"])
+
+    # Find the Estado de Resultados page using generic function
+    page_idx = find_section_page(pdf_path, "ingresos")
+    if page_idx is None:
+        logger.warning("Could not find Estado de Resultados page for Ingresos extraction")
+        return None
+
+    # Estado de Resultados table has a special structure:
+    # Multi-line cells where "Ganancia" header has no value, so indices don't align.
+    # Extract the value by finding the Ingresos line and getting the FIRST positive value
+    with pdfplumber.open(pdf_path) as pdf:
+        page = pdf.pages[page_idx]
+        tables = page.extract_tables()
+
+        for table in tables:
+            for row in table:
+                if not row or len(row) < 2:
+                    continue
+
+                first_col = str(row[0] or "").lower()
+                # Check if this cell contains Ingresos label
+                if not all(kw.lower() in first_col for kw in match_keywords):
+                    continue
+
+                # Found cell with Ingresos - parse the multi-line structure
+                labels = first_col.split("\n")
+                values_col = str(row[1] or "") if len(row) > 1 else ""
+                values = values_col.split("\n")
+
+                # Find the Ingresos label line index
+                ingresos_idx = None
+                for i, label in enumerate(labels):
+                    if all(kw.lower() in label.lower() for kw in match_keywords):
+                        ingresos_idx = i
+                        break
+
+                if ingresos_idx is not None:
+                    # Count value-bearing labels before Ingresos to find the value index
+                    # Labels with nota numbers (digits at end) have values
+                    value_idx = 0
+                    for i in range(ingresos_idx):
+                        label = labels[i].strip()
+                        # Headers like "Ganancia" have no nota number and no value
+                        if label and any(c.isdigit() for c in label.split()[-1] if label.split()):
+                            value_idx += 1
+
+                    if value_idx < len(values):
+                        value = parse_chilean_number(values[value_idx].strip())
+                        if value is not None and value > 1000:
+                            logger.info(f"Extracted Ingresos from PDF page {page_idx + 1}: {value:,}")
+                            return value
+
+                # Fallback: Ingresos is typically the first positive large value
+                for val_str in values:
+                    value = parse_chilean_number(val_str.strip())
+                    if value is not None and value > 1000:
+                        logger.info(f"Extracted Ingresos from PDF page {page_idx + 1}: {value:,}")
+                        return value
+
+    logger.warning("Could not extract Ingresos from Estado de Resultados page")
+    return None
 
 
 def extract_xbrl_totals(xbrl_path: Path) -> dict[str, int | None]:
@@ -1533,9 +1569,18 @@ def extract_sheet1_from_analisis_razonado(
         for item in nota_22.items:
             _map_nota22_item_to_sheet1(item, data)
 
-    # Validate/supplement with XBRL if available
+    # Extract Ingresos: prefer XBRL, fallback to PDF
     if xbrl_available and validate_with_xbrl:
         _validate_sheet1_with_xbrl(data, xbrl_path)
+    else:
+        # No XBRL available - extract Ingresos from PDF
+        logger.info("No XBRL available, extracting Ingresos from Estado de Resultados")
+        ingresos_value = extract_ingresos_from_pdf(ef_path)
+        if ingresos_value is not None:
+            data.ingresos_ordinarios = ingresos_value
+            logger.info(f"Set Ingresos from PDF: {ingresos_value:,}")
+        else:
+            logger.warning("Could not extract Ingresos from PDF")
 
     return data
 

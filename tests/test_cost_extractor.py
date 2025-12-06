@@ -847,3 +847,110 @@ class TestExtractSheet1MainEntry:
                 assert result is not None
                 assert result.total_costo_venta == -126202
                 mock_xbrl.assert_called_once()
+
+
+class TestIngresosPDFFallback:
+    """Tests for extracting Ingresos from PDF when XBRL is unavailable."""
+
+    def test_extract_ingresos_from_pdf_function(self) -> None:
+        """extract_ingresos_from_pdf should parse Estado de Resultados page."""
+        from puco_eeff.extractor.cost_extractor import extract_ingresos_from_pdf
+
+        # Mock pdfplumber to return Estado de Resultados table structure
+        mock_table = [
+            ["Nota", "01-01-2024\n31-03-2024\nMUS$", "01-01-2023\n31-03-2023\nMUS$"],
+            [
+                "Ganancia\nIngresos de actividades ordinarias 18\nCosto de ventas 21",
+                "80.767\n( 62.982)",
+                "82.663\n( 59.127)",
+            ],
+            ["Ganancia bruta", "17.785", "23.536"],
+        ]
+
+        with patch("pdfplumber.open") as mock_pdf_open:
+            mock_page = MagicMock()
+            mock_page.extract_text.return_value = "ESTADOS DE RESULTADOS Ingresos de actividades ordinarias"
+            mock_page.extract_tables.return_value = [mock_table]
+
+            mock_pdf = MagicMock()
+            mock_pdf.pages = [MagicMock(), MagicMock(), MagicMock(), MagicMock(), mock_page]  # Page 5
+            mock_pdf.__enter__ = MagicMock(return_value=mock_pdf)
+            mock_pdf.__exit__ = MagicMock(return_value=False)
+            mock_pdf_open.return_value = mock_pdf
+
+            result = extract_ingresos_from_pdf(Path("/fake/path.pdf"))
+
+            assert result == 80767
+
+    def test_extract_ingresos_from_pdf_returns_none_when_not_found(self) -> None:
+        """Should return None if Estado de Resultados page not found."""
+        from puco_eeff.extractor.cost_extractor import extract_ingresos_from_pdf
+
+        with patch("pdfplumber.open") as mock_pdf_open:
+            mock_page = MagicMock()
+            mock_page.extract_text.return_value = "Some other content without ingresos"
+            mock_page.extract_tables.return_value = []
+
+            mock_pdf = MagicMock()
+            mock_pdf.pages = [mock_page] * 10
+            mock_pdf.__enter__ = MagicMock(return_value=mock_pdf)
+            mock_pdf.__exit__ = MagicMock(return_value=False)
+            mock_pdf_open.return_value = mock_pdf
+
+            result = extract_ingresos_from_pdf(Path("/fake/path.pdf"))
+
+            assert result is None
+
+    def test_sheet1_uses_pdf_ingresos_when_no_xbrl(self) -> None:
+        """extract_sheet1_from_analisis_razonado should extract Ingresos from PDF when no XBRL."""
+        from puco_eeff.extractor.cost_extractor import extract_sheet1_from_analisis_razonado
+
+        with patch("puco_eeff.extractor.cost_extractor.get_period_paths") as mock_paths:
+            mock_paths.return_value = {
+                "raw_pdf": Path("/fake/pdf"),
+                "raw_xbrl": Path("/fake/xbrl"),
+            }
+
+            with patch("puco_eeff.extractor.cost_extractor.find_file_with_alternatives") as mock_find:
+                # Create mock paths that "exist"
+                mock_pdf_path = MagicMock(spec=Path)
+                mock_pdf_path.exists.return_value = True
+                mock_combined_path = MagicMock(spec=Path)
+                mock_combined_path.exists.return_value = True
+
+                def find_side_effect(dir_path, doc_type, year, quarter):
+                    if doc_type == "estados_financieros_pdf":
+                        return mock_pdf_path
+                    elif doc_type == "estados_financieros_xbrl":
+                        return None  # No XBRL available
+                    elif doc_type == "pucobre_combined":
+                        return mock_combined_path  # pucobre source
+                    return None
+
+                mock_find.side_effect = find_side_effect
+
+                with patch("puco_eeff.extractor.cost_extractor.extract_nota_21") as mock_n21:
+                    mock_n21.return_value = CostBreakdown(
+                        nota_number=21,
+                        nota_title="Costo de Venta",
+                        total_ytd_actual=-62982,
+                    )
+
+                    with patch("puco_eeff.extractor.cost_extractor.extract_nota_22") as mock_n22:
+                        mock_n22.return_value = CostBreakdown(
+                            nota_number=22,
+                            nota_title="Gastos Admin",
+                            total_ytd_actual=-5137,
+                        )
+
+                        with patch("puco_eeff.extractor.cost_extractor.extract_ingresos_from_pdf") as mock_ingresos:
+                            mock_ingresos.return_value = 80767
+
+                            result = extract_sheet1_from_analisis_razonado(2024, 1)
+
+                            assert result is not None
+                            assert result.ingresos_ordinarios == 80767
+                            assert result.total_costo_venta == -62982
+                            assert result.total_gasto_admin == -5137
+                            assert result.xbrl_available is False
+                            mock_ingresos.assert_called_once()
