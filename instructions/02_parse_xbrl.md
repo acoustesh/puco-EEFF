@@ -85,14 +85,14 @@ for cat, names in sorted(fact_categories.items()):
 ```python
 # Keywords for Balance Sheet items
 balance_keywords = [
-    "Asset", "Liability", "Equity", 
+    "Asset", "Liability", "Equity",
     "Activo", "Pasivo", "Patrimonio",
     "CurrentAsset", "NoncurrentAsset",
     "CurrentLiabilit", "NoncurrentLiabilit"
 ]
 
 balance_facts = [
-    n for n in fact_names 
+    n for n in fact_names
     if any(k.lower() in n.lower() for k in balance_keywords)
 ]
 
@@ -115,7 +115,7 @@ income_keywords = [
 ]
 
 income_facts = [
-    n for n in fact_names 
+    n for n in fact_names
     if any(k.lower() in n.lower() for k in income_keywords)
 ]
 
@@ -136,7 +136,7 @@ cashflow_keywords = [
 ]
 
 cashflow_facts = [
-    n for n in fact_names 
+    n for n in fact_names
     if any(k.lower() in n.lower() for k in cashflow_keywords)
 ]
 
@@ -180,7 +180,7 @@ sheet_mappings = {
         "description": "Estado de Situación Financiera (Balance)",
         "facts": [
             "Assets",
-            "CurrentAssets", 
+            "CurrentAssets",
             "NoncurrentAssets",
             "Liabilities",
             "CurrentLiabilities",

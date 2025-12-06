@@ -4,7 +4,7 @@
 
 Download all three financial document types from CMF Chile for a specified period:
 1. **Análisis Razonado** (PDF) - Management Discussion & Analysis
-2. **Estados Financieros** (PDF) - Financial Statements 
+2. **Estados Financieros** (PDF) - Financial Statements
 3. **Estados Financieros** (XBRL) - Financial Statements in structured XML format
 
 **Single source**: All documents come from the same CMF Chile portal page.
