@@ -77,11 +77,11 @@ def download_all_documents(
 
     results: list[DownloadResult] = []
 
-    # Create output directories - use raw_pdf for all downloads initially
-    raw_dir = paths["raw_pdf"]
-    raw_dir.mkdir(parents=True, exist_ok=True)
-    # Also ensure XBRL dir exists for extraction
-    paths["raw_xbrl"].mkdir(parents=True, exist_ok=True)
+    # Create output directories - PDFs and XBRL in separate directories
+    pdf_dir = paths["raw_pdf"]
+    xbrl_dir = paths["raw_xbrl"]
+    pdf_dir.mkdir(parents=True, exist_ok=True)
+    xbrl_dir.mkdir(parents=True, exist_ok=True)
 
     logger.info(f"Downloading all documents for {year} Q{quarter}")
     logger.debug(f"Filters: tipo={tipo}, tipo_norma={tipo_norma}")
@@ -95,11 +95,13 @@ def download_all_documents(
         else:
             # Download each document type
             for doc_type, doc_config in cmf_config["downloads"].items():
+                # XBRL goes to xbrl directory, PDFs go to pdf directory
+                output_dir = xbrl_dir if doc_type == "estados_financieros_xbrl" else pdf_dir
                 result = _download_single_document(
                     page=page,
                     doc_type=doc_type,
                     doc_config=doc_config,
-                    output_dir=raw_dir,
+                    output_dir=output_dir,
                     year=year,
                     quarter=quarter,
                 )
@@ -112,7 +114,7 @@ def download_all_documents(
     # Fallback to Pucobre.cl if CMF Chile failed and fallback is enabled
     if not cmf_success and fallback_to_pucobre:
         logger.info("CMF Chile download failed, trying Pucobre.cl fallback...")
-        results = _download_with_pucobre_fallback(year, quarter, results, raw_dir, headless)
+        results = _download_with_pucobre_fallback(year, quarter, results, pdf_dir, headless)
 
     # If we still don't have results, return failures
     if not results:
@@ -130,7 +132,7 @@ def download_all_documents(
     # Post-process: Extract XBRL if downloaded
     for result in results:
         if result.document_type == "estados_financieros_xbrl" and result.success:
-            _extract_xbrl_zip(result.file_path, raw_dir, year, quarter)
+            _extract_xbrl_zip(result.file_path, xbrl_dir, year, quarter)
 
     return results
 
@@ -139,7 +141,7 @@ def _download_with_pucobre_fallback(
     year: int,
     quarter: int,
     existing_results: list[DownloadResult],
-    raw_dir: Path,
+    pdf_dir: Path,
     headless: bool,
 ) -> list[DownloadResult]:
     """Try to download from Pucobre.cl as a fallback.
@@ -148,7 +150,7 @@ def _download_with_pucobre_fallback(
         year: Target year
         quarter: Target quarter
         existing_results: Results from CMF Chile attempt
-        raw_dir: Output directory
+        pdf_dir: Output directory for PDFs
         headless: Run browser in headless mode
 
     Returns:
@@ -159,7 +161,10 @@ def _download_with_pucobre_fallback(
     pucobre_result = download_from_pucobre(year, quarter, headless, split_pdf=True)
 
     # Update or add the PDF result
-    pdf_idx = next((i for i, r in enumerate(existing_results) if r.document_type == "estados_financieros_pdf"), None)
+    pdf_idx = next(
+        (i for i, r in enumerate(existing_results) if r.document_type == "estados_financieros_pdf"),
+        None,
+    )
     ar_idx = next((i for i, r in enumerate(existing_results) if r.document_type == "analisis_razonado"), None)
 
     if pucobre_result.success:
@@ -275,8 +280,13 @@ def download_single_document(
             error=f"Unknown document type: {document_type}",
         )
 
-    raw_dir = paths["raw_pdf"]
-    raw_dir.mkdir(parents=True, exist_ok=True)
+    # Use appropriate directory based on document type
+    pdf_dir = paths["raw_pdf"]
+    xbrl_dir = paths["raw_xbrl"]
+    pdf_dir.mkdir(parents=True, exist_ok=True)
+    xbrl_dir.mkdir(parents=True, exist_ok=True)
+
+    output_dir = xbrl_dir if document_type == "estados_financieros_xbrl" else pdf_dir
 
     logger.info(f"Downloading {document_type} for {year} Q{quarter}")
 
@@ -291,14 +301,14 @@ def download_single_document(
                 page=page,
                 doc_type=document_type,
                 doc_config=doc_config,
-                output_dir=raw_dir,
+                output_dir=output_dir,
                 year=year,
                 quarter=quarter,
             )
 
             # Extract XBRL if applicable
             if result.document_type == "estados_financieros_xbrl" and result.success:
-                _extract_xbrl_zip(result.file_path, raw_dir, year, quarter)
+                _extract_xbrl_zip(result.file_path, xbrl_dir, year, quarter)
 
     # Fallback to Pucobre for PDF if CMF failed
     if (result is None or not result.success) and fallback_to_pucobre:
@@ -495,7 +505,7 @@ def _download_single_document(
         )
 
 
-def _extract_xbrl_zip(zip_path: Path | None, output_dir: Path, year: int, quarter: int) -> Path | None:
+def _extract_xbrl_zip(zip_path: Path | None, xbrl_dir: Path, year: int, quarter: int) -> Path | None:
     """Extract XBRL instance document from downloaded ZIP file.
 
     The ZIP typically contains multiple files:
@@ -507,7 +517,7 @@ def _extract_xbrl_zip(zip_path: Path | None, output_dir: Path, year: int, quarte
 
     Args:
         zip_path: Path to the ZIP file
-        output_dir: Directory to extract to
+        xbrl_dir: Directory to extract XBRL files to (data/raw/xbrl/)
         year: Year for naming
         quarter: Quarter for naming
 
@@ -543,7 +553,9 @@ def _extract_xbrl_zip(zip_path: Path | None, output_dir: Path, year: int, quarte
                 logger.error("No XML/XBRL files found in ZIP archive")
                 return None
 
-            output_path = output_dir / output_filename
+            # Save to xbrl directory (separate from PDFs)
+            xbrl_dir.mkdir(parents=True, exist_ok=True)
+            output_path = xbrl_dir / output_filename
             logger.debug(f"Extracting: {main_file} -> {output_path}")
 
             with zf.open(main_file) as source:
@@ -586,11 +598,7 @@ def list_available_periods(headless: bool = True) -> list[dict]:
         year_select = page.query_selector("select[name='aa']")
         if year_select:
             year_options = year_select.query_selector_all("option")
-            years = [
-                opt.get_attribute("value")
-                for opt in year_options
-                if opt.get_attribute("value")
-            ]
+            years = [opt.get_attribute("value") for opt in year_options if opt.get_attribute("value")]
             logger.debug(f"Available years: {years}")
 
             # Get available months

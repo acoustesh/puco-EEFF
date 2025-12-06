@@ -263,14 +263,18 @@ def download_from_pucobre(
                 )
 
             combined_size = combined_path.stat().st_size
-            logger.info(f"Downloaded combined PDF from Pucobre: {combined_filename} ({combined_size:,} bytes)")
+            logger.info(
+                f"Downloaded combined PDF from Pucobre: {combined_filename} ({combined_size:,} bytes)"
+            )
 
             # Split the PDF if requested
             if split_pdf:
                 split_page = _find_analisis_razonado_page(combined_path)
 
                 if split_page is not None:
-                    success, error = _split_combined_pdf(combined_path, eeff_path, ar_path, split_page)
+                    success, error = _split_combined_pdf(
+                        combined_path, eeff_path, ar_path, split_page
+                    )
 
                     if success:
                         eeff_size = eeff_path.stat().st_size
@@ -391,12 +395,14 @@ def list_pucobre_periods(headless: bool = True) -> list[dict]:
                 quarter = month_to_quarter.get(month)
 
                 if quarter:
-                    periods.append({
-                        "year": int(year),
-                        "quarter": quarter,
-                        "link_text": link_text,
-                        "source": "pucobre.cl",
-                    })
+                    periods.append(
+                        {
+                            "year": int(year),
+                            "quarter": quarter,
+                            "link_text": link_text,
+                            "source": "pucobre.cl",
+                        }
+                    )
 
     logger.info(f"Found {len(periods)} periods on Pucobre.cl")
     return periods

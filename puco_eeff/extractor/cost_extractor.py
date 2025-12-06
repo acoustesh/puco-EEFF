@@ -111,7 +111,9 @@ class CostBreakdown:
 
     def sum_items_ytd_actual(self) -> int:
         """Sum all YTD actual values (excluding total row)."""
-        return sum(item.ytd_actual or 0 for item in self.items if "total" not in item.concepto.lower())
+        return sum(
+            item.ytd_actual or 0 for item in self.items if "total" not in item.concepto.lower()
+        )
 
     def is_valid(self) -> bool:
         """Check if the sum of items equals the total."""
@@ -292,7 +294,9 @@ def extract_table_from_page(
         return _parse_cost_table(best_table, expected_items)
 
 
-def _parse_cost_table(table: list[list[str | None]], expected_items: list[str]) -> list[dict[str, Any]]:
+def _parse_cost_table(
+    table: list[list[str | None]], expected_items: list[str]
+) -> list[dict[str, Any]]:
     """Parse a cost breakdown table.
 
     Args:
@@ -332,10 +336,12 @@ def _parse_cost_table(table: list[list[str | None]], expected_items: list[str]) 
                     if parsed is not None:
                         values.append(parsed)
 
-            parsed_rows.append({
-                "concepto": matched_item,
-                "values": values,
-            })
+            parsed_rows.append(
+                {
+                    "concepto": matched_item,
+                    "values": values,
+                }
+            )
 
     return parsed_rows
 
@@ -1091,7 +1097,9 @@ def _validate_sheet1_with_xbrl(data: Sheet1Data, xbrl_path: Path) -> None:
             if abs(data.total_gasto_admin) == abs(xbrl_admin):
                 logger.info(f"✓ Total Gasto Admin matches XBRL: {data.total_gasto_admin:,}")
             else:
-                logger.warning(f"✗ Total Gasto Admin mismatch - PDF: {data.total_gasto_admin:,}, XBRL: {xbrl_admin:,}")
+                logger.warning(
+                    f"✗ Total Gasto Admin mismatch - PDF: {data.total_gasto_admin:,}, XBRL: {xbrl_admin:,}"
+                )
         else:
             # PDF extraction failed - use XBRL value
             logger.info(f"Using XBRL value for Total Gasto Admin: {xbrl_admin:,}")
@@ -1380,7 +1388,10 @@ def extract_sheet1_from_xbrl(year: int, quarter: int) -> Sheet1Data | None:
                 continue
 
     # Check if we got at least one value
-    if all(v is None for v in [data.ingresos_ordinarios, data.total_costo_venta, data.total_gasto_admin]):
+    if all(
+        v is None
+        for v in [data.ingresos_ordinarios, data.total_costo_venta, data.total_gasto_admin]
+    ):
         logger.warning(f"No Sheet1 data found in XBRL for {year} Q{quarter}")
         return None
 
@@ -1425,7 +1436,9 @@ def extract_sheet1(
 
         if data is None or validate:
             # Try PDF for detailed breakdown or validation
-            pdf_data = extract_sheet1_from_analisis_razonado(year, quarter, validate_with_xbrl=False)
+            pdf_data = extract_sheet1_from_analisis_razonado(
+                year, quarter, validate_with_xbrl=False
+            )
             if pdf_data is not None:
                 if data is None:
                     data = pdf_data

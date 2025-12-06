@@ -1,4 +1,14 @@
-"""Scraper module for downloading financial documents from CMF Chile and Pucobre.cl."""
+"""Scraper module for downloading financial documents from CMF Chile and Pucobre.cl.
+
+Primary downloaders:
+- download_all_documents: Download all documents from CMF Chile (with Pucobre.cl fallback)
+- download_single_document: Download a specific document type
+- download_from_pucobre: Download directly from Pucobre.cl (fallback source)
+
+Files are saved to separate directories:
+- data/raw/pdf/ - PDF documents (Análisis Razonado, Estados Financieros PDF)
+- data/raw/xbrl/ - XBRL/XML documents (Estados Financieros XBRL)
+"""
 
 from puco_eeff.scraper.browser import create_browser, create_browser_context
 from puco_eeff.scraper.cmf_downloader import (
@@ -9,22 +19,18 @@ from puco_eeff.scraper.cmf_downloader import (
     list_available_periods,
 )
 from puco_eeff.scraper.downloader import download_file
-
-# Legacy imports for backward compatibility
-from puco_eeff.scraper.pdf_downloader import download_pdf_from_pucobre
 from puco_eeff.scraper.pucobre_downloader import (
     PucobreDownloadResult,
     check_pucobre_availability,
     download_from_pucobre,
     list_pucobre_periods,
 )
-from puco_eeff.scraper.xbrl_downloader import download_xbrl_from_cmf
 
 __all__ = [
     # Browser utilities
     "create_browser",
     "create_browser_context",
-    # New unified CMF downloader (recommended)
+    # Unified CMF downloader (primary)
     "DOCUMENT_TYPES",
     "DownloadResult",
     "download_all_documents",
@@ -37,7 +43,4 @@ __all__ = [
     "check_pucobre_availability",
     # Generic file download
     "download_file",
-    # Legacy (deprecated - use download_all_documents instead)
-    "download_pdf_from_pucobre",
-    "download_xbrl_from_cmf",
 ]

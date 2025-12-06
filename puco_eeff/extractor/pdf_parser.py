@@ -38,8 +38,7 @@ def extract_text_from_pdf(
 
         # Determine which pages to process
         page_indices = (
-            range(total_pages) if pages is None
-            else [p - 1 for p in pages if 0 < p <= total_pages]
+            range(total_pages) if pages is None else [p - 1 for p in pages if 0 < p <= total_pages]
         )
 
         for idx in page_indices:
@@ -86,8 +85,7 @@ def extract_tables_from_pdf(
         total_pages = len(pdf.pages)
 
         page_indices = (
-            range(total_pages) if pages is None
-            else [p - 1 for p in pages if 0 < p <= total_pages]
+            range(total_pages) if pages is None else [p - 1 for p in pages if 0 < p <= total_pages]
         )
 
         for idx in page_indices:
@@ -134,11 +132,13 @@ def find_section_in_pdf(
             end = min(len(text), idx + len(pattern_lower) + 200)
             context = text[start:end]
 
-            matches.append({
-                "page": page_num,
-                "pattern": section_pattern,
-                "context": context,
-            })
+            matches.append(
+                {
+                    "page": page_num,
+                    "pattern": section_pattern,
+                    "context": context,
+                }
+            )
             logger.debug(f"Found match on page {page_num}")
 
     logger.info(f"Found {len(matches)} matches for pattern '{section_pattern}'")

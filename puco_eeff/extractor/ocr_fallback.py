@@ -94,17 +94,19 @@ def ocr_with_fallback(
 
             except Exception as e:
                 logger.error(f"OCR exception: {e}")
-                all_responses.append({
-                    "success": False,
-                    "provider": provider,
-                    "model": model,
-                    "error": str(e),
-                    "attempt": attempt + 1,
-                })
+                all_responses.append(
+                    {
+                        "success": False,
+                        "provider": provider,
+                        "model": model,
+                        "error": str(e),
+                        "attempt": attempt + 1,
+                    }
+                )
 
             # Exponential backoff before retry
             if attempt < max_attempts - 1:
-                delay = min(base_delay * (2 ** attempt), max_delay)
+                delay = min(base_delay * (2**attempt), max_delay)
                 logger.debug(f"Waiting {delay}s before retry...")
                 time.sleep(delay)
 
@@ -145,7 +147,11 @@ def _ocr_with_openrouter(
         image_data = _encode_image(image_path)
         source_desc = f"Image: {image_path.name}"
     elif image_base64:
-        image_data = image_base64 if image_base64.startswith("data:") else f"data:image/png;base64,{image_base64}"
+        image_data = (
+            image_base64
+            if image_base64.startswith("data:")
+            else f"data:image/png;base64,{image_base64}"
+        )
         source_desc = "Base64 image"
     else:
         raise ValueError("Must provide image_path or image_base64")

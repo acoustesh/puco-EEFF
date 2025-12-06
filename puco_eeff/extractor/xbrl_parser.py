@@ -117,7 +117,9 @@ def _extract_facts(root: etree._Element, namespaces: dict[str, str]) -> list[dic
     return facts
 
 
-def _extract_contexts(root: etree._Element, namespaces: dict[str, str]) -> dict[str, dict[str, Any]]:
+def _extract_contexts(
+    root: etree._Element, namespaces: dict[str, str]
+) -> dict[str, dict[str, Any]]:
     """Extract XBRL contexts (periods and entity information).
 
     Args:
@@ -237,10 +239,7 @@ def get_facts_by_name(
     for fact in data.get("facts", []):
         fact_name = fact.get("name", "")
 
-        if exact:
-            matches = fact_name == name_pattern
-        else:
-            matches = name_pattern.lower() in fact_name.lower()
+        matches = fact_name == name_pattern if exact else name_pattern.lower() in fact_name.lower()
 
         if matches:
             # Enrich fact with context information
@@ -292,7 +291,8 @@ def summarize_facts(data: dict[str, Any]) -> dict[str, int]:
         name = fact.get("name", "Other")
         # Extract category from CamelCase name (take first capital-starting word)
         import re
-        parts = re.findall(r'[A-Z][a-z]*', name)
+
+        parts = re.findall(r"[A-Z][a-z]*", name)
         category = parts[0] if parts else "Other"
         categories[category] = categories.get(category, 0) + 1
 

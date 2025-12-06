@@ -42,7 +42,7 @@ The Pucobre.cl website provides a single combined PDF that contains:
 1. **Estados Financieros** (pages 1-95 typically)
    - Full financial statements
    - Notes including Nota 21 & 22 with detailed cost breakdown
-   
+
 2. **Análisis Razonado** (pages 96+ typically)
    - Starts with title page: "ANALISIS RAZONADO A los Estados Financieros al DD de MMM de YYYY"
    - Page numbering restarts at 1
@@ -186,9 +186,15 @@ from puco_eeff.config import get_period_paths
 
 paths = get_period_paths(year, quarter)
 pdf_dir = paths["raw_pdf"]
+xbrl_dir = paths["raw_xbrl"]
 
-print(f"\n=== Downloaded Files in {pdf_dir} ===")
+print(f"\n=== PDF Files in {pdf_dir} ===")
 for f in pdf_dir.iterdir():
+    if f.suffix == ".pdf":
+        print(f"  {f.name}: {f.stat().st_size:,} bytes")
+
+print(f"\n=== XBRL Files in {xbrl_dir} ===")
+for f in xbrl_dir.iterdir():
     print(f"  {f.name}: {f.stat().st_size:,} bytes")
 \`\`\`
 
@@ -210,15 +216,22 @@ for f in pdf_dir.iterdir():
 
 ## Output Files
 
-Downloads are saved to \`data/raw/pdf/\`:
+Downloads are saved to separate directories:
+
+**PDFs** → `data/raw/pdf/`:
 
 | Document | Filename | Source |
 |----------|----------|--------|
-| Análisis Razonado | \`analisis_razonado_YYYY_QN.pdf\` | CMF or Pucobre (split) |
-| Estados Financieros PDF | \`estados_financieros_YYYY_QN.pdf\` | CMF or Pucobre (split) |
-| Estados Financieros XBRL | \`estados_financieros_YYYY_QN_xbrl.zip\` | CMF only |
-| Extracted XBRL | \`estados_financieros_YYYY_QN.xbrl\` | From ZIP |
-| Combined (Pucobre) | \`pucobre_combined_YYYY_QN.pdf\` | Pucobre only (original) |
+| Análisis Razonado | `analisis_razonado_YYYY_QN.pdf` | CMF or Pucobre (split) |
+| Estados Financieros PDF | `estados_financieros_YYYY_QN.pdf` | CMF or Pucobre (split) |
+| Combined (Pucobre) | `pucobre_combined_YYYY_QN.pdf` | Pucobre only (original) |
+
+**XBRL** → `data/raw/xbrl/`:
+
+| Document | Filename | Source |
+|----------|----------|--------|
+| Estados Financieros XBRL | `estados_financieros_YYYY_QN_xbrl.zip` | CMF only |
+| Extracted XBRL | `estados_financieros_YYYY_QN.xbrl` | From ZIP |
 
 ## How It Works
 

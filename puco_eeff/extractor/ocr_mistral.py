@@ -91,7 +91,9 @@ Format tables as markdown tables when possible."""
         }
 
         logger.info("Mistral OCR extraction successful")
-        logger.debug(f"Tokens used: {response.usage.prompt_tokens} + {response.usage.completion_tokens}")
+        logger.debug(
+            f"Tokens used: {response.usage.prompt_tokens} + {response.usage.completion_tokens}"
+        )
 
     except Exception as e:
         logger.error(f"Mistral OCR failed: {e}")

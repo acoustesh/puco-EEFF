@@ -53,7 +53,9 @@ def create_browser_context(browser: Browser) -> BrowserContext:
 
 
 @contextmanager
-def browser_session(headless: bool = True) -> Generator[tuple[Browser, BrowserContext, Page], None, None]:
+def browser_session(
+    headless: bool = True,
+) -> Generator[tuple[Browser, BrowserContext, Page], None, None]:
     """Context manager for a complete browser session.
 
     Args:

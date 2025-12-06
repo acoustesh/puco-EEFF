@@ -220,3 +220,45 @@
 2025-12-06 02:54:23,755 - puco_eeff.extractor.xbrl_parser - ERROR - File not found: /fake/path.xbrl
 2025-12-06 02:54:23,755 - puco_eeff.extractor.cost_extractor - DEBUG - Could not extract Ingresos from XBRL: XBRL file not found: /fake/path.xbrl
 2025-12-06 02:54:23,756 - puco_eeff.extractor.cost_extractor - INFO - PDF extraction failed, trying XBRL for 2024 Q2
+2025-12-06 03:35:25,359 - puco_eeff.extractor.cost_extractor - INFO - No XBRL available for 2024 Q1 - using PDF only
+2025-12-06 03:35:25,362 - puco_eeff.extractor.cost_extractor - INFO - Saved extraction result to: /tmp/pytest-of-alvaro/pytest-8/test_save_creates_json0/detailed_costs.json
+2025-12-06 03:35:25,365 - puco_eeff.extractor.cost_extractor - INFO - Saved Sheet1 data to: /tmp/pytest-of-alvaro/pytest-8/test_save_creates_json1/sheet1_IIQ2024.json
+2025-12-06 03:35:25,366 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
+2025-12-06 03:35:25,366 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
+2025-12-06 03:35:25,366 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /fake/path.xbrl
+2025-12-06 03:35:25,366 - puco_eeff.extractor.xbrl_parser - ERROR - File not found: /fake/path.xbrl
+2025-12-06 03:35:25,366 - puco_eeff.extractor.cost_extractor - DEBUG - Could not extract Ingresos from XBRL: XBRL file not found: /fake/path.xbrl
+2025-12-06 03:35:25,366 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Total Costo de Venta: -126,202
+2025-12-06 03:35:25,366 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Total Gasto Admin: -11,632
+2025-12-06 03:35:25,366 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /fake/path.xbrl
+2025-12-06 03:35:25,366 - puco_eeff.extractor.xbrl_parser - ERROR - File not found: /fake/path.xbrl
+2025-12-06 03:35:25,366 - puco_eeff.extractor.cost_extractor - DEBUG - Could not extract Ingresos from XBRL: XBRL file not found: /fake/path.xbrl
+2025-12-06 03:35:25,368 - puco_eeff.extractor.cost_extractor - INFO - PDF extraction failed, trying XBRL for 2024 Q2
+2025-12-06 03:35:31,064 - puco_eeff.extractor.cost_extractor - INFO - No XBRL available for 2024 Q1 - using PDF only
+2025-12-06 03:35:31,067 - puco_eeff.extractor.cost_extractor - INFO - Saved extraction result to: /tmp/pytest-of-alvaro/pytest-9/test_save_creates_json0/detailed_costs.json
+2025-12-06 03:35:31,070 - puco_eeff.extractor.cost_extractor - INFO - Saved Sheet1 data to: /tmp/pytest-of-alvaro/pytest-9/test_save_creates_json1/sheet1_IIQ2024.json
+2025-12-06 03:35:31,070 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
+2025-12-06 03:35:31,070 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
+2025-12-06 03:35:31,070 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /fake/path.xbrl
+2025-12-06 03:35:31,070 - puco_eeff.extractor.xbrl_parser - ERROR - File not found: /fake/path.xbrl
+2025-12-06 03:35:31,070 - puco_eeff.extractor.cost_extractor - DEBUG - Could not extract Ingresos from XBRL: XBRL file not found: /fake/path.xbrl
+2025-12-06 03:35:31,071 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Total Costo de Venta: -126,202
+2025-12-06 03:35:31,071 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Total Gasto Admin: -11,632
+2025-12-06 03:35:31,071 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /fake/path.xbrl
+2025-12-06 03:35:31,071 - puco_eeff.extractor.xbrl_parser - ERROR - File not found: /fake/path.xbrl
+2025-12-06 03:35:31,071 - puco_eeff.extractor.cost_extractor - DEBUG - Could not extract Ingresos from XBRL: XBRL file not found: /fake/path.xbrl
+2025-12-06 03:35:31,072 - puco_eeff.extractor.cost_extractor - INFO - PDF extraction failed, trying XBRL for 2024 Q2
+2025-12-06 03:36:05,740 - puco_eeff.extractor.cost_extractor - INFO - No XBRL available for 2024 Q1 - using PDF only
+2025-12-06 03:36:05,742 - puco_eeff.extractor.cost_extractor - INFO - Saved extraction result to: /tmp/pytest-of-alvaro/pytest-10/test_save_creates_json0/detailed_costs.json
+2025-12-06 03:36:05,745 - puco_eeff.extractor.cost_extractor - INFO - Saved Sheet1 data to: /tmp/pytest-of-alvaro/pytest-10/test_save_creates_json1/sheet1_IIQ2024.json
+2025-12-06 03:36:05,746 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
+2025-12-06 03:36:05,746 - puco_eeff.extractor.cost_extractor - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
+2025-12-06 03:36:05,746 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /fake/path.xbrl
+2025-12-06 03:36:05,746 - puco_eeff.extractor.xbrl_parser - ERROR - File not found: /fake/path.xbrl
+2025-12-06 03:36:05,746 - puco_eeff.extractor.cost_extractor - DEBUG - Could not extract Ingresos from XBRL: XBRL file not found: /fake/path.xbrl
+2025-12-06 03:36:05,746 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Total Costo de Venta: -126,202
+2025-12-06 03:36:05,746 - puco_eeff.extractor.cost_extractor - INFO - Using XBRL value for Total Gasto Admin: -11,632
+2025-12-06 03:36:05,746 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /fake/path.xbrl
+2025-12-06 03:36:05,746 - puco_eeff.extractor.xbrl_parser - ERROR - File not found: /fake/path.xbrl
+2025-12-06 03:36:05,746 - puco_eeff.extractor.cost_extractor - DEBUG - Could not extract Ingresos from XBRL: XBRL file not found: /fake/path.xbrl
+2025-12-06 03:36:05,748 - puco_eeff.extractor.cost_extractor - INFO - PDF extraction failed, trying XBRL for 2024 Q2
