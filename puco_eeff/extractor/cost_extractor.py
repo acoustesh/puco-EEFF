@@ -35,6 +35,7 @@ from puco_eeff.config import (
     get_config,
     get_period_paths,
     get_period_specs,
+    get_sheet1_row_mapping,
     get_sheet1_value_fields,
     get_sum_tolerance,
     get_xbrl_fact_mapping,
@@ -1302,81 +1303,62 @@ class Sheet1Data:
     def to_row_list(self) -> list[tuple[int, str, int | None]]:
         """Convert to list of (row_number, label, value) tuples.
 
-        Uses config/extraction_specs.json sheet1_fields for row definitions.
-        Falls back to hardcoded structure if config unavailable.
+        Uses config/config.json row_mapping and config/extraction_specs.json
+        sheet1_fields for row definitions. Raises error if config unavailable.
+
+        Returns:
+            List of (row_number, label, value) tuples for all 27 rows.
+
+        Raises:
+            ValueError: If required config is not available.
         """
-        try:
-            value_fields = get_sheet1_value_fields()
-            if value_fields:
-                return self._to_row_list_from_config(value_fields)
-        except Exception as e:
-            logger.warning(f"Could not load sheet1_fields from config: {e}")
+        value_fields = get_sheet1_value_fields()
+        if not value_fields:
+            raise ValueError(
+                "sheet1_fields.value_fields not found in config/extraction_specs.json. "
+                "Config is the single source of truth - no hardcoded fallback."
+            )
 
-        # Fallback to hardcoded structure
-        return self._to_row_list_fallback()
+        row_mapping = get_sheet1_row_mapping()
+        if not row_mapping:
+            raise ValueError(
+                "row_mapping not found in config/config.json sheets.sheet1. "
+                "Config is the single source of truth - no hardcoded fallback."
+            )
 
-    def _to_row_list_from_config(self, value_fields: dict[str, Any]) -> list[tuple[int, str, int | None]]:
-        """Generate row list from config field definitions."""
-        # Build a dict of row -> (field_name, label, value)
-        rows_dict: dict[int, tuple[str, int | None]] = {}
+        return self._to_row_list_from_config(value_fields, row_mapping)
 
-        for field_name, field_def in value_fields.items():
-            row = field_def.get("row")
-            label = field_def.get("label", field_name)
-            value = self.get_value(field_name)
-            if row:
-                rows_dict[row] = (label, value)
+    def _to_row_list_from_config(
+        self,
+        value_fields: dict[str, Any],
+        row_mapping: dict[str, dict[str, Any]],
+    ) -> list[tuple[int, str, int | None]]:
+        """Generate row list from config field definitions.
 
-        # Build the 27-row list with headers and blanks
+        Args:
+            value_fields: Field definitions from extraction_specs.json
+            row_mapping: Row mapping from config.json
+
+        Returns:
+            List of (row_number, label, value) tuples.
+        """
         result = []
+
         for row_num in range(1, 28):
-            if row_num in rows_dict:
-                label, value = rows_dict[row_num]
+            row_key = str(row_num)
+            row_def = row_mapping.get(row_key, {})
+            field_name = row_def.get("field")
+            label = row_def.get("label", "")
+
+            if field_name and field_name not in ("costo_venta_header", "gasto_admin_header"):
+                # Data field - get value
+                value = self.get_value(field_name)
                 result.append((row_num, label, value))
-            elif row_num == 2:
-                result.append((row_num, "", None))
-            elif row_num == 3:
-                result.append((row_num, "Costo de Venta", None))  # Header
-            elif row_num in (16, 17, 18, 26):
-                result.append((row_num, "", None))
-            elif row_num == 19:
-                result.append((row_num, "Gasto Adm, y Ventas", None))  # Header
             else:
-                result.append((row_num, "", None))
+                # Header or blank row - no value
+                result.append((row_num, label, None))
 
         return result
-
-    def _to_row_list_fallback(self) -> list[tuple[int, str, int | None]]:
-        """Fallback hardcoded row list when config is unavailable."""
-        return [
-            (1, "Ingresos de actividades ordinarias M USD", self.ingresos_ordinarios),
-            (2, "", None),
-            (3, "Costo de Venta", None),  # Header
-            (4, "Gastos en personal", self.cv_gastos_personal),
-            (5, "Materiales y repuestos", self.cv_materiales),
-            (6, "Energía eléctrica", self.cv_energia),
-            (7, "Servicios de terceros", self.cv_servicios_terceros),
-            (8, "Depreciación y amort del periodo", self.cv_depreciacion_amort),
-            (9, "Depreciación Activos en leasing -Nota 20", self.cv_deprec_leasing),
-            (10, "Depreciación Arrendamientos -Nota 20", self.cv_deprec_arrend),
-            (11, "Servicios mineros de terceros", self.cv_serv_mineros),
-            (12, "Fletes y otros gastos operacionales", self.cv_fletes),
-            (13, "Gastos Diferidos, ajustes existencias y otros", self.cv_gastos_diferidos),
-            (14, "Obligaciones por convenios colectivos", self.cv_convenios),
-            (15, "Total Costo de Venta", self.total_costo_venta),
-            (16, "", None),
-            (17, "", None),
-            (18, "", None),
-            (19, "Gasto Adm, y Ventas", None),  # Header
-            (20, "Gastos en personal", self.ga_gastos_personal),
-            (21, "Materiales y repuestos", self.ga_materiales),
-            (22, "Servicios de terceros", self.ga_servicios_terceros),
-            (23, "Provision gratificacion legal y otros", self.ga_gratificacion),
-            (24, "Gastos comercializacion", self.ga_comercializacion),
-            (25, "Otros gastos", self.ga_otros),
-            (26, "", None),
-            (27, "Totales", self.total_gasto_admin),  # Gasto Admin total ONLY
-        ]
 
 
 def quarter_to_roman(quarter: int) -> str:
@@ -1390,17 +1372,26 @@ def quarter_to_roman(quarter: int) -> str:
 
     Returns:
         Roman numeral string (I, II, III, IV)
+
+    Raises:
+        ValueError: If roman_numerals not found in config.
     """
-    try:
-        config = get_config()
-        period_types = config.get("period_types", {})
-        quarterly_config = period_types.get("quarterly", {})
-        roman_map = quarterly_config.get("roman_numerals", {})
-        return roman_map.get(str(quarter), str(quarter))
-    except Exception:
-        # Fallback to hardcoded mapping
-        roman = {1: "I", 2: "II", 3: "III", 4: "IV"}
-        return roman.get(quarter, str(quarter))
+    config = get_config()
+    period_types = config.get("period_types", {})
+    quarterly_config = period_types.get("quarterly", {})
+    roman_map = quarterly_config.get("roman_numerals")
+
+    if roman_map is None:
+        raise ValueError(
+            "roman_numerals not found in config/config.json period_types.quarterly. "
+            "Config is the single source of truth - no hardcoded fallback."
+        )
+
+    result = roman_map.get(str(quarter))
+    if result is None:
+        raise ValueError(f"Quarter {quarter} not found in roman_numerals mapping. Available: {list(roman_map.keys())}")
+
+    return result
 
 
 def format_period_label(

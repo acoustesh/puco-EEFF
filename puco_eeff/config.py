@@ -535,9 +535,36 @@ def get_sheet1_metadata_fields() -> list[str]:
 
     Returns:
         List of metadata field names.
+
+    Raises:
+        ValueError: If metadata_fields not found in config.
     """
     fields = get_sheet1_fields()
-    return fields.get("metadata_fields", ["quarter", "year", "quarter_num", "source", "xbrl_available"])
+    metadata = fields.get("metadata_fields")
+    if metadata is None:
+        raise ValueError("metadata_fields not found in extraction_specs.json sheet1_fields")
+    return metadata
+
+
+def get_sheet1_row_mapping() -> dict[str, dict[str, Any]]:
+    """Get Sheet1 row mapping from config.json.
+
+    Returns the row_mapping from config.json sheets.sheet1.row_mapping,
+    which defines all 27 rows with field names, labels, and sections.
+
+    Returns:
+        Dictionary mapping row numbers (as strings) to row definitions.
+
+    Raises:
+        ValueError: If row_mapping not found in config.
+    """
+    config = get_config()
+    sheets = config.get("sheets", {})
+    sheet1 = sheets.get("sheet1", {})
+    row_mapping = sheet1.get("row_mapping")
+    if row_mapping is None:
+        raise ValueError("row_mapping not found in config.json sheets.sheet1")
+    return row_mapping
 
 
 def get_fields_for_section(section_name: str) -> list[str]:
