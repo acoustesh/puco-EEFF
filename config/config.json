@@ -52,6 +52,34 @@
           "description": "Financial Statements XBRL/XML package"
         }
       }
+    },
+    "pucobre": {
+      "name": "Pucobre.cl - Estados Financieros",
+      "base_url": "https://www.pucobre.cl/OpenDocs/asp/pagDefault.asp?boton=Doc51&argInstanciaId=51&argCarpetaId=32&argTreeNodosAbiertos=(32)&argTreeNodoActual=32&argTreeNodoSel=32",
+      "description": "Fallback source - Pucobre company website. Only has PDF Estados Financieros (no XBRL, no Análisis Razonado).",
+      "entity": {
+        "name": "Sociedad Punta del Cobre S.A.",
+        "website": "https://www.pucobre.cl"
+      },
+      "link_pattern": "Estados Financieros {date}",
+      "date_format": "DD-MM-YYYY",
+      "quarter_to_date": {
+        "1": "31-03",
+        "2": "30-06",
+        "3": "30-09",
+        "4": "31-12"
+      },
+      "downloads": {
+        "estados_financieros_pdf": {
+          "filename_pattern": "estados_financieros_{year}_Q{quarter}.pdf",
+          "description": "Financial Statements PDF (same content as CMF)"
+        }
+      },
+      "notes": [
+        "Use as fallback when CMF Chile doesn't have the data",
+        "Q1 data is typically available here before CMF publishes Q2",
+        "Only provides PDF - no XBRL or Análisis Razonado"
+      ]
     }
   },
   "sheets": {

@@ -6,6 +6,9 @@ Downloads all three financial document types from the CMF Chile portal:
 - Estados Financieros (XBRL) - Financial Statements in XBRL/XML format
 
 All documents are available on the same CMF Chile page with filter selection.
+
+When CMF Chile doesn't have the data (e.g., Q1 before Q2 is published),
+the downloader falls back to Pucobre.cl which has the PDF available.
 """
 
 from __future__ import annotations
@@ -36,6 +39,7 @@ class DownloadResult:
     file_path: Path | None
     file_size: int | None
     error: str | None = None
+    source: str = "cmf"  # "cmf" or "pucobre.cl"
 
 
 def download_all_documents(
@@ -44,6 +48,7 @@ def download_all_documents(
     headless: bool = True,
     tipo: str = "C",
     tipo_norma: str = "IFRS",
+    fallback_to_pucobre: bool = True,
 ) -> list[DownloadResult]:
     """Download all three financial documents for a period.
 
@@ -52,12 +57,16 @@ def download_all_documents(
     2. Estados Financieros (PDF)
     3. Estados Financieros (XBRL ZIP)
 
+    If CMF Chile doesn't have the data and fallback_to_pucobre is True,
+    attempts to download Estados Financieros PDF from Pucobre.cl.
+
     Args:
         year: Year of the financial statement (e.g., 2024)
         quarter: Quarter (1-4)
         headless: Run browser in headless mode
         tipo: Type of balance ("C" for Consolidado or "I" for Individual)
         tipo_norma: Accounting standard ("IFRS" for Estándar IFRS or "NCH" for Norma Chilena)
+        fallback_to_pucobre: If True, try Pucobre.cl when CMF fails
 
     Returns:
         List of DownloadResult for each document type
@@ -77,32 +86,46 @@ def download_all_documents(
     logger.info(f"Downloading all documents for {year} Q{quarter}")
     logger.debug(f"Filters: tipo={tipo}, tipo_norma={tipo_norma}")
 
+    cmf_success = False
+
     with browser_session(headless=headless) as (browser, context, page):
         # Navigate and apply filters
         if not _navigate_and_filter(page, cmf_config, year, quarter, tipo, tipo_norma):
-            logger.error("Failed to navigate and apply filters")
-            # Return all failures
-            for doc_type in DOCUMENT_TYPES:
-                results.append(DownloadResult(
+            logger.warning("Failed to navigate and apply filters on CMF Chile")
+        else:
+            # Download each document type
+            for doc_type, doc_config in cmf_config["downloads"].items():
+                result = _download_single_document(
+                    page=page,
+                    doc_type=doc_type,
+                    doc_config=doc_config,
+                    output_dir=raw_dir,
+                    year=year,
+                    quarter=quarter,
+                )
+                results.append(result)
+
+            # Check if we got the main PDF
+            pdf_result = next((r for r in results if r.document_type == "estados_financieros_pdf"), None)
+            cmf_success = pdf_result is not None and pdf_result.success
+
+    # Fallback to Pucobre.cl if CMF Chile failed and fallback is enabled
+    if not cmf_success and fallback_to_pucobre:
+        logger.info("CMF Chile download failed, trying Pucobre.cl fallback...")
+        results = _download_with_pucobre_fallback(year, quarter, results, raw_dir, headless)
+
+    # If we still don't have results, return failures
+    if not results:
+        for doc_type in DOCUMENT_TYPES:
+            results.append(
+                DownloadResult(
                     document_type=doc_type,
                     success=False,
                     file_path=None,
                     file_size=None,
-                    error="Failed to navigate and apply filters",
-                ))
-            return results
-
-        # Download each document type
-        for doc_type, doc_config in cmf_config["downloads"].items():
-            result = _download_single_document(
-                page=page,
-                doc_type=doc_type,
-                doc_config=doc_config,
-                output_dir=raw_dir,
-                year=year,
-                quarter=quarter,
+                    error="Failed to download from both CMF Chile and Pucobre.cl",
+                )
             )
-            results.append(result)
 
     # Post-process: Extract XBRL if downloaded
     for result in results:
@@ -112,6 +135,110 @@ def download_all_documents(
     return results
 
 
+def _download_with_pucobre_fallback(
+    year: int,
+    quarter: int,
+    existing_results: list[DownloadResult],
+    raw_dir: Path,
+    headless: bool,
+) -> list[DownloadResult]:
+    """Try to download from Pucobre.cl as a fallback.
+
+    Args:
+        year: Target year
+        quarter: Target quarter
+        existing_results: Results from CMF Chile attempt
+        raw_dir: Output directory
+        headless: Run browser in headless mode
+
+    Returns:
+        Updated results list
+    """
+    from puco_eeff.scraper.pucobre_downloader import download_from_pucobre
+
+    pucobre_result = download_from_pucobre(year, quarter, headless, split_pdf=True)
+
+    # Update or add the PDF result
+    pdf_idx = next((i for i, r in enumerate(existing_results) if r.document_type == "estados_financieros_pdf"), None)
+    ar_idx = next((i for i, r in enumerate(existing_results) if r.document_type == "analisis_razonado"), None)
+
+    if pucobre_result.success:
+        # Estados Financieros PDF
+        eeff_result = DownloadResult(
+            document_type="estados_financieros_pdf",
+            success=True,
+            file_path=pucobre_result.file_path,
+            file_size=pucobre_result.file_size,
+            error=None,
+            source="pucobre.cl",
+        )
+        if pdf_idx is not None:
+            existing_results[pdf_idx] = eeff_result
+        else:
+            existing_results.append(eeff_result)
+
+        logger.info(f"Successfully downloaded Estados Financieros from Pucobre.cl: {pucobre_result.file_path}")
+
+        # Análisis Razonado (if split was successful)
+        if pucobre_result.analisis_razonado_path is not None:
+            ar_result = DownloadResult(
+                document_type="analisis_razonado",
+                success=True,
+                file_path=pucobre_result.analisis_razonado_path,
+                file_size=pucobre_result.analisis_razonado_size,
+                error=None,
+                source="pucobre.cl",
+            )
+            if ar_idx is not None:
+                existing_results[ar_idx] = ar_result
+            else:
+                existing_results.append(ar_result)
+
+            logger.info(
+                f"Successfully extracted Análisis Razonado from Pucobre.cl: {pucobre_result.analisis_razonado_path}"
+            )
+        else:
+            # Análisis Razonado not extracted (split failed or not available)
+            if not any(r.document_type == "analisis_razonado" and r.success for r in existing_results):
+                ar_result = DownloadResult(
+                    document_type="analisis_razonado",
+                    success=False,
+                    file_path=None,
+                    file_size=None,
+                    error="Could not extract Análisis Razonado from combined PDF",
+                    source="pucobre.cl",
+                )
+                if ar_idx is not None:
+                    existing_results[ar_idx] = ar_result
+                else:
+                    existing_results.append(ar_result)
+
+        # XBRL is never available from Pucobre.cl
+        if not any(r.document_type == "estados_financieros_xbrl" for r in existing_results):
+            existing_results.append(
+                DownloadResult(
+                    document_type="estados_financieros_xbrl",
+                    success=False,
+                    file_path=None,
+                    file_size=None,
+                    error="XBRL not available on Pucobre.cl",
+                    source="pucobre.cl",
+                )
+            )
+    else:
+        logger.error(f"Pucobre.cl fallback also failed: {pucobre_result.error}")
+        if pdf_idx is not None:
+            existing_results[pdf_idx] = DownloadResult(
+                document_type="estados_financieros_pdf",
+                success=False,
+                file_path=None,
+                file_size=None,
+                error=f"CMF and Pucobre both failed: {pucobre_result.error}",
+            )
+
+    return existing_results
+
+
 def download_single_document(
     year: int,
     quarter: int,
@@ -119,6 +246,7 @@ def download_single_document(
     headless: bool = True,
     tipo: str = "C",
     tipo_norma: str = "IFRS",
+    fallback_to_pucobre: bool = True,
 ) -> DownloadResult:
     """Download a single document type.
 
@@ -129,6 +257,7 @@ def download_single_document(
         headless: Run browser in headless mode
         tipo: Type of balance
         tipo_norma: Accounting standard
+        fallback_to_pucobre: If True, try Pucobre.cl when CMF fails (PDF only)
 
     Returns:
         DownloadResult with status and file path
@@ -151,29 +280,67 @@ def download_single_document(
 
     logger.info(f"Downloading {document_type} for {year} Q{quarter}")
 
+    result = None
+
     with browser_session(headless=headless) as (browser, context, page):
         if not _navigate_and_filter(page, cmf_config, year, quarter, tipo, tipo_norma):
+            logger.warning("Failed to navigate and apply CMF Chile filters")
+        else:
+            doc_config = cmf_config["downloads"][document_type]
+            result = _download_single_document(
+                page=page,
+                doc_type=document_type,
+                doc_config=doc_config,
+                output_dir=raw_dir,
+                year=year,
+                quarter=quarter,
+            )
+
+            # Extract XBRL if applicable
+            if result.document_type == "estados_financieros_xbrl" and result.success:
+                _extract_xbrl_zip(result.file_path, raw_dir, year, quarter)
+
+    # Fallback to Pucobre for PDF if CMF failed
+    if (result is None or not result.success) and fallback_to_pucobre:
+        if document_type == "estados_financieros_pdf":
+            logger.info("Trying Pucobre.cl fallback for PDF...")
+            from puco_eeff.scraper.pucobre_downloader import download_from_pucobre
+
+            pucobre_result = download_from_pucobre(year, quarter, headless)
+            if pucobre_result.success:
+                return DownloadResult(
+                    document_type=document_type,
+                    success=True,
+                    file_path=pucobre_result.file_path,
+                    file_size=pucobre_result.file_size,
+                    error=None,
+                )
+            else:
+                return DownloadResult(
+                    document_type=document_type,
+                    success=False,
+                    file_path=None,
+                    file_size=None,
+                    error=f"CMF and Pucobre both failed: {pucobre_result.error}",
+                )
+        else:
+            # XBRL and Análisis Razonado not available on Pucobre
             return DownloadResult(
                 document_type=document_type,
                 success=False,
                 file_path=None,
                 file_size=None,
-                error="Failed to navigate and apply filters",
+                error="Not available on CMF Chile; document type not available on Pucobre.cl fallback",
             )
 
-        doc_config = cmf_config["downloads"][document_type]
-        result = _download_single_document(
-            page=page,
-            doc_type=document_type,
-            doc_config=doc_config,
-            output_dir=raw_dir,
-            year=year,
-            quarter=quarter,
+    if result is None:
+        return DownloadResult(
+            document_type=document_type,
+            success=False,
+            file_path=None,
+            file_size=None,
+            error="Failed to download from CMF Chile",
         )
-
-        # Extract XBRL if applicable
-        if result.document_type == "estados_financieros_xbrl" and result.success:
-            _extract_xbrl_zip(result.file_path, raw_dir, year, quarter)
 
     return result
 

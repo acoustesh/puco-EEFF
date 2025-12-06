@@ -41,6 +41,7 @@ openpyxl = "^3.1"
 # Configuration & CLI
 python-dotenv = "^1.0"
 questionary = "^2.0"
+pymupdf = "^1.26.6"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3"

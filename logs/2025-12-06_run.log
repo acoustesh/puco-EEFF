@@ -80,3 +80,101 @@
 2025-12-06 01:41:34,619 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full', 'cl-ci', 'cl-ci-i', 'ifrs-mc', 'iso4217', 'ref', 'tx', 'xbrldi', 'xsd', 'xsi']
 2025-12-06 01:41:34,623 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 1931 facts from XBRL
 2025-12-06 01:41:34,628 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 364 contexts
+2025-12-06 01:48:04,900 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: data/raw/pdf/estados_financieros_2024_Q2.xbrl
+2025-12-06 01:48:04,905 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full', 'cl-ci', 'cl-ci-i', 'ifrs-mc', 'iso4217', 'ref', 'tx', 'xbrldi', 'xsd', 'xsi']
+2025-12-06 01:48:04,908 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 1931 facts from XBRL
+2025-12-06 01:48:04,913 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 364 contexts
+2025-12-06 02:03:03,845 - puco_eeff.scraper.pucobre_downloader - INFO - Attempting to download from Pucobre.cl: Estados Financieros 31-03-2024
+2025-12-06 02:03:04,970 - puco_eeff.scraper.pucobre_downloader - DEBUG - Navigating to: https://www.pucobre.cl/OpenDocs/asp/pagDefault.asp?boton=Doc51&argInstanciaId=51&argCarpetaId=32&argTreeNodosAbiertos=(32)&argTreeNodoActual=32&argTreeNodoSel=32
+2025-12-06 02:03:08,782 - puco_eeff.scraper.pucobre_downloader - DEBUG - PDF viewer URL: :
+2025-12-06 02:03:08,784 - puco_eeff.scraper.pucobre_downloader - ERROR - Error downloading from Pucobre: APIRequestContext.get: Invalid URL
+2025-12-06 02:04:53,628 - puco_eeff.scraper.pucobre_downloader - INFO - Attempting to download from Pucobre.cl: Estados Financieros 31-03-2024
+2025-12-06 02:04:53,831 - puco_eeff.scraper.pucobre_downloader - DEBUG - Navigating to: https://www.pucobre.cl/OpenDocs/asp/pagDefault.asp?boton=Doc51&argInstanciaId=51&argCarpetaId=32&argTreeNodosAbiertos=(32)&argTreeNodoActual=32&argTreeNodoSel=32
+2025-12-06 02:05:02,059 - puco_eeff.scraper.pucobre_downloader - DEBUG - PDF URL captured: https://www.pucobre.cl/common/asp/pagAtachadorVisualizador.asp?argCryptedData=GP1TkTXdhRJAS2Wp3v88hO%2BTX4LimcNxAaTC9s9%2FJWY%3D&argModo=&argOrigen=BD&argFlagYaGrabados=&argArchivoId=46472
+2025-12-06 02:05:03,659 - puco_eeff.scraper.pucobre_downloader - INFO - Downloaded from Pucobre: estados_financieros_2024_Q1.pdf (4,734,722 bytes)
+2025-12-06 02:05:21,320 - puco_eeff.scraper.cmf_downloader - INFO - Downloading all documents for 2024 Q1
+2025-12-06 02:05:21,320 - puco_eeff.scraper.cmf_downloader - DEBUG - Filters: tipo=C, tipo_norma=IFRS
+2025-12-06 02:05:22,436 - puco_eeff.scraper.cmf_downloader - DEBUG - Navigating to: https://www.cmfchile.cl/institucional/mercados/entidad.php?mercado=V&rut=96561560&grupo=&tipoentidad=RVEMI&row=&vig=VI&control=svs&pestania=3
+2025-12-06 02:05:23,583 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting month: 03
+2025-12-06 02:05:23,604 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting year: 2024
+2025-12-06 02:05:23,609 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting tipo: C
+2025-12-06 02:05:23,614 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting tipo_norma: IFRS
+2025-12-06 02:05:23,617 - puco_eeff.scraper.cmf_downloader - DEBUG - Clicking Consultar button
+2025-12-06 02:05:26,334 - puco_eeff.scraper.cmf_downloader - INFO - Successfully filtered for 2024 Q1
+2025-12-06 02:05:26,334 - puco_eeff.scraper.cmf_downloader - DEBUG - Looking for link: Análisis Razonado
+2025-12-06 02:05:26,346 - puco_eeff.scraper.cmf_downloader - WARNING - Link not found: Análisis Razonado
+2025-12-06 02:05:26,346 - puco_eeff.scraper.cmf_downloader - DEBUG - Looking for link: Estados financieros (PDF)
+2025-12-06 02:05:26,349 - puco_eeff.scraper.cmf_downloader - WARNING - Link not found: Estados financieros (PDF)
+2025-12-06 02:05:26,349 - puco_eeff.scraper.cmf_downloader - DEBUG - Looking for link: Estados financieros (XBRL)
+2025-12-06 02:05:26,352 - puco_eeff.scraper.cmf_downloader - WARNING - Link not found: Estados financieros (XBRL)
+2025-12-06 02:05:26,440 - puco_eeff.scraper.cmf_downloader - INFO - CMF Chile download failed, trying Pucobre.cl fallback...
+2025-12-06 02:05:26,440 - puco_eeff.scraper.pucobre_downloader - INFO - Attempting to download from Pucobre.cl: Estados Financieros 31-03-2024
+2025-12-06 02:05:26,636 - puco_eeff.scraper.pucobre_downloader - DEBUG - Navigating to: https://www.pucobre.cl/OpenDocs/asp/pagDefault.asp?boton=Doc51&argInstanciaId=51&argCarpetaId=32&argTreeNodosAbiertos=(32)&argTreeNodoActual=32&argTreeNodoSel=32
+2025-12-06 02:05:34,857 - puco_eeff.scraper.pucobre_downloader - DEBUG - PDF URL captured: https://www.pucobre.cl/common/asp/pagAtachadorVisualizador.asp?argCryptedData=GP1TkTXdhRJAS2Wp3v88hO%2BTX4LimcNxAaTC9s9%2FJWY%3D&argModo=&argOrigen=BD&argFlagYaGrabados=&argArchivoId=46472
+2025-12-06 02:05:36,351 - puco_eeff.scraper.pucobre_downloader - INFO - Downloaded from Pucobre: estados_financieros_2024_Q1.pdf (4,734,722 bytes)
+2025-12-06 02:05:36,423 - puco_eeff.scraper.cmf_downloader - INFO - Successfully downloaded from Pucobre.cl: /home/alvaro/aa-ml/puco-EEFF/data/raw/pdf/estados_financieros_2024_Q1.pdf
+2025-12-06 02:06:39,088 - puco_eeff.scraper.cmf_downloader - INFO - Downloading all documents for 2024 Q1
+2025-12-06 02:06:39,088 - puco_eeff.scraper.cmf_downloader - DEBUG - Filters: tipo=C, tipo_norma=IFRS
+2025-12-06 02:06:39,309 - puco_eeff.scraper.cmf_downloader - DEBUG - Navigating to: https://www.cmfchile.cl/institucional/mercados/entidad.php?mercado=V&rut=96561560&grupo=&tipoentidad=RVEMI&row=&vig=VI&control=svs&pestania=3
+2025-12-06 02:06:40,249 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting month: 03
+2025-12-06 02:06:40,272 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting year: 2024
+2025-12-06 02:06:40,279 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting tipo: C
+2025-12-06 02:06:40,283 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting tipo_norma: IFRS
+2025-12-06 02:06:40,287 - puco_eeff.scraper.cmf_downloader - DEBUG - Clicking Consultar button
+2025-12-06 02:06:43,018 - puco_eeff.scraper.cmf_downloader - INFO - Successfully filtered for 2024 Q1
+2025-12-06 02:06:43,018 - puco_eeff.scraper.cmf_downloader - DEBUG - Looking for link: Análisis Razonado
+2025-12-06 02:06:43,029 - puco_eeff.scraper.cmf_downloader - WARNING - Link not found: Análisis Razonado
+2025-12-06 02:06:43,029 - puco_eeff.scraper.cmf_downloader - DEBUG - Looking for link: Estados financieros (PDF)
+2025-12-06 02:06:43,032 - puco_eeff.scraper.cmf_downloader - WARNING - Link not found: Estados financieros (PDF)
+2025-12-06 02:06:43,032 - puco_eeff.scraper.cmf_downloader - DEBUG - Looking for link: Estados financieros (XBRL)
+2025-12-06 02:06:43,034 - puco_eeff.scraper.cmf_downloader - WARNING - Link not found: Estados financieros (XBRL)
+2025-12-06 02:06:43,101 - puco_eeff.scraper.cmf_downloader - INFO - CMF Chile download failed, trying Pucobre.cl fallback...
+2025-12-06 02:06:43,101 - puco_eeff.scraper.pucobre_downloader - INFO - Attempting to download from Pucobre.cl: Estados Financieros 31-03-2024
+2025-12-06 02:06:43,301 - puco_eeff.scraper.pucobre_downloader - DEBUG - Navigating to: https://www.pucobre.cl/OpenDocs/asp/pagDefault.asp?boton=Doc51&argInstanciaId=51&argCarpetaId=32&argTreeNodosAbiertos=(32)&argTreeNodoActual=32&argTreeNodoSel=32
+2025-12-06 02:06:51,549 - puco_eeff.scraper.pucobre_downloader - DEBUG - PDF URL captured: https://www.pucobre.cl/common/asp/pagAtachadorVisualizador.asp?argCryptedData=GP1TkTXdhRJAS2Wp3v88hO%2BTX4LimcNxAaTC9s9%2FJWY%3D&argModo=&argOrigen=BD&argFlagYaGrabados=&argArchivoId=46472
+2025-12-06 02:06:53,231 - puco_eeff.scraper.pucobre_downloader - INFO - Downloaded from Pucobre: estados_financieros_2024_Q1.pdf (4,734,722 bytes)
+2025-12-06 02:06:53,302 - puco_eeff.scraper.cmf_downloader - INFO - Successfully downloaded from Pucobre.cl: /home/alvaro/aa-ml/puco-EEFF/data/raw/pdf/estados_financieros_2024_Q1.pdf
+2025-12-06 02:07:02,090 - puco_eeff.scraper.cmf_downloader - INFO - Downloading all documents for 2024 Q2
+2025-12-06 02:07:02,090 - puco_eeff.scraper.cmf_downloader - DEBUG - Filters: tipo=C, tipo_norma=IFRS
+2025-12-06 02:07:02,304 - puco_eeff.scraper.cmf_downloader - DEBUG - Navigating to: https://www.cmfchile.cl/institucional/mercados/entidad.php?mercado=V&rut=96561560&grupo=&tipoentidad=RVEMI&row=&vig=VI&control=svs&pestania=3
+2025-12-06 02:07:03,213 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting month: 06
+2025-12-06 02:07:03,235 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting year: 2024
+2025-12-06 02:07:03,241 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting tipo: C
+2025-12-06 02:07:03,245 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting tipo_norma: IFRS
+2025-12-06 02:07:03,249 - puco_eeff.scraper.cmf_downloader - DEBUG - Clicking Consultar button
+2025-12-06 02:07:08,835 - puco_eeff.scraper.cmf_downloader - INFO - Successfully filtered for 2024 Q2
+2025-12-06 02:07:08,835 - puco_eeff.scraper.cmf_downloader - DEBUG - Looking for link: Análisis Razonado
+2025-12-06 02:07:09,002 - puco_eeff.scraper.cmf_downloader - INFO - Downloaded: analisis_razonado_2024_Q2.pdf (225,683 bytes)
+2025-12-06 02:07:09,002 - puco_eeff.scraper.cmf_downloader - DEBUG - Looking for link: Estados financieros (PDF)
+2025-12-06 02:07:09,214 - puco_eeff.scraper.cmf_downloader - INFO - Downloaded: estados_financieros_2024_Q2.pdf (938,858 bytes)
+2025-12-06 02:07:09,214 - puco_eeff.scraper.cmf_downloader - DEBUG - Looking for link: Estados financieros (XBRL)
+2025-12-06 02:07:09,315 - puco_eeff.scraper.cmf_downloader - INFO - Downloaded: estados_financieros_2024_Q2_xbrl.zip (53,117 bytes)
+2025-12-06 02:07:09,374 - puco_eeff.scraper.cmf_downloader - DEBUG - Files in ZIP: ['96561560_2024-07-30_C_dim_label.xml', '96561560_2024-07-30_C_dimension.xsd', '96561560_202406_C.xbrl', '96561560_202406_C_shell.xsd', '96561560_2024-07-30_C_dim_definicion.xml']
+2025-12-06 02:07:09,374 - puco_eeff.scraper.cmf_downloader - INFO - Found .xbrl instance document: 96561560_202406_C.xbrl
+2025-12-06 02:07:09,374 - puco_eeff.scraper.cmf_downloader - DEBUG - Extracting: 96561560_202406_C.xbrl -> /home/alvaro/aa-ml/puco-EEFF/data/raw/pdf/estados_financieros_2024_Q2.xbrl
+2025-12-06 02:07:09,375 - puco_eeff.scraper.cmf_downloader - INFO - Extracted XBRL to: /home/alvaro/aa-ml/puco-EEFF/data/raw/pdf/estados_financieros_2024_Q2.xbrl (686,925 bytes)
+2025-12-06 02:15:00,701 - puco_eeff.scraper.cmf_downloader - INFO - Downloading all documents for 2024 Q1
+2025-12-06 02:15:00,701 - puco_eeff.scraper.cmf_downloader - DEBUG - Filters: tipo=C, tipo_norma=IFRS
+2025-12-06 02:15:02,043 - puco_eeff.scraper.cmf_downloader - DEBUG - Navigating to: https://www.cmfchile.cl/institucional/mercados/entidad.php?mercado=V&rut=96561560&grupo=&tipoentidad=RVEMI&row=&vig=VI&control=svs&pestania=3
+2025-12-06 02:15:03,098 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting month: 03
+2025-12-06 02:15:03,122 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting year: 2024
+2025-12-06 02:15:03,127 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting tipo: C
+2025-12-06 02:15:03,133 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting tipo_norma: IFRS
+2025-12-06 02:15:03,136 - puco_eeff.scraper.cmf_downloader - DEBUG - Clicking Consultar button
+2025-12-06 02:15:05,867 - puco_eeff.scraper.cmf_downloader - INFO - Successfully filtered for 2024 Q1
+2025-12-06 02:15:05,867 - puco_eeff.scraper.cmf_downloader - DEBUG - Looking for link: Análisis Razonado
+2025-12-06 02:15:05,880 - puco_eeff.scraper.cmf_downloader - WARNING - Link not found: Análisis Razonado
+2025-12-06 02:15:05,880 - puco_eeff.scraper.cmf_downloader - DEBUG - Looking for link: Estados financieros (PDF)
+2025-12-06 02:15:05,882 - puco_eeff.scraper.cmf_downloader - WARNING - Link not found: Estados financieros (PDF)
+2025-12-06 02:15:05,883 - puco_eeff.scraper.cmf_downloader - DEBUG - Looking for link: Estados financieros (XBRL)
+2025-12-06 02:15:05,885 - puco_eeff.scraper.cmf_downloader - WARNING - Link not found: Estados financieros (XBRL)
+2025-12-06 02:15:05,953 - puco_eeff.scraper.cmf_downloader - INFO - CMF Chile download failed, trying Pucobre.cl fallback...
+2025-12-06 02:15:05,953 - puco_eeff.scraper.pucobre_downloader - INFO - Attempting to download from Pucobre.cl: Estados Financieros 31-03-2024
+2025-12-06 02:15:06,145 - puco_eeff.scraper.pucobre_downloader - DEBUG - Navigating to: https://www.pucobre.cl/OpenDocs/asp/pagDefault.asp?boton=Doc51&argInstanciaId=51&argCarpetaId=32&argTreeNodosAbiertos=(32)&argTreeNodoActual=32&argTreeNodoSel=32
+2025-12-06 02:15:14,416 - puco_eeff.scraper.pucobre_downloader - DEBUG - PDF URL captured: https://www.pucobre.cl/common/asp/pagAtachadorVisualizador.asp?argCryptedData=GP1TkTXdhRJAS2Wp3v88hO%2BTX4LimcNxAaTC9s9%2FJWY%3D&argModo=&argOrigen=BD&argFlagYaGrabados=&argArchivoId=46472
+2025-12-06 02:15:16,026 - puco_eeff.scraper.pucobre_downloader - INFO - Downloaded combined PDF from Pucobre: pucobre_combined_2024_Q1.pdf (4,734,722 bytes)
+2025-12-06 02:15:16,412 - puco_eeff.scraper.pucobre_downloader - INFO - Found Análisis Razonado at page 96
+2025-12-06 02:15:16,423 - puco_eeff.scraper.pucobre_downloader - INFO - Split PDF: Estados Financieros (95 pages), Análisis Razonado (11 pages)
+2025-12-06 02:15:16,423 - puco_eeff.scraper.pucobre_downloader - INFO - Split into: estados_financieros_2024_Q1.pdf (4,320,171 bytes), analisis_razonado_2024_Q1.pdf (404,495 bytes)
+2025-12-06 02:15:16,482 - puco_eeff.scraper.cmf_downloader - INFO - Successfully downloaded Estados Financieros from Pucobre.cl: /home/alvaro/aa-ml/puco-EEFF/data/raw/pdf/estados_financieros_2024_Q1.pdf
+2025-12-06 02:15:16,482 - puco_eeff.scraper.cmf_downloader - INFO - Successfully extracted Análisis Razonado from Pucobre.cl: /home/alvaro/aa-ml/puco-EEFF/data/raw/pdf/analisis_razonado_2024_Q1.pdf
