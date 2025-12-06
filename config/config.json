@@ -241,6 +241,51 @@
             "context_2": "Under 'Gasto Adm. y Ventas' section"
           }
         }
+      },
+      "extraction_labels": {
+        "costo_venta_items": [
+          "Gastos en personal",
+          "Materiales y repuestos",
+          "Energía eléctrica",
+          "Servicios de terceros",
+          "Depreciación y amort del periodo",
+          "Depreciación Activos en leasing",
+          "Depreciación Arrendamientos",
+          "Servicios mineros de terceros",
+          "Fletes y otros gastos operacionales",
+          "Gastos Diferidos, ajustes existencias y otros",
+          "Obligaciones por convenios colectivos"
+        ],
+        "gasto_admin_items": [
+          "Gastos en personal",
+          "Materiales y repuestos",
+          "Servicios de terceros",
+          "Provision gratificacion legal y otros",
+          "Gastos comercializacion",
+          "Otros gastos"
+        ],
+        "field_labels": {
+          "ingresos_ordinarios": "Ingresos de actividades ordinarias",
+          "cv_gastos_personal": "Gastos en personal",
+          "cv_materiales": "Materiales y repuestos",
+          "cv_energia": "Energía eléctrica",
+          "cv_servicios_terceros": "Servicios de terceros",
+          "cv_depreciacion_amort": "Depreciación y amort del periodo",
+          "cv_deprec_leasing": "Depreciación Activos en leasing",
+          "cv_deprec_arrend": "Depreciación Arrendamientos",
+          "cv_serv_mineros": "Servicios mineros de terceros",
+          "cv_fletes": "Fletes y otros gastos operacionales",
+          "cv_gastos_diferidos": "Gastos Diferidos, ajustes existencias y otros",
+          "cv_convenios": "Obligaciones por convenios colectivos",
+          "total_costo_venta": "Total Costo de Venta",
+          "ga_gastos_personal": "Gastos en personal",
+          "ga_materiales": "Materiales y repuestos",
+          "ga_servicios_terceros": "Servicios de terceros",
+          "ga_gratificacion": "Provision gratificacion legal y otros",
+          "ga_comercializacion": "Gastos comercializacion",
+          "ga_otros": "Otros gastos",
+          "total_gasto_admin": "Totales"
+        }
       }
     },
     "sheet2": {
@@ -270,6 +315,28 @@
       "section 3.a.ii"
     ],
     "format": "note {number}[.{subsection}]"
+  },
+  "xbrl": {
+    "namespaces": {
+      "xbrli": "http://www.xbrl.org/2003/instance",
+      "link": "http://www.xbrl.org/2003/linkbase",
+      "xlink": "http://www.w3.org/1999/xlink",
+      "ifrs-full": "http://xbrl.ifrs.org/taxonomy/2023-03-23/ifrs-full"
+    },
+    "aggregate_facts": [
+      "RevenueFromContractsWithCustomers",
+      "Revenue",
+      "CostOfSales",
+      "GrossProfit",
+      "AdministrativeExpense",
+      "SellingExpense",
+      "ProfitLoss",
+      "ProfitLossBeforeTax"
+    ],
+    "period_filter": {
+      "type": "duration",
+      "description": "Filter to current period (YTD) values, not instant balances"
+    }
   },
   "ocr": {
     "primary": {

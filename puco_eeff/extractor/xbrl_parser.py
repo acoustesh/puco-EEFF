@@ -2,16 +2,59 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
 from lxml import etree
 
-from puco_eeff.config import setup_logging
+from puco_eeff.config import get_config, setup_logging
 
 logger = setup_logging(__name__)
 
-# Common XBRL namespaces
+
+def _get_xbrl_config(config: dict | None = None) -> tuple[dict[str, str], list[str]]:
+    """Get XBRL namespaces and aggregate facts from config.
+
+    Args:
+        config: Configuration dict, or None to load from file
+
+    Returns:
+        Tuple of (namespaces dict, aggregate_facts list)
+    """
+    if config is None:
+        config = get_config()
+
+    xbrl_config = config.get("xbrl", {})
+
+    namespaces = xbrl_config.get(
+        "namespaces",
+        {
+            "xbrli": "http://www.xbrl.org/2003/instance",
+            "link": "http://www.xbrl.org/2003/linkbase",
+            "xlink": "http://www.w3.org/1999/xlink",
+            "ifrs-full": "http://xbrl.ifrs.org/taxonomy/2023-03-23/ifrs-full",
+        },
+    )
+
+    aggregate_facts = xbrl_config.get(
+        "aggregate_facts",
+        [
+            "RevenueFromContractsWithCustomers",
+            "Revenue",
+            "CostOfSales",
+            "GrossProfit",
+            "AdministrativeExpense",
+            "SellingExpense",
+            "ProfitLoss",
+            "ProfitLossBeforeTax",
+        ],
+    )
+
+    return namespaces, aggregate_facts
+
+
+# Common XBRL namespaces (module-level for backward compatibility)
 NAMESPACES = {
     "xbrli": "http://www.xbrl.org/2003/instance",
     "link": "http://www.xbrl.org/2003/linkbase",
@@ -297,3 +340,113 @@ def summarize_facts(data: dict[str, Any]) -> dict[str, int]:
         categories[category] = categories.get(category, 0) + 1
 
     return dict(sorted(categories.items(), key=lambda x: -x[1]))
+
+
+def extract_xbrl_aggregates(
+    xml_path: Path,
+    config: dict | None = None,
+) -> dict[str, Any]:
+    """Extract aggregate financial facts from XBRL file.
+
+    This is a thin wrapper that parses XBRL and extracts key aggregate
+    values (Revenue, CostOfSales, etc.) for the current period.
+
+    Args:
+        xml_path: Path to the XBRL/XML file
+        config: Configuration dict, or None to load from file
+
+    Returns:
+        Dictionary with aggregate values:
+        {
+            "source_file": str,
+            "period": {"start": str, "end": str},
+            "aggregates": {
+                "Revenue": int,
+                "CostOfSales": int,
+                ...
+            },
+            "all_facts": list  # Full fact list for debugging
+        }
+    """
+    _, aggregate_fact_names = _get_xbrl_config(config)
+
+    # Parse the XBRL file
+    data = parse_xbrl_file(xml_path)
+    contexts = data.get("contexts", {})
+
+    # Find the current period context (duration type, most recent end date)
+    current_context = None
+    latest_end_date = ""
+
+    for ctx_id, ctx_info in contexts.items():
+        if ctx_info.get("period_type") == "duration":
+            end_date = ctx_info.get("end_date", "")
+            if end_date > latest_end_date:
+                latest_end_date = end_date
+                current_context = ctx_id
+
+    logger.debug(f"Using context: {current_context} (end: {latest_end_date})")
+
+    # Extract aggregate values
+    aggregates: dict[str, int | None] = {}
+
+    for fact_name in aggregate_fact_names:
+        matching = get_facts_by_name(data, fact_name, exact=True)
+
+        # Filter to current period context
+        for fact in matching:
+            if fact.get("context_ref") == current_context:
+                try:
+                    value = int(float(fact.get("value", 0)))
+                    aggregates[fact_name] = value
+                    logger.debug(f"{fact_name}: {value:,}")
+                except (ValueError, TypeError):
+                    aggregates[fact_name] = None
+                break
+
+    # Get period info
+    period_info = {}
+    if current_context and current_context in contexts:
+        ctx = contexts[current_context]
+        period_info = {
+            "start": ctx.get("start_date"),
+            "end": ctx.get("end_date"),
+        }
+
+    return {
+        "source_file": str(xml_path),
+        "period": period_info,
+        "aggregates": aggregates,
+        "all_facts": data.get("facts", []),
+    }
+
+
+def save_xbrl_aggregates(
+    aggregates: dict[str, Any],
+    output_path: Path,
+    config: dict | None = None,
+) -> Path:
+    """Save extracted XBRL aggregates to JSON file.
+
+    Args:
+        aggregates: Output from extract_xbrl_aggregates()
+        output_path: Path to save JSON file
+        config: Configuration dict (unused, for API consistency)
+
+    Returns:
+        Path to saved file
+    """
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Create a clean version for saving (exclude all_facts to keep file small)
+    save_data = {
+        "source_file": aggregates.get("source_file"),
+        "period": aggregates.get("period"),
+        "aggregates": aggregates.get("aggregates"),
+    }
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(save_data, f, indent=2, ensure_ascii=False)
+
+    logger.info(f"Saved XBRL aggregates to: {output_path}")
+    return output_path

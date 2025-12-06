@@ -20,25 +20,45 @@ from pathlib import Path
 from playwright.sync_api import Page
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
-from puco_eeff.config import get_period_paths, setup_logging
+from puco_eeff.config import get_config, get_period_paths, setup_logging
 from puco_eeff.scraper.browser import browser_session
 
 logger = setup_logging(__name__)
 
-# Pucobre Estados Financieros page
-PUCOBRE_EEFF_URL = (
-    "https://www.pucobre.cl/OpenDocs/asp/pagDefault.asp?"
-    "boton=Doc51&argInstanciaId=51&argCarpetaId=32&"
-    "argTreeNodosAbiertos=(32)&argTreeNodoActual=32&argTreeNodoSel=32"
-)
 
-# Quarter to end-of-period date mapping
-QUARTER_TO_DATE = {
-    1: "31-03",  # Q1 ends March 31
-    2: "30-06",  # Q2 ends June 30
-    3: "30-09",  # Q3 ends September 30
-    4: "31-12",  # Q4 ends December 31
-}
+def _get_pucobre_config(config: dict | None = None) -> tuple[str, dict[int, str]]:
+    """Get Pucobre URL and quarter-to-date mapping from config.
+
+    Args:
+        config: Configuration dict, or None to load from file
+
+    Returns:
+        Tuple of (base_url, quarter_to_date_mapping)
+    """
+    if config is None:
+        config = get_config()
+
+    pucobre_config = config.get("sources", {}).get("pucobre", {})
+    base_url = pucobre_config.get(
+        "base_url",
+        "https://www.pucobre.cl/OpenDocs/asp/pagDefault.asp?"
+        "boton=Doc51&argInstanciaId=51&argCarpetaId=32&"
+        "argTreeNodosAbiertos=(32)&argTreeNodoActual=32&argTreeNodoSel=32",
+    )
+
+    # Config stores keys as strings, convert to int keys
+    quarter_to_date_raw = pucobre_config.get(
+        "quarter_to_date",
+        {
+            "1": "31-03",
+            "2": "30-06",
+            "3": "30-09",
+            "4": "31-12",
+        },
+    )
+    quarter_to_date = {int(k): v for k, v in quarter_to_date_raw.items()}
+
+    return base_url, quarter_to_date
 
 
 @dataclass
@@ -150,6 +170,7 @@ def download_from_pucobre(
     quarter: int,
     headless: bool = True,
     split_pdf: bool = True,
+    config: dict | None = None,
 ) -> PucobreDownloadResult:
     """Download financial documents from Pucobre.cl.
 
@@ -162,10 +183,13 @@ def download_from_pucobre(
         quarter: Quarter (1-4)
         headless: Run browser in headless mode
         split_pdf: If True, split combined PDF into separate files
+        config: Configuration dict, or None to load from file
 
     Returns:
         PucobreDownloadResult with status and file paths
     """
+    pucobre_url, quarter_to_date = _get_pucobre_config(config)
+
     paths = get_period_paths(year, quarter)
     raw_dir = paths["raw_pdf"]
     raw_dir.mkdir(parents=True, exist_ok=True)
@@ -181,7 +205,7 @@ def download_from_pucobre(
     ar_path = raw_dir / ar_filename
 
     # Expected link text pattern: "Estados Financieros DD-MM-YYYY"
-    date_str = f"{QUARTER_TO_DATE[quarter]}-{year}"
+    date_str = f"{quarter_to_date[quarter]}-{year}"
     expected_link = f"Estados Financieros {date_str}"
 
     logger.info(f"Attempting to download from Pucobre.cl: {expected_link}")
@@ -203,8 +227,8 @@ def download_from_pucobre(
 
         try:
             # Navigate to Pucobre Estados Financieros page
-            logger.debug(f"Navigating to: {PUCOBRE_EEFF_URL}")
-            page.goto(PUCOBRE_EEFF_URL, wait_until="networkidle", timeout=60000)
+            logger.debug(f"Navigating to: {pucobre_url}")
+            page.goto(pucobre_url, wait_until="networkidle", timeout=60000)
 
             # Wait for the table to load
             time.sleep(2)
@@ -215,7 +239,7 @@ def download_from_pucobre(
             if link.count() == 0:
                 logger.warning(f"Link not found: {expected_link}")
                 # Try alternative search - look for partial match
-                link = _find_period_link(page, year, quarter)
+                link = _find_period_link(page, year, quarter, quarter_to_date)
                 if link is None:
                     return PucobreDownloadResult(
                         success=False,
@@ -330,18 +354,19 @@ def download_from_pucobre(
             )
 
 
-def _find_period_link(page: Page, year: int, quarter: int):
+def _find_period_link(page: Page, year: int, quarter: int, quarter_to_date: dict[int, str]):
     """Find the download link for a specific period using various patterns.
 
     Args:
         page: Playwright page instance
         year: Target year
         quarter: Target quarter (1-4)
+        quarter_to_date: Mapping from quarter number to date string
 
     Returns:
         Locator for the link, or None if not found
     """
-    date_str = f"{QUARTER_TO_DATE[quarter]}-{year}"
+    date_str = f"{quarter_to_date[quarter]}-{year}"
 
     # Try different patterns
     patterns = [
@@ -354,7 +379,7 @@ def _find_period_link(page: Page, year: int, quarter: int):
         if isinstance(pattern, str):
             link = page.get_by_role("link", name=pattern)
         else:
-            link = page.locator(f"a:has-text('{QUARTER_TO_DATE[quarter]}-{year}')")
+            link = page.locator(f"a:has-text('{quarter_to_date[quarter]}-{year}')")
 
         if link.count() > 0:
             logger.debug(f"Found link with pattern: {pattern}")
@@ -363,19 +388,21 @@ def _find_period_link(page: Page, year: int, quarter: int):
     return None
 
 
-def list_pucobre_periods(headless: bool = True) -> list[dict]:
+def list_pucobre_periods(headless: bool = True, config: dict | None = None) -> list[dict]:
     """List all available periods from Pucobre.cl.
 
     Args:
         headless: Run browser in headless mode
+        config: Configuration dict, or None to load from file
 
     Returns:
         List of available periods with year, quarter, and link text
     """
+    pucobre_url, _ = _get_pucobre_config(config)
     periods: list[dict] = []
 
     with browser_session(headless=headless) as (browser, context, page):
-        page.goto(PUCOBRE_EEFF_URL, wait_until="networkidle", timeout=60000)
+        page.goto(pucobre_url, wait_until="networkidle", timeout=60000)
         time.sleep(2)
 
         # Find all "Estados Financieros" links
@@ -408,22 +435,24 @@ def list_pucobre_periods(headless: bool = True) -> list[dict]:
     return periods
 
 
-def check_pucobre_availability(year: int, quarter: int, headless: bool = True) -> bool:
+def check_pucobre_availability(year: int, quarter: int, headless: bool = True, config: dict | None = None) -> bool:
     """Check if a specific period is available on Pucobre.cl.
 
     Args:
         year: Target year
         quarter: Target quarter (1-4)
         headless: Run browser in headless mode
+        config: Configuration dict, or None to load from file
 
     Returns:
         True if the period is available
     """
-    date_str = f"{QUARTER_TO_DATE[quarter]}-{year}"
+    pucobre_url, quarter_to_date = _get_pucobre_config(config)
+    date_str = f"{quarter_to_date[quarter]}-{year}"
     expected_link = f"Estados Financieros {date_str}"
 
     with browser_session(headless=headless) as (browser, context, page):
-        page.goto(PUCOBRE_EEFF_URL, wait_until="networkidle", timeout=60000)
+        page.goto(pucobre_url, wait_until="networkidle", timeout=60000)
         time.sleep(2)
 
         link = page.get_by_role("link", name=expected_link)

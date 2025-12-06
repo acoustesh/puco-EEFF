@@ -29,60 +29,105 @@ from puco_eeff.extractor.xbrl_parser import get_facts_by_name, parse_xbrl_file
 logger = setup_logging(__name__)
 
 
-def load_sheet1_config() -> dict[str, Any]:
-    """Load sheet1 configuration from config.json."""
-    config = get_config()
+def _get_extraction_labels(config: dict | None = None) -> tuple[list[str], list[str], dict[str, str]]:
+    """Get extraction labels from config.
+
+    Args:
+        config: Configuration dict, or None to load from file
+
+    Returns:
+        Tuple of (costo_venta_items, gasto_admin_items, field_labels)
+    """
+    if config is None:
+        config = get_config()
+
+    sheet1_config = config.get("sheets", {}).get("sheet1", {})
+    extraction_labels = sheet1_config.get("extraction_labels", {})
+
+    costo_venta_items = extraction_labels.get(
+        "costo_venta_items",
+        [
+            "Gastos en personal",
+            "Materiales y repuestos",
+            "Energía eléctrica",
+            "Servicios de terceros",
+            "Depreciación y amort del periodo",
+            "Depreciación Activos en leasing",
+            "Depreciación Arrendamientos",
+            "Servicios mineros de terceros",
+            "Fletes y otros gastos operacionales",
+            "Gastos Diferidos, ajustes existencias y otros",
+            "Obligaciones por convenios colectivos",
+        ],
+    )
+
+    gasto_admin_items = extraction_labels.get(
+        "gasto_admin_items",
+        [
+            "Gastos en personal",
+            "Materiales y repuestos",
+            "Servicios de terceros",
+            "Provision gratificacion legal y otros",
+            "Gastos comercializacion",
+            "Otros gastos",
+        ],
+    )
+
+    field_labels = extraction_labels.get(
+        "field_labels",
+        {
+            "ingresos_ordinarios": "Ingresos de actividades ordinarias",
+            "cv_gastos_personal": "Gastos en personal",
+            "cv_materiales": "Materiales y repuestos",
+            "cv_energia": "Energía eléctrica",
+            "cv_servicios_terceros": "Servicios de terceros",
+            "cv_depreciacion_amort": "Depreciación y amort del periodo",
+            "cv_deprec_leasing": "Depreciación Activos en leasing",
+            "cv_deprec_arrend": "Depreciación Arrendamientos",
+            "cv_serv_mineros": "Servicios mineros de terceros",
+            "cv_fletes": "Fletes y otros gastos operacionales",
+            "cv_gastos_diferidos": "Gastos Diferidos, ajustes existencias y otros",
+            "cv_convenios": "Obligaciones por convenios colectivos",
+            "total_costo_venta": "Total Costo de Venta",
+            "ga_gastos_personal": "Gastos en personal",
+            "ga_materiales": "Materiales y repuestos",
+            "ga_servicios_terceros": "Servicios de terceros",
+            "ga_gratificacion": "Provision gratificacion legal y otros",
+            "ga_comercializacion": "Gastos comercializacion",
+            "ga_otros": "Otros gastos",
+            "total_gasto_admin": "Totales",
+        },
+    )
+
+    return costo_venta_items, gasto_admin_items, field_labels
+
+
+def load_sheet1_config(config: dict | None = None) -> dict[str, Any]:
+    """Load sheet1 configuration from config.json.
+
+    Args:
+        config: Configuration dict, or None to load from file
+
+    Returns:
+        Sheet1 configuration dictionary
+    """
+    if config is None:
+        config = get_config()
     return config.get("sheets", {}).get("sheet1", {})
 
 
-# Sheet1 row structure from config - Costo de Venta items (rows 4-14)
-COSTO_VENTA_ITEMS = [
-    "Gastos en personal",
-    "Materiales y repuestos",
-    "Energía eléctrica",
-    "Servicios de terceros",
-    "Depreciación y amort del periodo",
-    "Depreciación Activos en leasing",
-    "Depreciación Arrendamientos",
-    "Servicios mineros de terceros",
-    "Fletes y otros gastos operacionales",
-    "Gastos Diferidos, ajustes existencias y otros",
-    "Obligaciones por convenios colectivos",
-]
+# Legacy module-level constants for backward compatibility
+# These are populated on first access when needed
+COSTO_VENTA_ITEMS: list[str] = []
+GASTO_ADMIN_ITEMS: list[str] = []
+FIELD_MAPPING: dict[str, str] = {}
 
-# Sheet1 row structure - Gasto Admin y Ventas items (rows 20-25)
-GASTO_ADMIN_ITEMS = [
-    "Gastos en personal",
-    "Materiales y repuestos",
-    "Servicios de terceros",
-    "Provision gratificacion legal y otros",
-    "Gastos comercializacion",
-    "Otros gastos",
-]
 
-# Field names matching config row_mapping
-FIELD_MAPPING = {
-    "ingresos_ordinarios": "Ingresos de actividades ordinarias",
-    "cv_gastos_personal": "Gastos en personal",
-    "cv_materiales": "Materiales y repuestos",
-    "cv_energia": "Energía eléctrica",
-    "cv_servicios_terceros": "Servicios de terceros",
-    "cv_depreciacion_amort": "Depreciación y amort del periodo",
-    "cv_deprec_leasing": "Depreciación Activos en leasing",
-    "cv_deprec_arrend": "Depreciación Arrendamientos",
-    "cv_serv_mineros": "Servicios mineros de terceros",
-    "cv_fletes": "Fletes y otros gastos operacionales",
-    "cv_gastos_diferidos": "Gastos Diferidos, ajustes existencias y otros",
-    "cv_convenios": "Obligaciones por convenios colectivos",
-    "total_costo_venta": "Total Costo de Venta",
-    "ga_gastos_personal": "Gastos en personal",
-    "ga_materiales": "Materiales y repuestos",
-    "ga_servicios_terceros": "Servicios de terceros",
-    "ga_gratificacion": "Provision gratificacion legal y otros",
-    "ga_comercializacion": "Gastos comercializacion",
-    "ga_otros": "Otros gastos",
-    "total_gasto_admin": "Totales",  # Row 27 - specifically Gasto Admin total
-}
+def _init_legacy_constants() -> None:
+    """Initialize legacy module-level constants from config."""
+    global COSTO_VENTA_ITEMS, GASTO_ADMIN_ITEMS, FIELD_MAPPING
+    if not COSTO_VENTA_ITEMS:
+        COSTO_VENTA_ITEMS, GASTO_ADMIN_ITEMS, FIELD_MAPPING = _get_extraction_labels()
 
 
 @dataclass
@@ -111,9 +156,7 @@ class CostBreakdown:
 
     def sum_items_ytd_actual(self) -> int:
         """Sum all YTD actual values (excluding total row)."""
-        return sum(
-            item.ytd_actual or 0 for item in self.items if "total" not in item.concepto.lower()
-        )
+        return sum(item.ytd_actual or 0 for item in self.items if "total" not in item.concepto.lower())
 
     def is_valid(self) -> bool:
         """Check if the sum of items equals the total."""
@@ -294,9 +337,7 @@ def extract_table_from_page(
         return _parse_cost_table(best_table, expected_items)
 
 
-def _parse_cost_table(
-    table: list[list[str | None]], expected_items: list[str]
-) -> list[dict[str, Any]]:
+def _parse_cost_table(table: list[list[str | None]], expected_items: list[str]) -> list[dict[str, Any]]:
     """Parse a cost breakdown table.
 
     Args:
@@ -336,35 +377,36 @@ def _parse_cost_table(
                     if parsed is not None:
                         values.append(parsed)
 
-            parsed_rows.append(
-                {
-                    "concepto": matched_item,
-                    "values": values,
-                }
-            )
+            parsed_rows.append({
+                "concepto": matched_item,
+                "values": values,
+            })
 
     return parsed_rows
 
 
-def extract_nota_21(pdf_path: Path) -> CostBreakdown | None:
+def extract_nota_21(pdf_path: Path, config: dict | None = None) -> CostBreakdown | None:
     """Extract Nota 21 - Costo de Venta from PDF.
 
     Args:
         pdf_path: Path to Estados Financieros PDF
+        config: Configuration dict, or None to load from file
 
     Returns:
         CostBreakdown object or None if extraction fails
     """
+    costo_venta_items, _, _ = _get_extraction_labels(config)
+
     page_idx = find_nota_page(pdf_path, 21)
     if page_idx is None:
         logger.error("Could not find Nota 21 in PDF")
         return None
 
-    rows = extract_table_from_page(pdf_path, page_idx, COSTO_VENTA_ITEMS)
+    rows = extract_table_from_page(pdf_path, page_idx, costo_venta_items)
 
     if not rows:
         # Try next page (table might span pages)
-        rows = extract_table_from_page(pdf_path, page_idx + 1, COSTO_VENTA_ITEMS)
+        rows = extract_table_from_page(pdf_path, page_idx + 1, costo_venta_items)
 
     if not rows:
         logger.error("Could not extract Nota 21 table")
@@ -399,15 +441,18 @@ def extract_nota_21(pdf_path: Path) -> CostBreakdown | None:
     return breakdown
 
 
-def extract_nota_22(pdf_path: Path) -> CostBreakdown | None:
+def extract_nota_22(pdf_path: Path, config: dict | None = None) -> CostBreakdown | None:
     """Extract Nota 22 - Gastos de Administración y Ventas from PDF.
 
     Args:
         pdf_path: Path to Estados Financieros PDF
+        config: Configuration dict, or None to load from file
 
     Returns:
         CostBreakdown object or None if extraction fails
     """
+    _, gasto_admin_items, _ = _get_extraction_labels(config)
+
     page_idx = find_nota_page(pdf_path, 22)
     if page_idx is None:
         # Nota 22 is often on the same page as Nota 21
@@ -416,11 +461,11 @@ def extract_nota_22(pdf_path: Path) -> CostBreakdown | None:
             logger.error("Could not find Nota 22 in PDF")
             return None
 
-    rows = extract_table_from_page(pdf_path, page_idx, GASTO_ADMIN_ITEMS)
+    rows = extract_table_from_page(pdf_path, page_idx, gasto_admin_items)
 
     if not rows:
         # Try next page
-        rows = extract_table_from_page(pdf_path, page_idx + 1, GASTO_ADMIN_ITEMS)
+        rows = extract_table_from_page(pdf_path, page_idx + 1, gasto_admin_items)
 
     if not rows:
         logger.error("Could not extract Nota 22 table")
@@ -1097,9 +1142,7 @@ def _validate_sheet1_with_xbrl(data: Sheet1Data, xbrl_path: Path) -> None:
             if abs(data.total_gasto_admin) == abs(xbrl_admin):
                 logger.info(f"✓ Total Gasto Admin matches XBRL: {data.total_gasto_admin:,}")
             else:
-                logger.warning(
-                    f"✗ Total Gasto Admin mismatch - PDF: {data.total_gasto_admin:,}, XBRL: {xbrl_admin:,}"
-                )
+                logger.warning(f"✗ Total Gasto Admin mismatch - PDF: {data.total_gasto_admin:,}, XBRL: {xbrl_admin:,}")
         else:
             # PDF extraction failed - use XBRL value
             logger.info(f"Using XBRL value for Total Gasto Admin: {xbrl_admin:,}")
@@ -1388,10 +1431,7 @@ def extract_sheet1_from_xbrl(year: int, quarter: int) -> Sheet1Data | None:
                 continue
 
     # Check if we got at least one value
-    if all(
-        v is None
-        for v in [data.ingresos_ordinarios, data.total_costo_venta, data.total_gasto_admin]
-    ):
+    if all(v is None for v in [data.ingresos_ordinarios, data.total_costo_venta, data.total_gasto_admin]):
         logger.warning(f"No Sheet1 data found in XBRL for {year} Q{quarter}")
         return None
 
@@ -1436,9 +1476,7 @@ def extract_sheet1(
 
         if data is None or validate:
             # Try PDF for detailed breakdown or validation
-            pdf_data = extract_sheet1_from_analisis_razonado(
-                year, quarter, validate_with_xbrl=False
-            )
+            pdf_data = extract_sheet1_from_analisis_razonado(year, quarter, validate_with_xbrl=False)
             if pdf_data is not None:
                 if data is None:
                     data = pdf_data
