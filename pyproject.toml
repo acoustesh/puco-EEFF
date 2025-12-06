@@ -1,0 +1,97 @@
+[project]
+name = "puco-eeff"
+version = "0.1.0"
+description = "Estados Financieros extraction pipeline for Pucobre - downloads PDFs and XBRL, extracts data via OCR, outputs Excel workbooks"
+readme = "README.md"
+requires-python = ">=3.12,<3.15"
+license = { text = "MIT" }
+authors = [{ name = "Alvaro" }]
+
+[build-system]
+requires = ["poetry-core>=2.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.12,<3.15"
+
+# Web scraping & browser automation
+playwright = "^1.49"
+httpx = "^0.28"
+
+# PDF processing
+pdfplumber = "^0.11"
+
+# XBRL/XML parsing
+python-xbrl = "^1.1"
+arelle-release = "^2.30"
+lxml = "^5.3"
+
+# OCR APIs
+mistralai = "^1.2"
+anthropic = "^0.40"
+openai = "^1.57"
+
+# Data processing & Excel output
+pandas = "^2.2"
+openpyxl = "^3.1"
+
+# Configuration & CLI
+python-dotenv = "^1.0"
+questionary = "^2.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3"
+pytest-asyncio = "^0.24"
+black = "^24.10"
+isort = "^5.13"
+ruff = "^0.8"
+mypy = "^1.13"
+pandas-stubs = "^2.2"
+types-openpyxl = "^3.1"
+lxml-stubs = "^0.5"
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+
+[[tool.mypy.overrides]]
+module = [
+    "pdfplumber.*",
+    "xbrl.*",
+    "arelle.*",
+    "questionary.*",
+    "playwright.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+asyncio_mode = "auto"

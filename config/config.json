@@ -1,0 +1,86 @@
+{
+  "sources": {
+    "pdf": {
+      "name": "Pucobre Estados Financieros",
+      "base_url": "https://www.pucobre.cl/OpenDocs/asp/pagDefault.asp?boton=Doc51&argInstanciaId=51&argCarpetaId=32&argTreeNodosAbiertos=(32)&argTreeNodoActual=32&argTreeNodoSel=32",
+      "description": "Portal de documentos públicos de Pucobre"
+    },
+    "xbrl": {
+      "name": "CMF Chile - XBRL",
+      "base_url": "https://www.cmfchile.cl/institucional/mercados/entidad.php?mercado=V&rut=96561560&grupo=&tipoentidad=RVEMI&row=&vig=VI&control=svs&pestania=3",
+      "description": "Portal de información financiera CMF Chile",
+      "filters": {
+        "tipo_balance": "Consolidado",
+        "tipo_norma": "Estandar IFRS"
+      }
+    }
+  },
+  "sheets": {
+    "sheet1": {
+      "name": "TBD - Estado de Situación Financiera",
+      "description": "Balance General / Statement of Financial Position",
+      "xml_paths": [],
+      "pdf_sections": []
+    },
+    "sheet2": {
+      "name": "TBD - Estado de Resultados",
+      "description": "Income Statement / Statement of Profit or Loss",
+      "xml_paths": [],
+      "pdf_sections": []
+    },
+    "sheet3": {
+      "name": "TBD - Estado de Flujos de Efectivo",
+      "description": "Cash Flow Statement",
+      "xml_paths": [],
+      "pdf_sections": []
+    },
+    "sheet4": {
+      "name": "TBD - Notas",
+      "description": "Notes to Financial Statements",
+      "xml_paths": [],
+      "pdf_sections": []
+    }
+  },
+  "pdf_section_patterns": {
+    "description": "String patterns to identify sections in PDFs",
+    "examples": [
+      "note 20.b",
+      "note 5",
+      "section 3.a.ii"
+    ],
+    "format": "note {number}[.{subsection}]"
+  },
+  "ocr": {
+    "primary": {
+      "provider": "mistral",
+      "model": "mistral-ocr-latest"
+    },
+    "fallback": [
+      {
+        "provider": "openrouter",
+        "model": "anthropic/claude-3.5-sonnet",
+        "description": "Anthropic Claude via OpenRouter"
+      },
+      {
+        "provider": "openrouter",
+        "model": "openai/gpt-4o",
+        "description": "OpenAI GPT-4o via OpenRouter"
+      }
+    ],
+    "retry": {
+      "max_attempts": 3,
+      "strategy": "exponential",
+      "base_delay_seconds": 1,
+      "max_delay_seconds": 30
+    },
+    "save_all_responses": true
+  },
+  "output": {
+    "filename_pattern": "EEFF_{year}_Q{quarter}.xlsx",
+    "date_format": "YYYY_QN"
+  },
+  "logging": {
+    "format": "simple",
+    "filename_pattern": "{date}_run.log"
+  }
+}
