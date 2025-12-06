@@ -21,6 +21,7 @@ from puco_eeff.extractor.cost_extractor import (
     extract_sheet1_from_xbrl,
     extract_xbrl_totals,
     find_section_page,
+    find_text_page,
     format_quarter_label,
     print_extraction_report,
     print_sheet1_report,
@@ -43,6 +44,7 @@ __all__ = [
     "ValidationResult",
     # Generic extraction (preferred)
     "extract_pdf_section",
+    "find_text_page",
     "find_section_page",
     # High-level Sheet1 extraction
     "extract_sheet1",

@@ -13,8 +13,8 @@ Key Classes:
 Key Functions:
     extract_pdf_section(): Generic config-driven PDF section extraction.
         Preferred over deprecated extract_nota_21/extract_nota_22 wrappers.
-    find_section_page(): Find page containing a section.
-        Preferred over deprecated find_nota_page wrapper.
+    find_text_page(): Generic PDF page finder - searches for required text strings.
+    find_section_page(): Config-driven wrapper using find_text_page.
     extract_sheet1(): Main entry point for Sheet1 extraction.
 
 Architecture:
@@ -81,6 +81,7 @@ __all__ = [
     "ExtractionResult",
     # Generic extraction functions (preferred)
     "extract_pdf_section",
+    "find_text_page",
     "find_section_page",
     "extract_table_from_page",
     "parse_chilean_number",
@@ -444,25 +445,104 @@ def parse_chilean_number(value: str | None) -> int | None:
         return None
 
 
+def find_text_page(
+    pdf_path: Path,
+    required_texts: list[str],
+    optional_texts: list[str] | None = None,
+    min_required: int | None = None,
+    min_optional: int = 0,
+) -> int | None:
+    """Find the first page containing required text strings.
+
+    Generic PDF page finder that searches for text patterns. This is the
+    primitive function used by find_section_page for config-driven lookups.
+
+    Args:
+        pdf_path: Path to the PDF file
+        required_texts: List of text strings that MUST appear (at least one).
+            Matching is case-insensitive.
+        optional_texts: Additional texts to look for (for scoring/validation).
+            If provided with min_optional > 0, page must have at least that many.
+        min_required: Minimum number of required_texts that must match.
+            Defaults to 1 (any single match). Set higher for stricter matching.
+        min_optional: Minimum number of optional_texts that must match.
+            Defaults to 0 (no optional requirement).
+
+    Returns:
+        0-indexed page number or None if not found
+
+    Example:
+        >>> # Find page with "Nota 21" header
+        >>> find_text_page(pdf, ["21. costo", "nota 21"])
+
+        >>> # Find page with header AND at least 3 detail items
+        >>> find_text_page(pdf, ["estado de resultados"],
+        ...                optional_texts=["ingresos", "gastos", "utilidad"],
+        ...                min_optional=2)
+    """
+    if min_required is None:
+        min_required = 1
+
+    # Normalize required texts for matching (case-insensitive + accent-stripped)
+    required_normalized = []
+    for text in required_texts:
+        required_normalized.append(text.lower())
+        normalized = _normalize_for_matching(text)
+        if normalized != text.lower():
+            required_normalized.append(normalized)
+
+    # Normalize optional texts if provided
+    optional_lower = []
+    if optional_texts:
+        for text in optional_texts:
+            optional_lower.append(text.lower())
+            normalized = _normalize_for_matching(text)
+            if normalized != text.lower():
+                optional_lower.append(normalized)
+
+    with pdfplumber.open(pdf_path) as pdf:
+        for page_idx, page in enumerate(pdf.pages):
+            text = (page.extract_text() or "").lower()
+
+            # Count required text matches
+            required_count = sum(1 for req in required_normalized if req in text)
+            if required_count < min_required:
+                continue
+
+            # Count optional text matches if specified
+            if optional_lower and min_optional > 0:
+                optional_count = sum(1 for opt in optional_lower if opt in text)
+                if optional_count < min_optional:
+                    continue
+
+            logger.debug(f"Found text match on page {page_idx + 1}")
+            return page_idx
+
+    return None
+
+
 def find_section_page(
     pdf_path: Path,
     section_name: str,
     year: int | None = None,
     quarter: int | None = None,
 ) -> int | None:
-    """Find the page number where a section with detailed breakdown exists.
+    """Find the page number where a config-defined section exists.
 
-    Uses config/sheet1/extraction.json to get search patterns and unique identifiers.
-    Works with any section: nota_21, nota_22, ingresos, etc.
+    Config-driven wrapper around find_text_page. Uses config/sheet1/extraction.json
+    to get search patterns and unique identifiers for the section.
 
     Args:
         pdf_path: Path to the PDF file
         section_name: Section name from config/sheet1/extraction.json (e.g., "nota_21", "ingresos")
-        year: Optional year for period-specific specs
-        quarter: Optional quarter for period-specific specs
+        year: Optional year for period-specific specs (reserved for future use)
+        quarter: Optional quarter for period-specific specs (reserved for future use)
 
     Returns:
         0-indexed page number or None if not found
+
+    See Also:
+        find_text_page: Generic text search (use directly for non-config searches)
     """
     section_spec = get_sheet1_section_spec(section_name)
 
@@ -474,16 +554,6 @@ def find_section_page(
             f"No unique_items defined in config/sheet1/extraction.json for section '{section_name}'. "
             "Please add table_identifiers.unique_items to the section spec."
         )
-
-    # Build detail items list from unique identifiers
-    # Add lowercase variations and accent-stripped versions
-    detail_items = []
-    for item in unique_items:
-        detail_items.append(item.lower())
-        # Also add without accents
-        normalized = _normalize_for_matching(item)
-        if normalized != item.lower():
-            detail_items.append(normalized)
 
     # Get search patterns from spec (check both top-level and pdf_fallback)
     search_patterns = section_spec.get("search_patterns", [])
@@ -502,50 +572,24 @@ def find_section_page(
     min_detail_items = validation.get("min_detail_items", 3)
     has_totales = validation.get("has_totales_row", True)
 
-    with pdfplumber.open(pdf_path) as pdf:
-        for page_idx, page in enumerate(pdf.pages):
-            text = (page.extract_text() or "").lower()
+    # Build optional texts from unique items + totales requirement
+    optional_texts = list(unique_items)
+    if has_totales:
+        optional_texts.append("totales")
 
-            # Look for section header pattern
-            has_header = any(pattern.lower() in text for pattern in search_patterns)
-            if not has_header:
-                continue
+    # Use find_text_page with search patterns as required, unique items as optional
+    page_idx = find_text_page(
+        pdf_path,
+        required_texts=search_patterns,
+        optional_texts=optional_texts,
+        min_required=1,
+        min_optional=min_detail_items,
+    )
 
-            # Check if this page has detailed breakdown
-            detail_count = sum(1 for item in detail_items if item in text)
+    if page_idx is not None:
+        logger.info(f"Found section '{section_name}' with details on page {page_idx + 1}")
 
-            # Check for totales if required
-            totales_present = not has_totales or "totales" in text
-
-            if detail_count >= min_detail_items and totales_present:
-                logger.info(f"Found section '{section_name}' with details on page {page_idx + 1}")
-                return page_idx
-
-    return None
-
-
-def find_nota_page(
-    pdf_path: Path,
-    nota_number: int,
-    year: int | None = None,
-    quarter: int | None = None,
-) -> int | None:
-    """Find the page number where a Nota section exists.
-
-    .. deprecated::
-        Use :func:`find_section_page` with section_name instead:
-        ``find_section_page(pdf_path, "nota_21")``
-
-    Args:
-        pdf_path: Path to the PDF file
-        nota_number: Nota number to find (21 or 22)
-        year: Optional year for period-specific specs
-        quarter: Optional quarter for period-specific specs
-
-    Returns:
-        0-indexed page number or None if not found
-    """
-    return find_section_page(pdf_path, f"nota_{nota_number}", year, quarter)
+    return page_idx
 
 
 def extract_table_from_page(
