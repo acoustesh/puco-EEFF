@@ -236,8 +236,8 @@ PDF extraction rules with keyword-based field matching:
       "title": "Costo de Venta",
       "search_patterns": ["21. costo", "21 costo", "nota 21"],
       "table_identifiers": {
-        "unique_items": ["energía eléctrica", "servicios mineros", "fletes"],
-        "exclude_items": ["gratificación", "comercialización"]
+        "unique_items": ["energía eléctrica", "energia electrica", "servicios mineros", "fletes"],
+        "exclude_items": ["gratificación", "gratificacion", "comercialización", "comercializacion"]
       },
       "field_mappings": {
         "cv_gastos_personal": {
@@ -245,11 +245,11 @@ PDF extraction rules with keyword-based field matching:
           "match_keywords": ["gastos en personal"]
         },
         "cv_deprec_leasing": {
-          "pdf_labels": ["Depreciación Activos en leasing"],
+          "pdf_labels": ["Depreciación Activos en leasing", "Depreciacion Activos en leasing"],
           "match_keywords": ["leasing"]
         },
         "cv_depreciacion_amort": {
-          "pdf_labels": ["Depreciación y amort del periodo"],
+          "pdf_labels": ["Depreciación y amort del periodo", "Depreciacion y amort del periodo"],
           "match_keywords": ["amort"],
           "exclude_keywords": ["leasing", "arrendamiento"]
         }
@@ -259,8 +259,8 @@ PDF extraction rules with keyword-based field matching:
       "title": "Gastos de Administración y Ventas",
       "search_patterns": ["22. gastos", "22 gastos", "nota 22"],
       "table_identifiers": {
-        "unique_items": ["gratificación", "comercialización"],
-        "exclude_items": ["energía", "servicios mineros"]
+        "unique_items": ["gratificación", "gratificacion", "comercialización", "comercializacion"],
+        "exclude_items": ["energía", "energia", "servicios mineros", "fletes"]
       },
       "field_mappings": {
         "ga_gastos_personal": {"match_keywords": ["gastos en personal"]},
@@ -293,11 +293,13 @@ XBRL fact mappings and validation rules:
     "total_costo_venta": {
       "primary": "CostOfSales",
       "fallbacks": ["CostoDeVentas"],
+      "context_type": "duration",
       "apply_scaling": true
     },
     "total_gasto_admin": {
       "primary": "AdministrativeExpense",
-      "fallbacks": ["GastosDeAdministracion"],
+      "fallbacks": ["GastosDeAdministracion", "GastosDeAdministracionYVentas"],
+      "context_type": "duration",
       "apply_scaling": true
     }
   },
