@@ -161,7 +161,7 @@ GASTOS ADM Y VENTAS (Nota 22):
 
 ### Cross-Validation Between Sources
 
-1. **XBRL vs PDF Totals**: 
+1. **XBRL vs PDF Totals**:
    - `CostOfSales` (XBRL) = Sum of Nota 21 line items
    - `AdministrativeExpense` (XBRL) = Sum of Nota 22 line items
 

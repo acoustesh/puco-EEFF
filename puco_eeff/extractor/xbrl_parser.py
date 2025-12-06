@@ -23,6 +23,8 @@ NAMESPACES = {
 def parse_xbrl_file(file_path: Path) -> dict[str, Any]:
     """Parse an XBRL/XML file and extract financial data.
 
+    Handles both .xml and .xbrl files with various encodings (UTF-8, ISO-8859-1).
+
     Args:
         file_path: Path to the XBRL/XML file
 
@@ -35,8 +37,17 @@ def parse_xbrl_file(file_path: Path) -> dict[str, Any]:
         logger.error(f"File not found: {file_path}")
         raise FileNotFoundError(f"XBRL file not found: {file_path}")
 
-    tree = etree.parse(str(file_path))  # noqa: S320
-    root = tree.getroot()
+    # Read file content and parse with encoding detection
+    content = file_path.read_bytes()
+
+    # Try parsing - lxml handles encoding declaration automatically
+    try:
+        root = etree.fromstring(content)  # noqa: S320
+    except etree.XMLSyntaxError as e:
+        # Fallback: try with explicit ISO-8859-1 encoding
+        logger.debug(f"Initial parse failed, trying ISO-8859-1: {e}")
+        content_str = content.decode("iso-8859-1")
+        root = etree.fromstring(content_str.encode("utf-8"))  # noqa: S320
 
     # Detect namespaces from the document
     doc_namespaces = _detect_namespaces(root)
@@ -180,8 +191,13 @@ def extract_by_xpath(file_path: Path, xpath_expr: str) -> list[str]:
     """
     logger.debug(f"Extracting with XPath: {xpath_expr}")
 
-    tree = etree.parse(str(file_path))  # noqa: S320
-    root = tree.getroot()
+    # Read file content and parse with encoding detection
+    content = file_path.read_bytes()
+    try:
+        root = etree.fromstring(content)  # noqa: S320
+    except etree.XMLSyntaxError:
+        content_str = content.decode("iso-8859-1")
+        root = etree.fromstring(content_str.encode("utf-8"))  # noqa: S320
 
     # Use document namespaces
     namespaces = _detect_namespaces(root)

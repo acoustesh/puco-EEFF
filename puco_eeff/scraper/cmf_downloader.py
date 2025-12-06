@@ -42,8 +42,8 @@ def download_all_documents(
     year: int,
     quarter: int,
     headless: bool = True,
-    tipo: str = "Consolidado",
-    tipo_norma: str = "Estándar IFRS",
+    tipo: str = "C",
+    tipo_norma: str = "IFRS",
 ) -> list[DownloadResult]:
     """Download all three financial documents for a period.
 
@@ -56,8 +56,8 @@ def download_all_documents(
         year: Year of the financial statement (e.g., 2024)
         quarter: Quarter (1-4)
         headless: Run browser in headless mode
-        tipo: Type of balance ("Consolidado" or "Individual")
-        tipo_norma: Accounting standard ("Estándar IFRS" or "Norma Chilena")
+        tipo: Type of balance ("C" for Consolidado or "I" for Individual)
+        tipo_norma: Accounting standard ("IFRS" for Estándar IFRS or "NCH" for Norma Chilena)
 
     Returns:
         List of DownloadResult for each document type
@@ -117,8 +117,8 @@ def download_single_document(
     quarter: int,
     document_type: str,
     headless: bool = True,
-    tipo: str = "Consolidado",
-    tipo_norma: str = "Estándar IFRS",
+    tipo: str = "C",
+    tipo_norma: str = "IFRS",
 ) -> DownloadResult:
     """Download a single document type.
 
@@ -329,7 +329,14 @@ def _download_single_document(
 
 
 def _extract_xbrl_zip(zip_path: Path | None, output_dir: Path, year: int, quarter: int) -> Path | None:
-    """Extract XBRL XML from downloaded ZIP file.
+    """Extract XBRL instance document from downloaded ZIP file.
+
+    The ZIP typically contains multiple files:
+    - .xbrl file: Main instance document with actual financial data
+    - .xml files: Usually label linkbases, definitions, etc. (not the main data)
+    - .xsd file: Schema definition
+
+    This function prioritizes .xbrl files as they contain the actual financial facts.
 
     Args:
         zip_path: Path to the ZIP file
@@ -338,14 +345,11 @@ def _extract_xbrl_zip(zip_path: Path | None, output_dir: Path, year: int, quarte
         quarter: Quarter for naming
 
     Returns:
-        Path to the extracted XML file, or None if extraction failed
+        Path to the extracted XBRL file, or None if extraction failed
     """
     if zip_path is None or not zip_path.exists():
         logger.warning(f"ZIP file not found: {zip_path}")
         return None
-
-    xml_filename = f"estados_financieros_{year}_Q{quarter}.xml"
-    xml_path = output_dir / xml_filename
 
     try:
         with zipfile.ZipFile(zip_path, "r") as zf:
@@ -353,23 +357,34 @@ def _extract_xbrl_zip(zip_path: Path | None, output_dir: Path, year: int, quarte
             all_files = zf.namelist()
             logger.debug(f"Files in ZIP: {all_files}")
 
-            # Find XML/XBRL files
-            xml_files = [f for f in all_files if f.endswith((".xml", ".xbrl"))]
+            # Prioritize .xbrl files (main instance document with actual data)
+            # .xml files are often just label linkbases without financial facts
+            xbrl_files = [f for f in all_files if f.endswith(".xbrl")]
+            xml_files = [f for f in all_files if f.endswith(".xml")]
 
-            if not xml_files:
+            if xbrl_files:
+                # Use .xbrl file - this is the main instance document
+                main_file = xbrl_files[0]
+                output_filename = f"estados_financieros_{year}_Q{quarter}.xbrl"
+                logger.info(f"Found .xbrl instance document: {main_file}")
+            elif xml_files:
+                # Fallback to .xml if no .xbrl found
+                main_file = xml_files[0]
+                output_filename = f"estados_financieros_{year}_Q{quarter}.xml"
+                logger.warning(f"No .xbrl found, falling back to .xml: {main_file}")
+            else:
                 logger.error("No XML/XBRL files found in ZIP archive")
                 return None
 
-            # Extract the main XML file (usually the largest or first one)
-            main_xml = xml_files[0]
-            logger.debug(f"Extracting: {main_xml}")
+            output_path = output_dir / output_filename
+            logger.debug(f"Extracting: {main_file} -> {output_path}")
 
-            with zf.open(main_xml) as source:
-                xml_content = source.read()
-                xml_path.write_bytes(xml_content)
+            with zf.open(main_file) as source:
+                xbrl_content = source.read()
+                output_path.write_bytes(xbrl_content)
 
-        logger.info(f"Extracted XBRL to: {xml_path} ({xml_path.stat().st_size:,} bytes)")
-        return xml_path
+        logger.info(f"Extracted XBRL to: {output_path} ({output_path.stat().st_size:,} bytes)")
+        return output_path
 
     except zipfile.BadZipFile:
         logger.error(f"Invalid ZIP file: {zip_path}")

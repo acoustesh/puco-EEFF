@@ -17,8 +17,10 @@
           "submit": "input[value='Consultar']"
         },
         "default_values": {
-          "tipo": "Consolidado",
-          "tipo_norma": "Estándar IFRS"
+          "tipo": "C",
+          "tipo_norma": "IFRS",
+          "_tipo_options": {"C": "Consolidado", "I": "Individual"},
+          "_tipo_norma_options": {"IFRS": "Estándar IFRS", "NCH": "Norma Chilena"}
         },
         "month_to_quarter": {
           "03": 1,

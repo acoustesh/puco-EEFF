@@ -55,3 +55,28 @@
 2025-12-06 01:18:07,296 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full', 'cl-ci', 'cl-ci-i', 'ifrs-mc', 'iso4217', 'ref', 'tx', 'xbrldi', 'xsd', 'xsi']
 2025-12-06 01:18:07,298 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 1930 facts from XBRL
 2025-12-06 01:18:07,303 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 369 contexts
+2025-12-06 01:29:28,958 - puco_eeff.scraper.cmf_downloader - INFO - Downloading all documents for 2024 Q1
+2025-12-06 01:29:28,959 - puco_eeff.scraper.cmf_downloader - DEBUG - Filters: tipo=Consolidado, tipo_norma=Estándar IFRS
+2025-12-06 01:29:30,016 - puco_eeff.scraper.cmf_downloader - DEBUG - Navigating to: https://www.cmfchile.cl/institucional/mercados/entidad.php?mercado=V&rut=96561560&grupo=&tipoentidad=RVEMI&row=&vig=VI&control=svs&pestania=3
+2025-12-06 01:29:31,299 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting month: 03
+2025-12-06 01:29:31,319 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting year: 2024
+2025-12-06 01:29:31,324 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting tipo: Consolidado
+2025-12-06 01:29:31,327 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting tipo_norma: Estándar IFRS
+2025-12-06 01:29:31,330 - puco_eeff.scraper.cmf_downloader - DEBUG - Clicking Consultar button
+2025-12-06 01:29:34,069 - puco_eeff.scraper.cmf_downloader - INFO - Successfully filtered for 2024 Q1
+2025-12-06 01:29:34,069 - puco_eeff.scraper.cmf_downloader - DEBUG - Looking for link: Análisis Razonado
+2025-12-06 01:29:34,081 - puco_eeff.scraper.cmf_downloader - WARNING - Link not found: Análisis Razonado
+2025-12-06 01:29:34,081 - puco_eeff.scraper.cmf_downloader - DEBUG - Looking for link: Estados financieros (PDF)
+2025-12-06 01:29:34,083 - puco_eeff.scraper.cmf_downloader - WARNING - Link not found: Estados financieros (PDF)
+2025-12-06 01:29:34,083 - puco_eeff.scraper.cmf_downloader - DEBUG - Looking for link: Estados financieros (XBRL)
+2025-12-06 01:29:34,085 - puco_eeff.scraper.cmf_downloader - WARNING - Link not found: Estados financieros (XBRL)
+2025-12-06 01:29:42,791 - puco_eeff.scraper.cmf_downloader - DEBUG - Available years: ['###', '2025', '2024', '2023', '2022', '2021', '2020', '2019', '2018', '2017', '2016', '2015', '2014', '2013', '2012', '2011', '2010', '2009', '2008', '2007', '2006', '2005', '2004', '2003', '2002', '2001']
+2025-12-06 01:29:42,810 - puco_eeff.scraper.cmf_downloader - DEBUG - Available months: ['03', '06', '09', '12']
+2025-12-06 01:34:48,374 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /home/alvaro/aa-ml/puco-EEFF/data/raw/pdf/estados_financieros_2024_Q2.xml
+2025-12-06 01:34:48,376 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full']
+2025-12-06 01:34:48,376 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 0 facts from XBRL
+2025-12-06 01:34:48,376 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 0 contexts
+2025-12-06 01:41:34,615 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: data/raw/pdf/estados_financieros_2024_Q2.xbrl
+2025-12-06 01:41:34,619 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full', 'cl-ci', 'cl-ci-i', 'ifrs-mc', 'iso4217', 'ref', 'tx', 'xbrldi', 'xsd', 'xsi']
+2025-12-06 01:41:34,623 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 1931 facts from XBRL
+2025-12-06 01:41:34,628 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 364 contexts

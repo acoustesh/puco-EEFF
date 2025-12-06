@@ -88,34 +88,34 @@ print(f"Nota 21 is on page index {nota_21_page} (display: {nota_21_page + 1})")
 ```python
 def extract_cost_tables(pdf_path, page_index):
     """Extract Nota 21 and Nota 22 tables from PDF."""
-    
+
     with pdfplumber.open(pdf_path) as pdf:
         page = pdf.pages[page_index]
-        
+
         # Extract all tables from this page
         tables = page.extract_tables()
-        
+
         results = {
             "nota_21": None,  # Costo de Venta
             "nota_22": None,  # Gastos Admin
         }
-        
+
         for table in tables:
             if not table or len(table) < 3:
                 continue
-                
+
             # Check if this is Nota 21 (Costo de Venta)
             # Look for "Gastos en personal" in first column
             text_content = str(table).lower()
-            
+
             if "gastos en personal" in text_content and "energía eléctrica" in text_content:
                 results["nota_21"] = table
                 print("✓ Found Nota 21 (Costo de Venta) table")
-                
+
             elif "gastos en personal" in text_content and "gastos comercialización" in text_content:
                 results["nota_22"] = table
                 print("✓ Found Nota 22 (Gastos Admin) table")
-        
+
         return results
 
 # Extract tables
@@ -131,7 +131,7 @@ import re
 def parse_nota_21(table_data):
     """
     Parse Nota 21 table into structured data.
-    
+
     Expected columns:
     - Concepto (may be merged with values)
     - 01-01-YYYY to 30-09-YYYY (YTD current)
@@ -139,7 +139,7 @@ def parse_nota_21(table_data):
     - 01-07-YYYY to 30-09-YYYY (Q3 current)
     - 01-07-YYYY to 30-09-YYYY (Q3 prior)
     """
-    
+
     # Expected line items in order
     expected_items = [
         "Gastos en personal",
@@ -155,19 +155,19 @@ def parse_nota_21(table_data):
         "Obligaciones por convenios colectivos",
         "Totales",
     ]
-    
+
     # Parse table rows
     parsed = []
     for row in table_data:
         if not row:
             continue
-            
+
         # Get the text content (may be in first cell or merged)
         row_text = str(row[0]) if row[0] else ""
-        
+
         # Split newline-merged content
         lines = row_text.split("\n")
-        
+
         # Extract numbers from remaining columns
         values = []
         for cell in row[1:]:
@@ -181,7 +181,7 @@ def parse_nota_21(table_data):
                         values.append(int(num_str))
                     except:
                         values.append(None)
-                        
+
         # Match to expected items
         for line in lines:
             for expected in expected_items:
@@ -192,7 +192,7 @@ def parse_nota_21(table_data):
                         "ytd_anterior": values[1] if len(values) > 1 else None,
                     })
                     break
-    
+
     return pd.DataFrame(parsed)
 
 # Parse the table
@@ -207,7 +207,7 @@ if tables["nota_21"]:
 ```python
 def parse_nota_22(table_data):
     """Parse Nota 22 table into structured data."""
-    
+
     expected_items = [
         "Gastos en personal",
         "Materiales y repuestos",
@@ -217,15 +217,15 @@ def parse_nota_22(table_data):
         "Otros gastos",
         "Totales",
     ]
-    
+
     parsed = []
     for row in table_data:
         if not row:
             continue
-            
+
         row_text = str(row[0]) if row[0] else ""
         lines = row_text.split("\n")
-        
+
         values = []
         for cell in row[1:]:
             if cell:
@@ -237,7 +237,7 @@ def parse_nota_22(table_data):
                         values.append(int(num_str))
                     except:
                         values.append(None)
-                        
+
         for line in lines:
             for expected in expected_items:
                 if expected.lower() in line.lower():
@@ -247,7 +247,7 @@ def parse_nota_22(table_data):
                         "ytd_anterior": values[1] if len(values) > 1 else None,
                     })
                     break
-    
+
     return pd.DataFrame(parsed)
 
 if tables["nota_22"]:
@@ -266,20 +266,20 @@ xbrl_path = paths["processed"] / "xbrl_aggregates.json"
 if xbrl_path.exists():
     with open(xbrl_path) as f:
         xbrl = json.load(f)
-    
+
     # Validate Nota 21 total matches XBRL CostOfSales
     pdf_costo_total = nota_21_df[nota_21_df["concepto"] == "Totales"]["ytd_actual"].values[0]
     xbrl_costo = int(xbrl.get("costo_ventas_total", 0))
-    
+
     print(f"\n=== Validation ===")
     print(f"PDF Costo de Venta Total: {pdf_costo_total:,}")
     print(f"XBRL CostOfSales:         {xbrl_costo:,}")
     print(f"Match: {'✓' if abs(pdf_costo_total) == abs(xbrl_costo) else '✗ MISMATCH!'}")
-    
+
     # Validate Nota 22 total matches XBRL AdminExpense
     pdf_admin_total = nota_22_df[nota_22_df["concepto"] == "Totales"]["ytd_actual"].values[0]
     xbrl_admin = int(xbrl.get("gastos_admin_ventas_total", 0))
-    
+
     print(f"\nPDF Gastos Admin Total: {pdf_admin_total:,}")
     print(f"XBRL AdminExpense:      {xbrl_admin:,}")
     print(f"Match: {'✓' if abs(pdf_admin_total) == abs(xbrl_admin) else '✗ MISMATCH!'}")
@@ -335,10 +335,10 @@ Values are in thousands of US dollars (MUS$).
 
 if not tables["nota_21"] or not tables["nota_22"]:
     print("Using OCR fallback for table extraction...")
-    
+
     audit_dir = paths["audit"]
     audit_dir.mkdir(parents=True, exist_ok=True)
-    
+
     ocr_result = ocr_with_fallback(
         pdf_path=pdf_path,
         prompt=ocr_prompt,
@@ -346,7 +346,7 @@ if not tables["nota_21"] or not tables["nota_22"]:
         save_all_responses=True,
         audit_dir=audit_dir
     )
-    
+
     if ocr_result["success"]:
         # Parse JSON from OCR response
         import json

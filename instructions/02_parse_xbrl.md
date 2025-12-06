@@ -108,15 +108,15 @@ aggregate_facts = {
     "Revenue": "Ingresos de actividades ordinarias",
     "CostOfSales": "Costo de ventas (total)",
     "GrossProfit": "Ganancia bruta",
-    
+
     # Operating expenses
     "AdministrativeExpense": "Gastos de administración",
     "SellingExpense": "Gastos de ventas (if separate)",
-    
+
     # Financial items
     "FinanceIncome": "Ingresos financieros",
     "FinanceCosts": "Costos financieros",
-    
+
     # Results
     "ProfitLossBeforeTax": "Ganancia antes de impuestos",
     "IncomeTaxExpenseContinuingOperations": "Gasto por impuesto a las ganancias",
@@ -160,7 +160,7 @@ From actual Q3 2024 XBRL extraction:
 # Balance sheet keywords
 balance_facts = [
     "Assets",
-    "CurrentAssets", 
+    "CurrentAssets",
     "NoncurrentAssets",
     "Liabilities",
     "CurrentLiabilities",
