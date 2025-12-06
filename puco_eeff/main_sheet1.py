@@ -21,13 +21,13 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from puco_eeff.config import (
+from puco_eeff.config import (  # noqa: E402, I001
     find_file_with_alternatives,
     get_period_paths,
     setup_logging,
 )
-from puco_eeff.extractor.cost_extractor import extract_sheet1
-from puco_eeff.sheets.sheet1 import (
+from puco_eeff.extractor.cost_extractor import extract_sheet1  # noqa: E402
+from puco_eeff.sheets.sheet1 import (  # noqa: E402
     Sheet1Data,
     print_sheet1_report,
     save_sheet1_data,

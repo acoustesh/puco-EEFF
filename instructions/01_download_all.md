@@ -1,5 +1,41 @@
 # 01 - Download All Documents from CMF Chile (with Pucobre.cl Fallback)
 
+> **📌 Unified Workflow**: For most use cases, use `process_sheet1()` which handles download, extraction, and saving automatically. See [Unified Workflow](#unified-workflow-recommended) below. This document covers standalone download operations for debugging or manual control.
+
+## Unified Workflow (Recommended)
+
+The simplest way to download and process files is via the unified orchestrator:
+
+```python
+from puco_eeff.main_sheet1 import process_sheet1
+
+# Downloads files if needed, extracts data, saves JSON, prints report
+data = process_sheet1(year=2024, quarter=2)
+```
+
+**CLI equivalent:**
+```bash
+python -m puco_eeff.main_sheet1 --year 2024 --quarter 2
+python -m puco_eeff.main_sheet1 --year 2024                    # All quarters
+python -m puco_eeff.main_sheet1 --year 2024 --skip-download    # Use existing files
+```
+
+The orchestrator automatically:
+1. Checks if files exist (`files_exist_for_period()`)
+2. Downloads missing files (`ensure_files_downloaded()` → `download_all_documents()`)
+3. Falls back to Pucobre.cl if CMF Chile fails
+4. Proceeds to extraction (see `03_extract_detailed_costs.md`)
+
+---
+
+## Standalone Download (This Document)
+
+Use standalone download functions when you need:
+- Manual control over download process
+- Download without extraction
+- Debugging download issues
+- Checking available periods
+
 ## Objective
 
 Download all three financial document types from CMF Chile for a specified period:
@@ -268,9 +304,10 @@ The downloader **automatically** uses Pucobre.cl when:
 
 After completing this instruction:
 1. Verify all files downloaded successfully
-2. Proceed to \`02_parse_xbrl.md\` to extract aggregate totals from XBRL (if available)
-3. Proceed to \`03_extract_detailed_costs.md\` to extract line-item breakdown from PDF (Nota 21-22)
-4. See \`data_mapping.md\` for field mappings and number format rules
+2. Proceed to `03_extract_detailed_costs.md` to extract and format Sheet1 data
+3. See `data_mapping.md` for field mappings and number format rules
+
+> **Note**: `02_parse_xbrl.md` is for debugging only. XBRL parsing is handled automatically by `extract_sheet1()` in the unified workflow.
 
 ## Data Extraction Flow
 

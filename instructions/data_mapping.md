@@ -232,86 +232,88 @@ Some line items may vary between periods:
 
 Always validate OCR results against XBRL totals.
 
-## Configuration Architecture (4-File System)
+## Configuration Architecture
 
-Configuration is split into **four** JSON files in `config/`:
+Configuration is organized into a hierarchical structure:
 
-| File | Purpose |
-|------|---------|
-| `config.json` | Shared project config: file patterns, period types (quarterly/monthly/yearly), sources |
-| `extraction_specs.json` | PDF extraction rules: search patterns, field mappings with `match_keywords` |
-| `xbrl_specs.json` | **NEW**: XBRL-specific config: fact names, scaling factor, validation rules |
-| `reference_data.json` | Known-good values for validation (by period) |
+```
+config/
+├── config.json              # Shared project config: file patterns, period types, sources
+├── xbrl_specs.json          # XBRL namespaces, global scaling factor
+├── extraction_specs.json    # Legacy (being deprecated) - use sheet-specific configs
+│
+└── sheet1/                  # Sheet1-specific configuration
+    ├── fields.json          # Field definitions, 27-row mapping
+    ├── extraction.json      # PDF section rules (nota_21, nota_22)
+    ├── xbrl_mappings.json   # XBRL fact mappings, validation rules
+    └── reference_data.json  # Known-good values per period
+```
 
-### xbrl_specs.json (NEW)
+### config/config.json (Shared)
 
-XBRL configuration is now in a dedicated file:
+Project-wide settings:
 
 ```json
 {
-  "scaling_factor": 1000,
-  "fact_mappings": {
-    "ingresos_ordinarios": {
-      "primary": "RevenueFromContractsWithCustomers",
-      "fallbacks": ["Revenue", "IngresosPorActividadesOrdinarias"],
-      "apply_scaling": true
-    },
-    "total_costo_venta": {
-      "primary": "CostOfSales",
-      "fallbacks": ["CostoDeVentas"],
-      "apply_scaling": true
-    },
-    "total_gasto_admin": {
-      "primary": "AdministrativeExpense",
-      "fallbacks": ["GastosDeAdministracion"],
-      "apply_scaling": true
-    },
-    "gross_profit": {
-      "primary": "GrossProfit",
-      "fallbacks": ["UtilidadBruta"],
-      "apply_scaling": true
-    },
-    "profit_loss": {
-      "primary": "ProfitLoss",
-      "fallbacks": ["GananciaPerdida"],
-      "apply_scaling": true
-    }
-  },
-  "validation_rules": {
-    "sum_tolerance": 1
+  "sources": ["cmf", "pucobre"],
+  "period_types": ["quarterly"],
+  "file_patterns": {
+    "estados_financieros_pdf": "estados_financieros_{year}_Q{quarter}.pdf",
+    "estados_financieros_xbrl": "estados_financieros_{year}_Q{quarter}.xbrl"
   }
 }
 ```
 
-**Key fields:**
-- `scaling_factor`: XBRL values are in full USD, divide by this to get MUS$
-- `apply_scaling`: Set to `true` for all fields that need conversion to MUS$
-- `fallbacks`: Alternative XBRL fact names tried if primary not found
+### config/sheet1/fields.json (Field Definitions)
 
-### extraction_specs.json (Keyword-Based Matching)
-
-PDF field matching now uses `match_keywords` instead of exact labels:
+Defines the 27-row structure and field metadata:
 
 ```json
 {
-  "default": {
-    "sections": {
-      "nota_21": {
-        "field_mappings": {
-          "cv_gastos_personal": {
-            "match_keywords": ["gastos en personal"],
-            "sheet1_field": "cv_gastos_personal"
-          },
-          "cv_deprec_leasing": {
-            "match_keywords": ["leasing"],
-            "sheet1_field": "cv_deprec_leasing"
-          },
-          "cv_depreciacion_amort": {
-            "match_keywords": ["amort"],
-            "exclude_keywords": ["leasing", "arrendamiento"],
-            "sheet1_field": "cv_depreciacion_amort"
-          }
+  "name": "Ingresos y Costos",
+  "value_fields": {
+    "ingresos_ordinarios": {"type": "int", "section": "ingresos", "row": 1},
+    "cv_gastos_personal": {"type": "int", "section": "nota_21", "row": 4},
+    "total_costo_venta": {"type": "int", "section": "nota_21", "row": 15, "is_total": true},
+    "ga_gastos_personal": {"type": "int", "section": "nota_22", "row": 20},
+    "total_gasto_admin": {"type": "int", "section": "nota_22", "row": 27, "is_total": true}
+  },
+  "row_mapping": {
+    "1": {"field": "ingresos_ordinarios", "label": "Ingresos de actividades ordinarias M USD"},
+    "4": {"field": "cv_gastos_personal", "label": "Gastos en personal", "section": "costo_venta"}
+  }
+}
+```
+
+### config/sheet1/extraction.json (PDF Rules)
+
+Keyword-based PDF field matching:
+
+```json
+{
+  "sections": {
+    "nota_21": {
+      "title": "Costo de Venta",
+      "search_patterns": ["21. costo", "21 costo", "nota 21"],
+      "table_identifiers": {
+        "unique_items": ["energía eléctrica", "servicios mineros", "fletes"],
+        "exclude_items": ["gratificación", "comercialización"]
+      },
+      "field_mappings": {
+        "cv_gastos_personal": {"match_keywords": ["gastos en personal"]},
+        "cv_deprec_leasing": {"match_keywords": ["leasing"]},
+        "cv_depreciacion_amort": {
+          "match_keywords": ["amort"],
+          "exclude_keywords": ["leasing", "arrendamiento"]
         }
+      }
+    },
+    "nota_22": {
+      "title": "Gastos de Administración y Ventas",
+      "search_patterns": ["22. gastos", "22 gastos", "nota 22"],
+      "field_mappings": {
+        "ga_gratificacion": {"match_keywords": ["gratificación", "gratificacion"]},
+        "ga_comercializacion": {"match_keywords": ["comercialización", "comercializacion"]}
       }
     }
   }
@@ -323,18 +325,82 @@ PDF field matching now uses `match_keywords` instead of exact labels:
 - `exclude_keywords`: If any match, skip this field mapping
 - Use unique identifiers to avoid overlapping matches
 
-### Default + Deviation Pattern
+### config/sheet1/xbrl_mappings.json (XBRL Facts)
 
-`extraction_specs.json` uses a **default template + per-quarter deviations** pattern:
-- `default` section contains the full extraction template
-- Per-quarter sections (e.g., `2024_Q2`) only need to specify deviations
-- `verified: true` flag indicates quarters with confirmed extraction
+XBRL fact name mappings and validation:
 
-### Reference Values
+```json
+{
+  "fact_mappings": {
+    "ingresos_ordinarios": {
+      "primary": "RevenueFromContractsWithCustomers",
+      "fallbacks": ["Revenue", "IngresosPorActividadesOrdinarias"],
+      "context_type": "duration",
+      "apply_scaling": true
+    },
+    "total_costo_venta": {
+      "primary": "CostOfSales",
+      "fallbacks": ["CostoDeVentas"],
+      "apply_scaling": true
+    },
+    "total_gasto_admin": {
+      "primary": "AdministrativeExpense",
+      "fallbacks": ["GastosDeAdministracion"],
+      "apply_scaling": true
+    }
+  },
+  "validation_rules": {
+    "sum_tolerance": 1,
+    "total_validations": [
+      {"total_field": "total_costo_venta", "sum_fields": ["cv_gastos_personal", "cv_materiales", "..."]},
+      {"total_field": "total_gasto_admin", "sum_fields": ["ga_gastos_personal", "ga_materiales", "..."]}
+    ]
+  }
+}
+```
 
-`reference_data.json` stores known-good values for validation:
-- `2024_Q2`: Fully verified with 20 reference values (all fields match)
-- `2024_Q3`: Verified with totals and key fields
-- Other quarters: Placeholders until verified
+**Key fields:**
+- `apply_scaling`: Set to `true` for fields that need conversion from USD to MUS$ (÷1000)
+- `fallbacks`: Alternative XBRL fact names tried if primary not found
+- `context_type`: "duration" for YTD values, "instant" for balance sheet values
 
-This architecture allows learning from each quarter's extraction experience.
+### config/sheet1/reference_data.json (Validation)
+
+Known-good values for validation by period:
+
+```json
+{
+  "2024_Q2": {
+    "verified": true,
+    "verified_date": "2024-12-06",
+    "values": {
+      "ingresos_ordinarios": 179165,
+      "total_costo_venta": -126202,
+      "total_gasto_admin": -11632
+    }
+  },
+  "2024_Q1": {
+    "verified": true,
+    "source": "Estados Financieros PDF - pucobre.cl (no XBRL)",
+    "values": {"..."}
+  }
+}
+```
+
+### Loading Configuration (Python API)
+
+```python
+from puco_eeff.config import load_sheet_config, get_period_paths
+
+# Load sheet1 configs
+fields = load_sheet_config("sheet1", "fields")
+extraction = load_sheet_config("sheet1", "extraction")
+xbrl_mappings = load_sheet_config("sheet1", "xbrl_mappings")
+reference = load_sheet_config("sheet1", "reference_data")
+
+# Get file paths for a period
+paths = get_period_paths(2024, 2)
+# paths["raw_pdf"], paths["raw_xbrl"], paths["processed"]
+```
+
+This architecture allows learning from each quarter's extraction experience and supports adding new sheets (sheet2, sheet3) with their own configs.

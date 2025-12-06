@@ -1,5 +1,23 @@
 # 02 - Parse XBRL and Extract Aggregate Data
 
+> **⚠️ Debugging Guide**: This document is for standalone XBRL debugging and exploration. In normal operation, XBRL parsing is handled automatically by `extract_sheet1()`. You don't need to run these steps manually.
+
+## When to Use This Guide
+
+Use standalone XBRL parsing when:
+- Debugging XBRL fact extraction issues
+- Exploring what data is available in XBRL files
+- Validating XBRL totals independently
+- Understanding XBRL structure for new periods
+
+**For normal extraction**, use the unified workflow instead:
+```python
+from puco_eeff.main_sheet1 import process_sheet1
+data = process_sheet1(year=2024, quarter=2)  # Handles XBRL automatically
+```
+
+---
+
 ## Objective
 
 Parse the downloaded XBRL file to extract **aggregate financial data**. The XBRL contains high-level totals but NOT the detailed line-item breakdowns (those come from PDF - see `03_extract_detailed_costs.md`).
@@ -136,8 +154,14 @@ The detailed line-item breakdowns are NOT in XBRL. You must extract from PDF:
 ## Next Steps
 
 1. Use XBRL aggregates as validation totals
-2. Proceed to `03_extract_detailed_costs.md` for PDF extraction
+2. Proceed to `03_extract_detailed_costs.md` for PDF extraction and formatting
 3. Cross-validate: Sum of PDF line items should match XBRL totals
+
+> **Note**: In the unified workflow (`process_sheet1()`), XBRL validation happens automatically during `extract_sheet1()`. You'll see validation output like:
+> ```
+> ✓ Total Costo de Venta matches XBRL: -126,202
+> ✓ Total Gasto Admin matches XBRL: -11,632
+> ```
 
 ## Troubleshooting
 
