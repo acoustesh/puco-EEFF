@@ -24,3 +24,34 @@
 2025-12-06 00:50:12,126 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full', 'cl-ci', 'cl-ci-i', 'ifrs-mc', 'iso4217', 'ref', 'tx', 'xbrldi', 'xsd', 'xsi']
 2025-12-06 00:50:12,129 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 1930 facts from XBRL
 2025-12-06 00:50:12,133 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 369 contexts
+2025-12-06 01:17:13,134 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /home/alvaro/aa-ml/puco-EEFF/data/raw/pdf/estados_financieros_2024_Q3.xml
+2025-12-06 01:17:13,139 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full', 'cl-ci', 'cl-ci-i', 'ifrs-mc', 'iso4217', 'ref', 'tx', 'xbrldi', 'xsd', 'xsi']
+2025-12-06 01:17:13,142 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 1930 facts from XBRL
+2025-12-06 01:17:13,148 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 369 contexts
+2025-12-06 01:17:22,480 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /home/alvaro/aa-ml/puco-EEFF/data/raw/pdf/estados_financieros_2024_Q3.xml
+2025-12-06 01:17:22,483 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full', 'cl-ci', 'cl-ci-i', 'ifrs-mc', 'iso4217', 'ref', 'tx', 'xbrldi', 'xsd', 'xsi']
+2025-12-06 01:17:22,485 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 1930 facts from XBRL
+2025-12-06 01:17:22,490 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 369 contexts
+2025-12-06 01:17:32,003 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /home/alvaro/aa-ml/puco-EEFF/data/raw/pdf/estados_financieros_2024_Q3.xml
+2025-12-06 01:17:32,005 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full', 'cl-ci', 'cl-ci-i', 'ifrs-mc', 'iso4217', 'ref', 'tx', 'xbrldi', 'xsd', 'xsi']
+2025-12-06 01:17:32,008 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 1930 facts from XBRL
+2025-12-06 01:17:32,013 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 369 contexts
+2025-12-06 01:17:41,930 - puco_eeff.scraper.cmf_downloader - INFO - Downloading all documents for 2024 Q1
+2025-12-06 01:17:41,930 - puco_eeff.scraper.cmf_downloader - DEBUG - Filters: tipo=Consolidado, tipo_norma=Estándar IFRS
+2025-12-06 01:17:43,112 - puco_eeff.scraper.cmf_downloader - DEBUG - Navigating to: https://www.cmfchile.cl/institucional/mercados/entidad.php?mercado=V&rut=96561560&grupo=&tipoentidad=RVEMI&row=&vig=VI&control=svs&pestania=3
+2025-12-06 01:17:46,632 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting month: 03
+2025-12-06 01:17:46,654 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting year: 2024
+2025-12-06 01:17:46,661 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting tipo: Consolidado
+2025-12-06 01:17:46,665 - puco_eeff.scraper.cmf_downloader - DEBUG - Selecting tipo_norma: Estándar IFRS
+2025-12-06 01:17:46,669 - puco_eeff.scraper.cmf_downloader - DEBUG - Clicking Consultar button
+2025-12-06 01:17:49,395 - puco_eeff.scraper.cmf_downloader - INFO - Successfully filtered for 2024 Q1
+2025-12-06 01:17:49,395 - puco_eeff.scraper.cmf_downloader - DEBUG - Looking for link: Análisis Razonado
+2025-12-06 01:17:49,407 - puco_eeff.scraper.cmf_downloader - WARNING - Link not found: Análisis Razonado
+2025-12-06 01:17:49,408 - puco_eeff.scraper.cmf_downloader - DEBUG - Looking for link: Estados financieros (PDF)
+2025-12-06 01:17:49,410 - puco_eeff.scraper.cmf_downloader - WARNING - Link not found: Estados financieros (PDF)
+2025-12-06 01:17:49,410 - puco_eeff.scraper.cmf_downloader - DEBUG - Looking for link: Estados financieros (XBRL)
+2025-12-06 01:17:49,413 - puco_eeff.scraper.cmf_downloader - WARNING - Link not found: Estados financieros (XBRL)
+2025-12-06 01:18:07,292 - puco_eeff.extractor.xbrl_parser - INFO - Parsing XBRL file: /home/alvaro/aa-ml/puco-EEFF/data/raw/pdf/estados_financieros_2024_Q3.xml
+2025-12-06 01:18:07,296 - puco_eeff.extractor.xbrl_parser - DEBUG - Detected namespaces: ['xbrli', 'link', 'xlink', 'ifrs-full', 'cl-ci', 'cl-ci-i', 'ifrs-mc', 'iso4217', 'ref', 'tx', 'xbrldi', 'xsd', 'xsi']
+2025-12-06 01:18:07,298 - puco_eeff.extractor.xbrl_parser - INFO - Extracted 1930 facts from XBRL
+2025-12-06 01:18:07,303 - puco_eeff.extractor.xbrl_parser - DEBUG - Extracted 369 contexts

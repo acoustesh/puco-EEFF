@@ -4,10 +4,20 @@
 
 Download all three financial document types from CMF Chile for a specified period:
 1. **Análisis Razonado** (PDF) - Management Discussion & Analysis
-2. **Estados Financieros** (PDF) - Financial Statements
+2. **Estados Financieros** (PDF) - Financial Statements with detailed notes
 3. **Estados Financieros** (XBRL) - Financial Statements in structured XML format
 
 **Single source**: All documents come from the same CMF Chile portal page.
+
+## What Each Document Contains
+
+| Document | Format | Key Data | Use For |
+|----------|--------|----------|---------|
+| Análisis Razonado | PDF | Narrative, cost analysis, KPIs | Context, EBITDA calculation |
+| Estados Financieros | PDF | Full statements + **Nota 21 & 22** (detailed cost breakdown) | Line-item extraction |
+| Estados Financieros | XBRL | Structured data, aggregate totals | Validation, primary totals |
+
+**Important**: The **detailed cost breakdown** (11 items for Costo de Venta, 6 for Gastos Admin) is ONLY in the PDF (Nota 21-22, page ~71), not in XBRL.
 
 ## Prerequisites
 
@@ -131,6 +141,17 @@ The CMF portal supports these filters:
 | `tipo` | `Consolidado`, `Individual` | Balance type |
 | `tipo_norma` | `Estándar IFRS`, `Norma Chilena` | Accounting standard |
 
+## Quarter to Month Mapping
+
+| Quarter | CMF Month Value | Report Period |
+|---------|-----------------|---------------|
+| Q1 | `03` (March) | Jan 1 - Mar 31 |
+| Q2 | `06` (June) | Jan 1 - Jun 30 |
+| Q3 | `09` (September) | Jan 1 - Sep 30 |
+| Q4 | `12` (December) | Jan 1 - Dec 31 |
+
+**Note**: CMF uses the **end month** of each quarter for the dropdown selection.
+
 ## Output Files
 
 Downloads are saved to `data/raw/pdf/`:
@@ -163,8 +184,27 @@ The downloader performs these steps:
 
 After completing this instruction:
 1. Verify all files downloaded successfully
-2. Proceed to `03_parse_xbrl.md` to extract structured data from XBRL
-3. Or proceed to `04_ocr_pdf.md` if you need to extract data from PDFs
+2. Proceed to `02_parse_xbrl.md` to extract aggregate totals from XBRL
+3. Proceed to `03_extract_detailed_costs.md` to extract line-item breakdown from PDF (Nota 21-22)
+4. See `data_mapping.md` for field mappings and number format rules
+
+## Data Extraction Flow
+
+```
+CMF Chile Portal
+      │
+      ├── analisis_razonado.pdf ──────────> Narrative context (optional)
+      │
+      ├── estados_financieros.pdf ────────> Nota 21 & 22 (DETAILED BREAKDOWN)
+      │                                     Page 71: 11 Costo de Venta items
+      │                                              6 Gastos Admin items
+      │
+      └── estados_financieros_xbrl.zip ───> XML (AGGREGATE TOTALS)
+                  │                         Revenue, CostOfSales, GrossProfit,
+                  │                         AdminExpense, ProfitLoss
+                  │
+                  └── .xml extracted
+```
 
 ## Troubleshooting
 

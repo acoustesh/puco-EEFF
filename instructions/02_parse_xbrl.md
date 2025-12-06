@@ -1,8 +1,21 @@
-# 02 - Parse XBRL and Explore Data Structure
+# 02 - Parse XBRL and Extract Aggregate Data
 
 ## Objective
 
-Parse the downloaded XBRL file and explore its structure to understand available data for extraction. This step identifies which financial data can be extracted directly from the structured XBRL/XML.
+Parse the downloaded XBRL file to extract **aggregate financial data**. The XBRL contains high-level totals but NOT the detailed line-item breakdowns (those come from PDF - see `03_extract_sheet1.md`).
+
+## What XBRL Contains
+
+The XBRL provides **aggregate totals** only:
+- Ingresos de actividades ordinarias (Revenue): ✓
+- Costo de ventas total: ✓
+- Ganancia bruta: ✓
+- Gastos de administración y ventas total: ✓
+- Ganancia (pérdida) del periodo: ✓
+
+**NOT in XBRL** (requires PDF extraction):
+- Detailed Costo de Venta breakdown (11 line items)
+- Detailed Gastos Adm y Ventas breakdown (6 line items)
 
 ## Prerequisites
 
@@ -80,197 +93,190 @@ for cat, names in sorted(fact_categories.items()):
     print(f"  {cat}: {len(names)} facts")
 ```
 
-### 4. Find Balance Sheet Data (Estado de Situación Financiera)
+### 4. Extract Aggregate Financial Data (CONFIRMED FACT NAMES)
 
-```python
-# Keywords for Balance Sheet items
-balance_keywords = [
-    "Asset", "Liability", "Equity",
-    "Activo", "Pasivo", "Patrimonio",
-    "CurrentAsset", "NoncurrentAsset",
-    "CurrentLiabilit", "NoncurrentLiabilit"
-]
-
-balance_facts = [
-    n for n in fact_names
-    if any(k.lower() in n.lower() for k in balance_keywords)
-]
-
-print(f"\n=== Balance Sheet Facts ({len(balance_facts)}) ===")
-for name in sorted(balance_facts)[:30]:  # Show first 30
-    # Get sample value
-    sample = next((f for f in data["facts"] if f["name"] == name), None)
-    value = sample["value"] if sample else "N/A"
-    print(f"  {name}: {value}")
-```
-
-### 5. Find Income Statement Data (Estado de Resultados)
-
-```python
-# Keywords for Income Statement items
-income_keywords = [
-    "Revenue", "Profit", "Loss", "Expense", "Income",
-    "Ingreso", "Gasto", "Utilidad", "Perdida",
-    "OperatingIncome", "NetIncome", "GrossProfit"
-]
-
-income_facts = [
-    n for n in fact_names
-    if any(k.lower() in n.lower() for k in income_keywords)
-]
-
-print(f"\n=== Income Statement Facts ({len(income_facts)}) ===")
-for name in sorted(income_facts)[:30]:
-    sample = next((f for f in data["facts"] if f["name"] == name), None)
-    value = sample["value"] if sample else "N/A"
-    print(f"  {name}: {value}")
-```
-
-### 6. Find Cash Flow Data (Estado de Flujos de Efectivo)
-
-```python
-# Keywords for Cash Flow items
-cashflow_keywords = [
-    "CashFlow", "Cash", "Operating", "Investing", "Financing",
-    "Efectivo", "Operacion", "Inversion", "Financiamiento"
-]
-
-cashflow_facts = [
-    n for n in fact_names
-    if any(k.lower() in n.lower() for k in cashflow_keywords)
-]
-
-print(f"\n=== Cash Flow Facts ({len(cashflow_facts)}) ===")
-for name in sorted(cashflow_facts)[:30]:
-    sample = next((f for f in data["facts"] if f["name"] == name), None)
-    value = sample["value"] if sample else "N/A"
-    print(f"  {name}: {value}")
-```
-
-### 7. Extract Specific Values
+These fact names have been verified against actual Pucobre XBRL data:
 
 ```python
 from puco_eeff.extractor.xbrl_parser import get_facts_by_name
 
-# Example: Get Total Assets
-assets = get_facts_by_name(data, "Assets")
-print("\n=== Total Assets ===")
-for fact in assets:
-    print(f"  Period: {fact.get('context', 'N/A')}")
-    print(f"  Value: {fact['value']}")
-    print(f"  Unit: {fact.get('unit', 'N/A')}")
-    print()
+# === INCOME STATEMENT AGGREGATES (Estado de Resultados) ===
+# These are the exact fact names from Pucobre's XBRL taxonomy
 
-# Example: Get Equity
-equity = get_facts_by_name(data, "Equity")
-print("=== Equity ===")
-for fact in equity:
-    print(f"  Period: {fact.get('context', 'N/A')}")
-    print(f"  Value: {fact['value']}")
-```
-
-### 8. Document Available Facts for Sheets
-
-Based on exploration, document which facts map to which sheets:
-
-```python
-# Create mapping document
-sheet_mappings = {
-    "sheet1_situacion_financiera": {
-        "description": "Estado de Situación Financiera (Balance)",
-        "facts": [
-            "Assets",
-            "CurrentAssets",
-            "NoncurrentAssets",
-            "Liabilities",
-            "CurrentLiabilities",
-            "NoncurrentLiabilities",
-            "Equity",
-            # Add discovered facts...
-        ]
-    },
-    "sheet2_resultados": {
-        "description": "Estado de Resultados",
-        "facts": [
-            "Revenue",
-            "CostOfSales",
-            "GrossProfit",
-            "OperatingIncome",
-            "ProfitLoss",
-            # Add discovered facts...
-        ]
-    },
-    "sheet3_flujos_efectivo": {
-        "description": "Estado de Flujos de Efectivo",
-        "facts": [
-            "CashFlowsFromOperatingActivities",
-            "CashFlowsFromInvestingActivities",
-            "CashFlowsFromFinancingActivities",
-            # Add discovered facts...
-        ]
-    }
+aggregate_facts = {
+    # Revenue and Cost
+    "Revenue": "Ingresos de actividades ordinarias",
+    "CostOfSales": "Costo de ventas (total)",
+    "GrossProfit": "Ganancia bruta",
+    
+    # Operating expenses
+    "AdministrativeExpense": "Gastos de administración",
+    "SellingExpense": "Gastos de ventas (if separate)",
+    
+    # Financial items
+    "FinanceIncome": "Ingresos financieros",
+    "FinanceCosts": "Costos financieros",
+    
+    # Results
+    "ProfitLossBeforeTax": "Ganancia antes de impuestos",
+    "IncomeTaxExpenseContinuingOperations": "Gasto por impuesto a las ganancias",
+    "ProfitLoss": "Ganancia (pérdida) del periodo",
 }
 
-# Save mapping for reference
-import json
-mapping_path = paths["audit"]
-mapping_path.mkdir(parents=True, exist_ok=True)
-with open(mapping_path / "xbrl_fact_mapping.json", "w") as f:
-    json.dump(sheet_mappings, f, indent=2, ensure_ascii=False)
-
-print(f"\nSaved fact mapping to: {mapping_path / 'xbrl_fact_mapping.json'}")
+# Extract and display each
+print("=== XBRL AGGREGATE DATA ===\n")
+for fact_name, spanish_name in aggregate_facts.items():
+    facts = get_facts_by_name(data, fact_name)
+    if facts:
+        # Get the YTD value (9-month accumulation for Q3)
+        for f in facts:
+            ctx = f.get("context", "")
+            value = f.get("value", "N/A")
+            # Format large numbers
+            if value and value.isdigit():
+                value = f"{int(value):,}"
+            print(f"{spanish_name}:")
+            print(f"  Fact: {fact_name}")
+            print(f"  Value: {value}")
+            print(f"  Context: {ctx}")
+            print()
 ```
 
-### 9. Identify Gaps (What Needs PDF/OCR)
+### 5. Q3 2024 Verified Values
+
+From actual Q3 2024 XBRL extraction:
+
+| XBRL Fact Name | Spanish Name | Value (MUS$) |
+|----------------|--------------|--------------|
+| `Revenue` | Ingresos de actividades ordinarias | 231,472 |
+| `CostOfSales` | Costo de ventas | 170,862 |
+| `GrossProfit` | Ganancia bruta | 60,610 |
+| `AdministrativeExpense` | Gastos de administración y ventas | 17,363 |
+| `ProfitLoss` | Ganancia del periodo | 27,882 |
+
+### 6. Balance Sheet Facts (Estado de Situación)
 
 ```python
-# Check if key financial data is available in XBRL
-required_facts = [
-    ("Total Assets", "Assets"),
-    ("Total Liabilities", "Liabilities"),
-    ("Equity", "Equity"),
-    ("Revenue", "Revenue"),
-    ("Net Profit", "ProfitLoss"),
+# Balance sheet keywords
+balance_facts = [
+    "Assets",
+    "CurrentAssets", 
+    "NoncurrentAssets",
+    "Liabilities",
+    "CurrentLiabilities",
+    "NoncurrentLiabilities",
+    "Equity",
+    "CashAndCashEquivalents",
+    "Inventories",
+    "TradeAndOtherCurrentReceivables",
+    "PropertyPlantAndEquipment",
+    "IntangibleAssetsOtherThanGoodwill",
+    "Goodwill",
 ]
 
-print("\n=== Data Availability Check ===")
-gaps = []
-for label, fact_name in required_facts:
-    found = any(fact_name.lower() in n.lower() for n in fact_names)
-    status = "✓ XBRL" if found else "✗ Need PDF/OCR"
-    print(f"  {label}: {status}")
-    if not found:
-        gaps.append(label)
-
-if gaps:
-    print(f"\n⚠️  Fields requiring PDF/OCR extraction: {gaps}")
-else:
-    print("\n✓ All key fields available in XBRL")
+print("\n=== Balance Sheet Data ===")
+for fact_name in balance_facts:
+    facts = get_facts_by_name(data, fact_name)
+    if facts:
+        for f in facts[:1]:  # Just show first match
+            value = f.get("value", "N/A")
+            if value and value.lstrip("-").isdigit():
+                value = f"{int(value):,}"
+            print(f"{fact_name}: {value}")
 ```
+
+### 7. Cash Flow Facts (Estado de Flujos de Efectivo)
+
+```python
+cashflow_facts = [
+    "CashFlowsFromUsedInOperatingActivities",
+    "CashFlowsFromUsedInInvestingActivities",
+    "CashFlowsFromUsedInFinancingActivities",
+    "IncreaseDecreaseInCashAndCashEquivalents",
+    "CashAndCashEquivalentsAtBeginningOfPeriod",
+    "CashAndCashEquivalentsAtEndOfPeriod",
+]
+
+print("\n=== Cash Flow Data ===")
+for fact_name in cashflow_facts:
+    facts = get_facts_by_name(data, fact_name)
+    if facts:
+        for f in facts[:1]:
+            value = f.get("value", "N/A")
+            if value and value.lstrip("-").isdigit():
+                value = f"{int(value):,}"
+            print(f"{fact_name}: {value}")
+```
+
+### 8. Export XBRL Data for Excel Sheet 1
+
+```python
+import json
+
+# Aggregate data from XBRL for Excel Sheet 1
+xbrl_aggregates = {
+    "ingresos_ordinarios": get_facts_by_name(data, "Revenue")[0]["value"] if get_facts_by_name(data, "Revenue") else None,
+    "costo_ventas_total": get_facts_by_name(data, "CostOfSales")[0]["value"] if get_facts_by_name(data, "CostOfSales") else None,
+    "ganancia_bruta": get_facts_by_name(data, "GrossProfit")[0]["value"] if get_facts_by_name(data, "GrossProfit") else None,
+    "gastos_admin_ventas_total": get_facts_by_name(data, "AdministrativeExpense")[0]["value"] if get_facts_by_name(data, "AdministrativeExpense") else None,
+    "ganancia_periodo": get_facts_by_name(data, "ProfitLoss")[0]["value"] if get_facts_by_name(data, "ProfitLoss") else None,
+}
+
+# Save for later use
+output_path = paths["processed"] / "xbrl_aggregates.json"
+output_path.parent.mkdir(parents=True, exist_ok=True)
+with open(output_path, "w") as f:
+    json.dump(xbrl_aggregates, f, indent=2)
+
+print(f"\n✓ XBRL aggregates saved to: {output_path}")
+print("\nValues extracted:")
+for key, value in xbrl_aggregates.items():
+    if value:
+        print(f"  {key}: {int(value):,}")
+```
+
+## What XBRL Does NOT Contain
+
+The detailed line-item breakdowns are NOT in XBRL. You must extract from PDF:
+
+### Costo de Venta - Detailed Breakdown (PDF Nota 21, Page 71)
+| Line Item | Q3 2024 Value |
+|-----------|---------------|
+| Gastos en personal | (30,294) |
+| Materiales y repuestos | (37,269) |
+| Energía eléctrica | (14,710) |
+| Servicios de terceros | (39,213) |
+| Depreciación y amort. del periodo | (33,178) |
+| Depreciación Activos en leasing | (1,354) |
+| Depreciación Arrendamientos | (2,168) |
+| Servicios mineros de terceros | (19,577) |
+| Fletes y otros gastos operacionales | (7,405) |
+| Gastos Diferidos, ajustes existencias y otros | 20,968 |
+| Obligaciones por convenios colectivos | (6,662) |
+| **Total** | **(170,862)** |
+
+### Gastos Adm y Ventas - Detailed Breakdown (PDF Nota 22, Page 71)
+| Line Item | Q3 2024 Value |
+|-----------|---------------|
+| Gastos en personal | (5,727) |
+| Materiales y repuestos | (226) |
+| Servicios de terceros | (4,474) |
+| Provisión gratificación legal y otros | (2,766) |
+| Gastos comercialización | (3,506) |
+| Otros gastos | (664) |
+| **Total** | **(17,363)** |
 
 ## Output
 
-- Understanding of XBRL structure and available facts
-- Fact mapping saved to `audit/YYYY_QN/xbrl_fact_mapping.json`
-- List of fields that need PDF/OCR extraction
-
-## XBRL Namespaces Reference
-
-Common IFRS XBRL namespaces you'll encounter:
-
-| Prefix | Description |
-|--------|-------------|
-| `ifrs-full` | IFRS full taxonomy |
-| `cl-ci` | Chile-specific extensions |
-| `iso4217` | Currency codes |
+- XBRL aggregate data saved to `data/processed/YYYY_QN/xbrl_aggregates.json`
+- Understanding that detailed breakdown requires PDF extraction
 
 ## Next Steps
 
-After completing this instruction:
-1. Review the discovered XBRL facts
-2. Map facts to desired Excel sheet structure
-3. For any gaps, proceed to PDF extraction
-4. Continue to `03_extract_sheet1.md`
+Since detailed line items require PDF extraction:
+1. Use aggregates from XBRL as validation totals
+2. Proceed to `03_extract_sheet1.md` for PDF extraction of Nota 21 and Nota 22
+3. Cross-validate: Sum of PDF line items should match XBRL totals
 
 ## Troubleshooting
 
