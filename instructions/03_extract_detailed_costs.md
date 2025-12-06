@@ -202,7 +202,7 @@ Row  Label                                          IIQ2024
 
 ### config/sheet1/fields.json
 
-Field definitions and row mapping (27 rows):
+Field definitions and row mapping (27 rows). The **row_mapping** block is the canonical structure used by the code; the optional `layout` block in this file is metadata only and not read by the formatter/writer.
 
 ```json
 {
@@ -211,23 +211,54 @@ Field definitions and row mapping (27 rows):
     "ingresos_ordinarios": {"type": "int", "section": "ingresos", "row": 1},
     "cv_gastos_personal": {"type": "int", "section": "nota_21", "row": 4},
     "cv_materiales": {"type": "int", "section": "nota_21", "row": 5},
-    ...
+    "cv_energia": {"type": "int", "section": "nota_21", "row": 6},
+    "cv_servicios_terceros": {"type": "int", "section": "nota_21", "row": 7},
+    "cv_depreciacion_amort": {"type": "int", "section": "nota_21", "row": 8},
+    "cv_deprec_leasing": {"type": "int", "section": "nota_21", "row": 9},
+    "cv_deprec_arrend": {"type": "int", "section": "nota_21", "row": 10},
+    "cv_serv_mineros": {"type": "int", "section": "nota_21", "row": 11},
+    "cv_fletes": {"type": "int", "section": "nota_21", "row": 12},
+    "cv_gastos_diferidos": {"type": "int", "section": "nota_21", "row": 13},
+    "cv_convenios": {"type": "int", "section": "nota_21", "row": 14},
     "total_costo_venta": {"type": "int", "section": "nota_21", "row": 15, "is_total": true},
     "ga_gastos_personal": {"type": "int", "section": "nota_22", "row": 20},
-    ...
+    "ga_materiales": {"type": "int", "section": "nota_22", "row": 21},
+    "ga_servicios_terceros": {"type": "int", "section": "nota_22", "row": 22},
+    "ga_gratificacion": {"type": "int", "section": "nota_22", "row": 23},
+    "ga_comercializacion": {"type": "int", "section": "nota_22", "row": 24},
+    "ga_otros": {"type": "int", "section": "nota_22", "row": 25},
     "total_gasto_admin": {"type": "int", "section": "nota_22", "row": 27, "is_total": true}
   },
   "row_mapping": {
     "1": {"field": "ingresos_ordinarios", "label": "Ingresos de actividades ordinarias M USD"},
     "4": {"field": "cv_gastos_personal", "label": "Gastos en personal", "section": "costo_venta"},
-    ...
+    "5": {"field": "cv_materiales", "label": "Materiales y repuestos", "section": "costo_venta"},
+    "6": {"field": "cv_energia", "label": "Energía eléctrica", "section": "costo_venta"},
+    "7": {"field": "cv_servicios_terceros", "label": "Servicios de terceros", "section": "costo_venta"},
+    "8": {"field": "cv_depreciacion_amort", "label": "Depreciación y amort del periodo", "section": "costo_venta"},
+    "9": {"field": "cv_deprec_leasing", "label": "Depreciación Activos en leasing -Nota 20", "section": "costo_venta"},
+    "10": {"field": "cv_deprec_arrend", "label": "Depreciación Arrendamientos -Nota 20", "section": "costo_venta"},
+    "11": {"field": "cv_serv_mineros", "label": "Servicios mineros de terceros", "section": "costo_venta"},
+    "12": {"field": "cv_fletes", "label": "Fletes y otros gastos operacionales", "section": "costo_venta"},
+    "13": {"field": "cv_gastos_diferidos", "label": "Gastos Diferidos, ajustes existencias y otros", "section": "costo_venta"},
+    "14": {"field": "cv_convenios", "label": "Obligaciones por convenios colectivos", "section": "costo_venta"},
+    "15": {"field": "total_costo_venta", "label": "Total Costo de Venta", "section": "costo_venta_total"},
+    "20": {"field": "ga_gastos_personal", "label": "Gastos en personal", "section": "gasto_admin"},
+    "21": {"field": "ga_materiales", "label": "Materiales y repuestos", "section": "gasto_admin"},
+    "22": {"field": "ga_servicios_terceros", "label": "Servicios de terceros", "section": "gasto_admin"},
+    "23": {"field": "ga_gratificacion", "label": "Provision gratificacion legal y otros", "section": "gasto_admin"},
+    "24": {"field": "ga_comercializacion", "label": "Gastos comercializacion", "section": "gasto_admin"},
+    "25": {"field": "ga_otros", "label": "Otros gastos", "section": "gasto_admin"},
+    "27": {"field": "total_gasto_admin", "label": "Totales", "section": "gasto_admin_total"}
   }
 }
 ```
 
+> Note: rows 2, 16–18, and 26 are intentionally blank in `row_mapping`.
+
 ### config/sheet1/extraction.json
 
-PDF extraction rules with keyword-based field matching:
+PDF extraction rules with keyword-based field matching. All Nota 21/22 fields are mapped with `pdf_labels` and `match_keywords`; totals in both sections are matched via generic labels `"Totales"`/`"Total"`.
 
 ```json
 {
@@ -240,19 +271,18 @@ PDF extraction rules with keyword-based field matching:
         "exclude_items": ["gratificación", "gratificacion", "comercialización", "comercializacion"]
       },
       "field_mappings": {
-        "cv_gastos_personal": {
-          "pdf_labels": ["Gastos en personal"],
-          "match_keywords": ["gastos en personal"]
-        },
-        "cv_deprec_leasing": {
-          "pdf_labels": ["Depreciación Activos en leasing", "Depreciacion Activos en leasing"],
-          "match_keywords": ["leasing"]
-        },
-        "cv_depreciacion_amort": {
-          "pdf_labels": ["Depreciación y amort del periodo", "Depreciacion y amort del periodo"],
-          "match_keywords": ["amort"],
-          "exclude_keywords": ["leasing", "arrendamiento"]
-        }
+        "cv_gastos_personal": {"pdf_labels": ["Gastos en personal"], "match_keywords": ["gastos en personal"]},
+        "cv_materiales": {"pdf_labels": ["Materiales y repuestos"], "match_keywords": ["materiales", "repuestos"]},
+        "cv_energia": {"pdf_labels": ["Energía eléctrica", "Energia electrica"], "match_keywords": ["energía", "energia", "eléctrica", "electrica"]},
+        "cv_servicios_terceros": {"pdf_labels": ["Servicios de terceros"], "match_keywords": ["servicios de terceros"]},
+        "cv_depreciacion_amort": {"pdf_labels": ["Depreciación y amort del periodo", "Depreciacion y amort del periodo"], "match_keywords": ["amort"], "exclude_keywords": ["leasing", "arrendamiento"]},
+        "cv_deprec_leasing": {"pdf_labels": ["Depreciación Activos en leasing", "Depreciacion Activos en leasing"], "match_keywords": ["leasing"]},
+        "cv_deprec_arrend": {"pdf_labels": ["Depreciación Arrendamientos", "Depreciacion Arrendamientos"], "match_keywords": ["arrendamiento"]},
+        "cv_serv_mineros": {"pdf_labels": ["Servicios mineros de terceros"], "match_keywords": ["servicios mineros"]},
+        "cv_fletes": {"pdf_labels": ["Fletes y otros gastos operacionales"], "match_keywords": ["fletes"]},
+        "cv_gastos_diferidos": {"pdf_labels": ["Gastos Diferidos, ajustes existencias y otros", "Gastos Diferidos"], "match_keywords": ["gastos diferidos", "ajustes existencias"]},
+        "cv_convenios": {"pdf_labels": ["Obligaciones por convenios colectivos"], "match_keywords": ["convenios", "obligaciones"]},
+        "total_costo_venta": {"pdf_labels": ["Totales", "Total"], "match_keywords": ["totales", "total"]}
       }
     },
     "nota_22": {
@@ -263,11 +293,29 @@ PDF extraction rules with keyword-based field matching:
         "exclude_items": ["energía", "energia", "servicios mineros", "fletes"]
       },
       "field_mappings": {
-        "ga_gastos_personal": {"match_keywords": ["gastos en personal"]},
-        "ga_gratificacion": {"match_keywords": ["gratificación", "gratificacion"]},
-        "ga_comercializacion": {"match_keywords": ["comercialización", "comercializacion"]}
+        "ga_gastos_personal": {"pdf_labels": ["Gastos en personal"], "match_keywords": ["gastos en personal"]},
+        "ga_materiales": {"pdf_labels": ["Materiales y repuestos"], "match_keywords": ["materiales", "repuestos"]},
+        "ga_servicios_terceros": {"pdf_labels": ["Servicios de terceros"], "match_keywords": ["servicios de terceros"]},
+        "ga_gratificacion": {"pdf_labels": ["Provision gratificacion legal y otros", "Provisión gratificación legal y otros"], "match_keywords": ["gratificación", "gratificacion"]},
+        "ga_comercializacion": {"pdf_labels": ["Gastos comercializacion", "Gastos comercialización"], "match_keywords": ["comercialización", "comercializacion"]},
+        "ga_otros": {"pdf_labels": ["Otros gastos"], "match_keywords": ["otros gastos"]},
+        "total_gasto_admin": {"pdf_labels": ["Totales", "Total"], "match_keywords": ["totales", "total"]}
+      }
+    },
+    "ingresos": {
+      "title": "Ingresos de actividades ordinarias",
+      "source": "xbrl_preferred",
+      "pdf_fallback": {
+        "page_type": "estado_de_resultados",
+        "search_patterns": ["estados de resultados", "estado de resultados", "ingresos de actividades ordinarias"],
+        "typical_page_range": [3, 10]
       }
     }
+  },
+  "period_overrides": {
+    "2024_Q2": {"verified": true, "verified_date": "2024-12-06", "page_numbers": {"nota_21": 72, "nota_22": 72}},
+    "2024_Q3": {"verified": false, "deviations": {}},
+    "2024_Q1": {"verified": false, "xbrl_available": false, "deviations": {}}
   }
 }
 ```
@@ -279,37 +327,28 @@ PDF extraction rules with keyword-based field matching:
 
 ### config/sheet1/xbrl_mappings.json
 
-XBRL fact mappings and validation rules:
+XBRL fact mappings and validation rules (includes extra facts used for cross-checks):
 
 ```json
 {
   "fact_mappings": {
-    "ingresos_ordinarios": {
-      "primary": "RevenueFromContractsWithCustomers",
-      "fallbacks": ["Revenue", "IngresosPorActividadesOrdinarias"],
-      "context_type": "duration",
-      "apply_scaling": true
-    },
-    "total_costo_venta": {
-      "primary": "CostOfSales",
-      "fallbacks": ["CostoDeVentas"],
-      "context_type": "duration",
-      "apply_scaling": true
-    },
-    "total_gasto_admin": {
-      "primary": "AdministrativeExpense",
-      "fallbacks": ["GastosDeAdministracion", "GastosDeAdministracionYVentas"],
-      "context_type": "duration",
-      "apply_scaling": true
-    }
+    "ingresos_ordinarios": {"primary": "RevenueFromContractsWithCustomers", "fallbacks": ["Revenue", "IngresosPorActividadesOrdinarias"], "context_type": "duration", "apply_scaling": true},
+    "total_costo_venta": {"primary": "CostOfSales", "fallbacks": ["CostoDeVentas"], "context_type": "duration", "apply_scaling": true},
+    "total_gasto_admin": {"primary": "AdministrativeExpense", "fallbacks": ["GastosDeAdministracion", "GastosDeAdministracionYVentas"], "context_type": "duration", "apply_scaling": true},
+    "gross_profit": {"primary": "GrossProfit", "fallbacks": ["GananciaBruta"], "context_type": "duration", "apply_scaling": true},
+    "profit_loss": {"primary": "ProfitLoss", "fallbacks": ["GananciaPerdida"], "context_type": "duration", "apply_scaling": true}
   },
   "validation_rules": {
     "sum_tolerance": 1,
     "total_validations": [
-      {"total_field": "total_costo_venta", "sum_fields": ["cv_gastos_personal", "cv_materiales", ...]},
-      {"total_field": "total_gasto_admin", "sum_fields": ["ga_gastos_personal", "ga_materiales", ...]}
+      {"total_field": "total_costo_venta", "sum_fields": ["cv_gastos_personal", "cv_materiales", "cv_energia", "cv_servicios_terceros", "cv_depreciacion_amort", "cv_deprec_leasing", "cv_deprec_arrend", "cv_serv_mineros", "cv_fletes", "cv_gastos_diferidos", "cv_convenios"], "xbrl_fact": "CostOfSales"},
+      {"total_field": "total_gasto_admin", "sum_fields": ["ga_gastos_personal", "ga_materiales", "ga_servicios_terceros", "ga_gratificacion", "ga_comercializacion", "ga_otros"], "xbrl_fact": "AdministrativeExpense"}
+    ],
+    "cross_validations": [
+      {"description": "Gross Profit = Revenue - Cost of Sales", "formula": "gross_profit == ingresos_ordinarios - abs(total_costo_venta)", "tolerance": 1}
     ]
-  }
+  },
+  "aggregate_facts": ["RevenueFromContractsWithCustomers", "Revenue", "CostOfSales", "GrossProfit", "AdministrativeExpense", "SellingExpense", "ProfitLoss", "ProfitLossBeforeTax"]
 }
 ```
 
@@ -319,23 +358,9 @@ Known-good values for validation:
 
 ```json
 {
-  "2024_Q2": {
-    "verified": true,
-    "verified_date": "2024-12-06",
-    "values": {
-      "ingresos_ordinarios": 179165,
-      "cv_gastos_personal": -19721,
-      "cv_materiales": -23219,
-      ...
-      "total_costo_venta": -126202,
-      "total_gasto_admin": -11632
-    }
-  },
-  "2024_Q1": {
-    "verified": true,
-    "source": "Estados Financieros PDF - pucobre.cl (no XBRL)",
-    "values": {...}
-  }
+  "2024_Q2": {"verified": true, "verified_date": "2024-12-06", "source": "Estados Financieros PDF + XBRL cross-validation", "values": {"ingresos_ordinarios": 179165, "cv_gastos_personal": -19721, "cv_materiales": -23219, "cv_energia": -9589, "cv_servicios_terceros": -25063, "cv_depreciacion_amort": -21694, "cv_deprec_leasing": -881, "cv_deprec_arrend": -1577, "cv_serv_mineros": -10804, "cv_fletes": -5405, "cv_gastos_diferidos": -1587, "cv_convenios": -6662, "total_costo_venta": -126202, "ga_gastos_personal": -3818, "ga_materiales": -129, "ga_servicios_terceros": -4239, "ga_gratificacion": -639, "ga_comercializacion": -2156, "ga_otros": -651, "total_gasto_admin": -11632}},
+  "2024_Q1": {"verified": true, "verified_date": "2024-12-06", "source": "Estados Financieros PDF - Estado de Resultados + Nota 21/22 (no XBRL)", "values": {"ingresos_ordinarios": 80767, "cv_gastos_personal": -9857, "cv_materiales": -10986, "cv_energia": -4727, "cv_servicios_terceros": -11723, "cv_depreciacion_amort": -10834, "cv_deprec_leasing": -485, "cv_deprec_arrend": -711, "cv_serv_mineros": -3675, "cv_fletes": -2489, "cv_gastos_diferidos": -875, "cv_convenios": -6620, "total_costo_venta": -62982, "ga_gastos_personal": -1831, "ga_materiales": -56, "ga_servicios_terceros": -1250, "ga_gratificacion": -966, "ga_comercializacion": -805, "ga_otros": -229, "total_gasto_admin": -5137}},
+  "2024_Q3": {"verified": false, "values": null}
 }
 ```
 
