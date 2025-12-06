@@ -6,16 +6,52 @@ Extract the **detailed line-item breakdowns** from the Estados Financieros PDF t
 - **Nota 21**: Costo de Venta (11 line items)
 - **Nota 22**: Gastos de Administración y Ventas (6 line items)
 
-## Data Location
+**Key Features:**
+- Works with both CMF Chile (PDF + XBRL) and Pucobre.cl fallback (PDF only)
+- Automatically validates against XBRL when available
+- Handles cases when no XBRL exists (Q1 2024 from Pucobre.cl)
 
-The detailed breakdowns are in:
+## Data Sources
+
+### CMF Chile (Primary)
 - **PDF**: `estados_financieros_YYYY_QN.pdf`
-- **Page**: 71 (may vary by period - search for "NOTA 21" or "COSTO DE VENTA")
+- **XBRL**: `estados_financieros_YYYY_QN.xbrl` (for validation)
+- **XBRL Contains**: Aggregated totals (CostOfSales, AdministrativeExpense)
+- **PDF Contains**: Detailed line-item breakdowns not in XBRL
+
+### Pucobre.cl (Fallback)
+- **PDF**: `estados_financieros_YYYY_QN.pdf` (split from combined)
+- **XBRL**: NOT AVAILABLE
+- **Use Case**: Q1 of any year (not on CMF Chile)
 
 ## Prerequisites
 
 - Documents downloaded via `01_download_all.md`
-- XBRL aggregates extracted via `02_parse_xbrl.md`
+- For CMF source: XBRL aggregates extracted via `02_parse_xbrl.md` (optional but recommended)
+
+## Quick Start (Using the Module)
+
+\`\`\`python
+from puco_eeff.extractor import (
+    extract_detailed_costs,
+    print_extraction_report,
+    save_extraction_result,
+)
+
+# Extract with automatic validation
+result = extract_detailed_costs(year=2024, quarter=2)
+
+# Print formatted report
+print_extraction_report(result)
+
+# Save to JSON
+save_extraction_result(result)
+
+# Check results
+print(f"Source: {result.source}")
+print(f"XBRL Available: {result.xbrl_available}")
+print(f"Extraction Valid: {result.is_valid()}")
+\`\`\`
 
 ## Target Data Structure
 
@@ -48,11 +84,96 @@ The detailed breakdowns are in:
 | Otros gastos | N/A | (664) |
 | **Total (debe = XBRL AdminExpense)** | AdministrativeExpense | **(17,363)** |
 
-## Steps
+---
+
+## Extraction Scenarios
+
+### Scenario 1: CMF Chile Source (With XBRL Validation)
+
+When data is downloaded from CMF Chile, both PDF and XBRL are available:
+
+\`\`\`python
+from puco_eeff.extractor import extract_detailed_costs, print_extraction_report
+
+# Q2-Q4 typically from CMF Chile
+result = extract_detailed_costs(year=2024, quarter=2, validate=True)
+
+print_extraction_report(result)
+
+# Example output:
+# ============================================================
+# Cost Extraction Report: 2024 Q2
+# ============================================================
+# Source: cmf
+# XBRL Available: Yes
+#
+# --- Validation Results ---
+#   Costo de Venta (Nota 21):
+#     PDF:  170,862
+#     XBRL: 170,862
+#     ✓ Match
+#   Gastos Administración (Nota 22):
+#     PDF:  17,363
+#     XBRL: 17,363
+#     ✓ Match
+\`\`\`
+
+### Scenario 2: Pucobre.cl Fallback (PDF Only, No XBRL)
+
+When Q1 data comes from Pucobre.cl, only PDF is available:
+
+\`\`\`python
+# Q1 typically from Pucobre.cl fallback
+result = extract_detailed_costs(year=2024, quarter=1, validate=True)
+
+print_extraction_report(result)
+
+# Example output:
+# ============================================================
+# Cost Extraction Report: 2024 Q1
+# ============================================================
+# Source: pucobre.cl
+# XBRL Available: No
+#
+# --- Nota 21: Costo de Venta ---
+# Page: 68
+# Items extracted: 11
+#   Gastos en personal: 9,542
+#   Materiales y repuestos: 12,103
+#   ...
+#   TOTAL: 54,287
+#
+# --- Validation Results ---
+#   Costo de Venta (Nota 21):
+#     PDF:  54,287
+#     ⚠ PDF only (no XBRL)
+\`\`\`
+
+### Scenario 3: Batch Extraction Across Quarters
+
+\`\`\`python
+from puco_eeff.extractor import extract_detailed_costs, save_extraction_result
+
+results = {}
+for quarter in [1, 2, 3, 4]:
+    result = extract_detailed_costs(year=2024, quarter=quarter)
+    results[f"Q{quarter}"] = result
+    save_extraction_result(result)
+    print(f"Q{quarter}: Source={result.source}, Valid={result.is_valid()}")
+
+# Q1: Source=pucobre.cl, Valid=True (PDF only)
+# Q2: Source=cmf, Valid=True (validated against XBRL)
+# Q3: Source=cmf, Valid=True (validated against XBRL)
+# Q4: Source=cmf, Valid=True (validated against XBRL)
+\`\`\`
+
+---
+
+## Manual Extraction Steps (If Needed)
 
 ### 1. Load PDF and Find Nota 21
 
-```python
+\`\`\`python
 import pdfplumber
 from puco_eeff.config import get_period_paths
 
@@ -81,11 +202,11 @@ if nota_21_page is None:
                 break
 
 print(f"Nota 21 is on page index {nota_21_page} (display: {nota_21_page + 1})")
-```
+\`\`\`
 
-### 2. Extract Tables from Page 71 (or found page)
+### 2. Extract Tables from Page
 
-```python
+\`\`\`python
 def extract_cost_tables(pdf_path, page_index):
     """Extract Nota 21 and Nota 22 tables from PDF."""
 
@@ -105,7 +226,6 @@ def extract_cost_tables(pdf_path, page_index):
                 continue
 
             # Check if this is Nota 21 (Costo de Venta)
-            # Look for "Gastos en personal" in first column
             text_content = str(table).lower()
 
             if "gastos en personal" in text_content and "energía eléctrica" in text_content:
@@ -120,208 +240,87 @@ def extract_cost_tables(pdf_path, page_index):
 
 # Extract tables
 tables = extract_cost_tables(pdf_path, nota_21_page)
-```
+\`\`\`
 
-### 3. Parse Nota 21 - Costo de Venta
+### 3. Parse Chilean Number Format
 
-```python
-import pandas as pd
+\`\`\`python
 import re
 
-def parse_nota_21(table_data):
+def parse_chilean_number(value):
+    """Parse Chilean-formatted numbers.
+
+    - Period as thousands separator: 30.294 = 30,294
+    - Parentheses for negatives: (30.294) = -30,294
     """
-    Parse Nota 21 table into structured data.
+    if not value:
+        return None
 
-    Expected columns:
-    - Concepto (may be merged with values)
-    - 01-01-YYYY to 30-09-YYYY (YTD current)
-    - 01-01-YYYY to 30-09-YYYY (YTD prior)
-    - 01-07-YYYY to 30-09-YYYY (Q3 current)
-    - 01-07-YYYY to 30-09-YYYY (Q3 prior)
-    """
+    value = str(value).strip()
+    is_negative = "(" in value and ")" in value
 
-    # Expected line items in order
-    expected_items = [
-        "Gastos en personal",
-        "Materiales y repuestos",
-        "Energía eléctrica",
-        "Servicios de terceros",
-        "Depreciación y amort. del periodo",
-        "Depreciación Activos en leasing",
-        "Depreciación Arrendamientos",
-        "Servicios mineros de terceros",
-        "Fletes y otros gastos operacionales",
-        "Gastos Diferidos",  # May include more text
-        "Obligaciones por convenios colectivos",
-        "Totales",
-    ]
+    # Remove non-numeric except period and minus
+    value = re.sub(r"[^\d.\-]", "", value)
+    if not value or value in (".", "-"):
+        return None
 
-    # Parse table rows
-    parsed = []
-    for row in table_data:
-        if not row:
-            continue
+    try:
+        value = value.replace(".", "")  # Remove thousands sep
+        result = int(value)
+        return -abs(result) if is_negative else result
+    except ValueError:
+        return None
+\`\`\`
 
-        # Get the text content (may be in first cell or merged)
-        row_text = str(row[0]) if row[0] else ""
+### 4. Validate Against XBRL (When Available)
 
-        # Split newline-merged content
-        lines = row_text.split("\n")
+\`\`\`python
+from puco_eeff.extractor import parse_xbrl_file, get_facts_by_name
 
-        # Extract numbers from remaining columns
-        values = []
-        for cell in row[1:]:
-            if cell:
-                # Clean and parse number
-                num_str = str(cell).replace(",", "").replace(".", "")
-                num_str = num_str.replace("(", "-").replace(")", "")
-                num_str = re.sub(r"[^\d\-]", "", num_str)
-                if num_str:
-                    try:
-                        values.append(int(num_str))
-                    except:
-                        values.append(None)
+# Check if XBRL exists
+xbrl_path = paths["raw_xbrl"] / f"estados_financieros_{year}_Q{quarter}.xbrl"
 
-        # Match to expected items
-        for line in lines:
-            for expected in expected_items:
-                if expected.lower() in line.lower():
-                    parsed.append({
-                        "concepto": expected,
-                        "ytd_actual": values[0] if len(values) > 0 else None,
-                        "ytd_anterior": values[1] if len(values) > 1 else None,
-                    })
-                    break
-
-    return pd.DataFrame(parsed)
-
-# Parse the table
-if tables["nota_21"]:
-    nota_21_df = parse_nota_21(tables["nota_21"])
-    print("\n=== Nota 21 - Costo de Venta ===")
-    print(nota_21_df.to_string())
-```
-
-### 4. Parse Nota 22 - Gastos Administración
-
-```python
-def parse_nota_22(table_data):
-    """Parse Nota 22 table into structured data."""
-
-    expected_items = [
-        "Gastos en personal",
-        "Materiales y repuestos",
-        "Servicios de terceros",
-        "Provisión gratificación legal",
-        "Gastos comercialización",
-        "Otros gastos",
-        "Totales",
-    ]
-
-    parsed = []
-    for row in table_data:
-        if not row:
-            continue
-
-        row_text = str(row[0]) if row[0] else ""
-        lines = row_text.split("\n")
-
-        values = []
-        for cell in row[1:]:
-            if cell:
-                num_str = str(cell).replace(",", "").replace(".", "")
-                num_str = num_str.replace("(", "-").replace(")", "")
-                num_str = re.sub(r"[^\d\-]", "", num_str)
-                if num_str:
-                    try:
-                        values.append(int(num_str))
-                    except:
-                        values.append(None)
-
-        for line in lines:
-            for expected in expected_items:
-                if expected.lower() in line.lower():
-                    parsed.append({
-                        "concepto": expected,
-                        "ytd_actual": values[0] if len(values) > 0 else None,
-                        "ytd_anterior": values[1] if len(values) > 1 else None,
-                    })
-                    break
-
-    return pd.DataFrame(parsed)
-
-if tables["nota_22"]:
-    nota_22_df = parse_nota_22(tables["nota_22"])
-    print("\n=== Nota 22 - Gastos Admin y Ventas ===")
-    print(nota_22_df.to_string())
-```
-
-### 5. Validate Against XBRL Totals
-
-```python
-import json
-
-# Load XBRL aggregates
-xbrl_path = paths["processed"] / "xbrl_aggregates.json"
 if xbrl_path.exists():
-    with open(xbrl_path) as f:
-        xbrl = json.load(f)
+    print("✓ XBRL available - performing validation")
 
-    # Validate Nota 21 total matches XBRL CostOfSales
-    pdf_costo_total = nota_21_df[nota_21_df["concepto"] == "Totales"]["ytd_actual"].values[0]
-    xbrl_costo = int(xbrl.get("costo_ventas_total", 0))
+    data = parse_xbrl_file(xbrl_path)
 
-    print(f"\n=== Validation ===")
-    print(f"PDF Costo de Venta Total: {pdf_costo_total:,}")
-    print(f"XBRL CostOfSales:         {xbrl_costo:,}")
-    print(f"Match: {'✓' if abs(pdf_costo_total) == abs(xbrl_costo) else '✗ MISMATCH!'}")
+    # Get CostOfSales from XBRL
+    cost_facts = get_facts_by_name(data, "CostOfSales")
+    xbrl_cost = int(float(cost_facts[0]["value"])) if cost_facts else None
 
-    # Validate Nota 22 total matches XBRL AdminExpense
-    pdf_admin_total = nota_22_df[nota_22_df["concepto"] == "Totales"]["ytd_actual"].values[0]
-    xbrl_admin = int(xbrl.get("gastos_admin_ventas_total", 0))
+    # Get AdminExpense from XBRL
+    admin_facts = get_facts_by_name(data, "AdministrativeExpense")
+    xbrl_admin = int(float(admin_facts[0]["value"])) if admin_facts else None
 
-    print(f"\nPDF Gastos Admin Total: {pdf_admin_total:,}")
-    print(f"XBRL AdminExpense:      {xbrl_admin:,}")
-    print(f"Match: {'✓' if abs(pdf_admin_total) == abs(xbrl_admin) else '✗ MISMATCH!'}")
-```
+    # Compare with PDF totals
+    print(f"\nCosto de Venta:")
+    print(f"  PDF:  {pdf_cost_total:,}")
+    print(f"  XBRL: {xbrl_cost:,}")
+    print(f"  Match: {'✓' if abs(pdf_cost_total) == abs(xbrl_cost) else '✗ MISMATCH!'}")
 
-### 6. OCR Fallback (If Tables Cannot Be Extracted)
+else:
+    print("⚠ No XBRL available - using PDF-only extraction")
+    print("  Source is likely Pucobre.cl fallback (Q1 data)")
+\`\`\`
+
+### 5. OCR Fallback (If Tables Cannot Be Extracted)
 
 If pdfplumber fails to extract tables (image-based PDF), use OCR:
 
-```python
-from puco_eeff.extractor.ocr_fallback import ocr_with_fallback
+\`\`\`python
+from puco_eeff.extractor import ocr_with_fallback
 
 # OCR prompt for structured extraction
 ocr_prompt = """
 Extract the following tables from Nota 21 and Nota 22 of this financial statement:
 
 NOTA 21 - COSTO DE VENTA:
-Extract all line items with their values for the column "01-01-2024 30-09-2024".
-Expected items:
-- Gastos en personal
-- Materiales y repuestos
-- Energía eléctrica
-- Servicios de terceros
-- Depreciación y amort. del periodo
-- Depreciación Activos en leasing
-- Depreciación Arrendamientos
-- Servicios mineros de terceros
-- Fletes y otros gastos operacionales
-- Gastos Diferidos, ajustes existencias y otros
-- Obligaciones por convenios colectivos
-- Totales
+Extract all line items with their values for the YTD column.
+Expected items: Gastos en personal, Materiales y repuestos, Energía eléctrica, etc.
 
 NOTA 22 - GASTOS DE ADMINISTRACION Y VENTAS:
-Extract all line items with their values for the column "01-01-2024 30-09-2024".
-Expected items:
-- Gastos en personal
-- Materiales y repuestos
-- Servicios de terceros
-- Provisión gratificación legal y otros
-- Gastos comercialización
-- Otros gastos
-- Totales
+Extract all line items with their values for the YTD column.
 
 Return as JSON format:
 {
@@ -348,65 +347,120 @@ if not tables["nota_21"] or not tables["nota_22"]:
     )
 
     if ocr_result["success"]:
-        # Parse JSON from OCR response
         import json
         try:
             ocr_data = json.loads(ocr_result["content"])
-            nota_21_df = pd.DataFrame(ocr_data["nota_21"])
-            nota_22_df = pd.DataFrame(ocr_data["nota_22"])
             print("✓ OCR extraction successful")
         except json.JSONDecodeError:
             print("⚠ OCR returned non-JSON, needs manual parsing")
-```
+\`\`\`
 
-### 7. Save Extracted Data
-
-```python
-import json
-
-# Prepare output structure
-extracted_data = {
-    "period": f"{year}_Q{quarter}",
-    "source": str(pdf_path),
-    "page": nota_21_page + 1,
-    "nota_21_costo_venta": nota_21_df.to_dict(orient="records"),
-    "nota_22_gastos_admin": nota_22_df.to_dict(orient="records"),
-}
-
-# Save to processed directory
-output_path = paths["processed"] / "detailed_costs.json"
-output_path.parent.mkdir(parents=True, exist_ok=True)
-
-with open(output_path, "w", encoding="utf-8") as f:
-    json.dump(extracted_data, f, indent=2, ensure_ascii=False)
-
-print(f"\n✓ Saved extracted data to: {output_path}")
-```
+---
 
 ## Output Files
 
-- `data/processed/YYYY_QN/detailed_costs.json` - Extracted line items
-- `data/processed/YYYY_QN/xbrl_aggregates.json` - XBRL totals for validation
-- `audit/YYYY_QN/ocr_*.json` - OCR responses (if used)
+| File | Description |
+|------|-------------|
+| \`data/processed/detailed_costs.json\` | Extracted line items + validation |
+| \`data/processed/xbrl_aggregates.json\` | XBRL totals (when available) |
+| \`audit/YYYY_QN/ocr_*.json\` | OCR responses (if used) |
+
+### Example Output (detailed_costs.json)
+
+\`\`\`json
+{
+  "period": "2024_Q2",
+  "source": "cmf",
+  "pdf_path": "data/raw/pdf/estados_financieros_2024_Q2.pdf",
+  "xbrl_path": "data/raw/xbrl/estados_financieros_2024_Q2.xbrl",
+  "xbrl_available": true,
+  "nota_21": {
+    "nota_number": 21,
+    "nota_title": "Costo de Venta",
+    "page_number": 71,
+    "items": [
+      {"concepto": "Gastos en personal", "ytd_actual": -30294, "ytd_anterior": -28150},
+      {"concepto": "Materiales y repuestos", "ytd_actual": -37269, "ytd_anterior": -34521}
+    ],
+    "total_ytd_actual": -170862
+  },
+  "nota_22": {
+    "nota_number": 22,
+    "nota_title": "Gastos de Administración y Ventas",
+    "page_number": 71,
+    "items": [...],
+    "total_ytd_actual": -17363
+  },
+  "validations": [
+    {
+      "field": "Costo de Venta (Nota 21)",
+      "pdf_value": -170862,
+      "xbrl_value": -170862,
+      "match": true,
+      "source": "both",
+      "status": "✓ Match"
+    }
+  ]
+}
+\`\`\`
+
+---
 
 ## Number Format Notes
 
 Chilean financial documents may use:
-- **Period separators**: `30.294` means 30,294 (thousands separator)
-- **Parentheses**: `(30.294)` means negative -30,294
+- **Period separators**: \`30.294\` means 30,294 (thousands separator)
+- **Parentheses**: \`(30.294)\` means negative -30,294
 - **Currency**: MUS$ = Miles de dólares estadounidenses (thousands of USD)
 
 Always parse parentheses as negative values.
 
+---
+
 ## Validation Checklist
 
+### When XBRL is Available (CMF Source)
 - [ ] Sum of Nota 21 line items = Total Costo de Venta
-- [ ] Total Costo de Venta = XBRL CostOfSales
+- [ ] Total Costo de Venta = XBRL CostOfSales ✓
 - [ ] Sum of Nota 22 line items = Total Gastos Admin
-- [ ] Total Gastos Admin = XBRL AdministrativeExpense
+- [ ] Total Gastos Admin = XBRL AdministrativeExpense ✓
 - [ ] No line items with unexpected NULL values
+
+### When XBRL is NOT Available (Pucobre.cl Source)
+- [ ] Sum of Nota 21 line items = Total Costo de Venta (internal check)
+- [ ] Sum of Nota 22 line items = Total Gastos Admin (internal check)
+- [ ] All expected line items extracted (11 for Nota 21, 6 for Nota 22)
+- [ ] Values appear reasonable compared to other quarters
+- [ ] No line items with unexpected NULL values
+
+---
+
+## Troubleshooting
+
+### Issue: "Could not find Nota 21 in PDF"
+- The page number may vary. Try searching for different patterns:
+  - "COSTO DE VENTA"
+  - "NOTA 21"
+  - "21."
+- For Pucobre.cl combined PDFs, make sure the PDF was split correctly
+
+### Issue: "Tables not extracted by pdfplumber"
+- Some PDFs may have tables as images. Use OCR fallback.
+- Check if PDF is scanned vs native text
+
+### Issue: "XBRL values don't match PDF"
+- Sign differences: XBRL may report positive, PDF shows parentheses (negative)
+- Scale differences: Both should be in thousands (MUS\$)
+- Period mismatch: Ensure you're comparing YTD values
+
+### Issue: "Q1 data not available on CMF"
+- This is expected! Q1 is typically only on Pucobre.cl
+- Use the fallback downloader: \`download_from_pucobre(year, 1)\`
+- Extraction will work in PDF-only mode
+
+---
 
 ## Next Steps
 
-1. Continue to `04_extract_main_statements.md` for Income Statement and Balance Sheet
-2. Format data for Excel output in `05_format_sheets.md`
+1. Continue to \`04_extract_main_statements.md\` for Income Statement and Balance Sheet
+2. Format data for Excel output in \`05_format_sheets.md\`

@@ -178,3 +178,9 @@
 2025-12-06 02:15:16,423 - puco_eeff.scraper.pucobre_downloader - INFO - Split into: estados_financieros_2024_Q1.pdf (4,320,171 bytes), analisis_razonado_2024_Q1.pdf (404,495 bytes)
 2025-12-06 02:15:16,482 - puco_eeff.scraper.cmf_downloader - INFO - Successfully downloaded Estados Financieros from Pucobre.cl: /home/alvaro/aa-ml/puco-EEFF/data/raw/pdf/estados_financieros_2024_Q1.pdf
 2025-12-06 02:15:16,482 - puco_eeff.scraper.cmf_downloader - INFO - Successfully extracted Análisis Razonado from Pucobre.cl: /home/alvaro/aa-ml/puco-EEFF/data/raw/pdf/analisis_razonado_2024_Q1.pdf
+2025-12-06 02:29:05,692 - puco_eeff.extractor.cost_extractor - INFO - No XBRL available for 2024 Q1 - using PDF only
+2025-12-06 02:29:05,695 - puco_eeff.extractor.cost_extractor - INFO - Saved extraction result to: /tmp/pytest-of-alvaro/pytest-0/test_save_creates_json0/detailed_costs.json
+2025-12-06 02:29:30,360 - puco_eeff.extractor.cost_extractor - INFO - No XBRL available for 2024 Q1 - using PDF only
+2025-12-06 02:29:30,362 - puco_eeff.extractor.cost_extractor - INFO - Saved extraction result to: /tmp/pytest-of-alvaro/pytest-1/test_save_creates_json0/detailed_costs.json
+2025-12-06 02:29:51,382 - puco_eeff.extractor.cost_extractor - INFO - No XBRL available for 2024 Q1 - using PDF only
+2025-12-06 02:29:51,385 - puco_eeff.extractor.cost_extractor - INFO - Saved extraction result to: /tmp/pytest-of-alvaro/pytest-2/test_save_creates_json0/detailed_costs.json
