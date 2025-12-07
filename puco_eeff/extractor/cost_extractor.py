@@ -20,6 +20,11 @@ Key Functions:
     run_sheet1_validations(): Unified validation entry point (sum, PDF↔XBRL, cross).
     format_validation_report(): Format ValidationReport for display.
 
+Config Accessors (from sheet1 module):
+    get_section_config(): Canonical accessor for section config with validation.
+    get_section_fallback(): Get fallback section for page lookup (config-driven).
+    get_ingresos_pdf_fallback_config(): Get PDF extraction settings for ingresos.
+
 Validation System:
     The extraction pipeline includes multi-level validation:
     1. PDF ↔ XBRL totals comparison (always runs)
@@ -42,9 +47,15 @@ Configuration Files:
 - config/extraction_specs.json: General PDF extraction settings (number format)
 - config/xbrl_specs.json: XBRL namespaces, scaling factor, period filters
 - config/sheet1/fields.json: Sheet1 field definitions, row mapping (27 rows)
-- config/sheet1/extraction.json: Sheet1 sections (nota_21, nota_22, ingresos)
+- config/sheet1/extraction.json: Sheet1 sections with fallback_section, min_value_threshold
 - config/sheet1/xbrl_mappings.json: Sheet1 XBRL fact mappings, validation rules
 - config/sheet1/reference_data.json: Known-good values for validation
+
+Deprecated Functions (use alternatives):
+- validate_extraction() → use run_sheet1_validations()
+- _section_breakdowns_to_sheet1data() → use sections_to_sheet1data()
+- _map_nota21_item_to_sheet1() → use _map_nota_item_to_sheet1() or sections_to_sheet1data()
+- _map_nota22_item_to_sheet1() → use _map_nota_item_to_sheet1() or sections_to_sheet1data()
 """
 
 from __future__ import annotations
@@ -72,6 +83,8 @@ from puco_eeff.config import (
 from puco_eeff.extractor.xbrl_parser import get_facts_by_name, parse_xbrl_file
 from puco_eeff.sheets.sheet1 import (
     Sheet1Data,
+    get_ingresos_pdf_fallback_config,
+    get_section_fallback,
     get_sheet1_cross_validations,
     get_sheet1_detail_fields,
     get_sheet1_extraction_sections,
@@ -1012,12 +1025,9 @@ def extract_pdf_section(
     page_idx = find_section_page(pdf_path, section_name, year, quarter)
 
     if page_idx is None:
-        # Try fallback: some sections share pages
-        fallback_sections = {
-            "nota_22": "nota_21",  # Nota 22 often on same page as Nota 21
-        }
-        if section_name in fallback_sections:
-            fallback = fallback_sections[section_name]
+        # Try fallback: some sections share pages (e.g., nota_22 often on same page as nota_21)
+        fallback = get_section_fallback(section_name)
+        if fallback:
             page_idx = find_section_page(pdf_path, fallback, year, quarter)
 
     if page_idx is None:
@@ -1086,7 +1096,16 @@ def extract_ingresos_from_pdf(pdf_path: Path) -> int | None:
     ingresos_spec = get_sheet1_section_spec("ingresos")
     field_mappings = ingresos_spec.get("field_mappings", {})
     ingresos_mapping = field_mappings.get("ingresos_ordinarios", {})
-    match_keywords = ingresos_mapping.get("match_keywords", ["ingresos", "actividades ordinarias"])
+    match_keywords = ingresos_mapping.get("match_keywords")
+    if not match_keywords:
+        raise KeyError(
+            "ingresos.field_mappings.ingresos_ordinarios.match_keywords missing from config. "
+            "Add it to config/sheet1/extraction.json."
+        )
+
+    # Get minimum value threshold from config (no default - must be in config)
+    pdf_config = get_ingresos_pdf_fallback_config()
+    min_threshold = pdf_config["min_value_threshold"]
 
     # Find the Estado de Resultados page using generic function
     page_idx = find_section_page(pdf_path, "ingresos")
@@ -1135,14 +1154,14 @@ def extract_ingresos_from_pdf(pdf_path: Path) -> int | None:
 
                     if value_idx < len(values):
                         value = parse_chilean_number(values[value_idx].strip())
-                        if value is not None and value > 1000:
+                        if value is not None and value > min_threshold:
                             logger.info(f"Extracted Ingresos from PDF page {page_idx + 1}: {value:,}")
                             return value
 
                 # Fallback: Ingresos is typically the first positive large value
                 for val_str in values:
                     value = parse_chilean_number(val_str.strip())
-                    if value is not None and value > 1000:
+                    if value is not None and value > min_threshold:
                         logger.info(f"Extracted Ingresos from PDF page {page_idx + 1}: {value:,}")
                         return value
 
@@ -1382,7 +1401,17 @@ def _section_breakdowns_to_sheet1data(
     Returns:
         Sheet1Data with totals populated
     """
-    quarter_label = format_quarter_label(year, quarter) if year and quarter else f"{year}Q{quarter}"
+    import warnings
+
+    warnings.warn(
+        "_section_breakdowns_to_sheet1data() is deprecated. "
+        "Use sections_to_sheet1data() from puco_eeff.sheets.sheet1 instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
+    # Always use format_quarter_label for consistency
+    quarter_label = format_quarter_label(year, quarter)
     data = Sheet1Data(quarter=quarter_label, year=year, quarter_num=quarter)
 
     # Use config-driven mapping to set totals
@@ -1513,8 +1542,12 @@ def extract_detailed_costs(
 
         if validate:
             xbrl_totals = extract_xbrl_totals(xbrl_path)
-            result.xbrl_totals["cost_of_sales"] = xbrl_totals.get("cost_of_sales")
-            result.xbrl_totals["admin_expense"] = xbrl_totals.get("admin_expense")
+
+            # Copy XBRL totals using config-driven key mapping (no hard-coded keys)
+            result_key_mapping = get_sheet1_result_key_mapping()
+            for _field_name, xbrl_key in result_key_mapping.items():
+                if xbrl_key in xbrl_totals:
+                    result.xbrl_totals[xbrl_key] = xbrl_totals.get(xbrl_key)
 
             # Build Sheet1Data from sections using config-driven mapping
             sheet1_data = sections_to_sheet1data(result.sections, year, quarter)
@@ -1881,20 +1914,46 @@ def _map_nota_item_to_sheet1(item: LineItem, data: Sheet1Data, section_name: str
 def _map_nota21_item_to_sheet1(item: LineItem, data: Sheet1Data) -> None:
     """Map a Nota 21 line item to Sheet1Data fields.
 
+    .. deprecated::
+        Use :func:`_map_nota_item_to_sheet1` with section_name="nota_21" directly,
+        or use :func:`sections_to_sheet1data` from puco_eeff.sheets.sheet1 for
+        complete config-driven conversion.
+
     Args:
         item: LineItem from Nota 21
         data: Sheet1Data to update
     """
+    import warnings
+
+    warnings.warn(
+        "_map_nota21_item_to_sheet1() is deprecated. "
+        "Use _map_nota_item_to_sheet1(item, data, 'nota_21') or sections_to_sheet1data() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     _map_nota_item_to_sheet1(item, data, "nota_21")
 
 
 def _map_nota22_item_to_sheet1(item: LineItem, data: Sheet1Data) -> None:
     """Map a Nota 22 line item to Sheet1Data fields.
 
+    .. deprecated::
+        Use :func:`_map_nota_item_to_sheet1` with section_name="nota_22" directly,
+        or use :func:`sections_to_sheet1data` from puco_eeff.sheets.sheet1 for
+        complete config-driven conversion.
+
     Args:
         item: LineItem from Nota 22
         data: Sheet1Data to update
     """
+    import warnings
+
+    warnings.warn(
+        "_map_nota22_item_to_sheet1() is deprecated. "
+        "Use _map_nota_item_to_sheet1(item, data, 'nota_22') or sections_to_sheet1data() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     _map_nota_item_to_sheet1(item, data, "nota_22")
 
 

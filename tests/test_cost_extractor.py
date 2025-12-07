@@ -46,6 +46,9 @@ from puco_eeff.extractor.cost_extractor import (
 )
 from puco_eeff.sheets.sheet1 import (
     Sheet1Data,
+    get_ingresos_pdf_fallback_config,
+    get_section_config,
+    get_section_fallback,
     get_sheet1_section_total_mapping,
     sections_to_sheet1data,
 )
@@ -1835,10 +1838,17 @@ class TestValidateExtractionDeprecation:
             warnings.simplefilter("always")
             validate_extraction(nota_21, None, None)
 
-            assert len(w) == 1
-            assert issubclass(w[0].category, DeprecationWarning)
-            assert "deprecated" in str(w[0].message).lower()
-            assert "run_sheet1_validations" in str(w[0].message)
+            # Should have at least 1 warning for validate_extraction itself
+            # (may also have warning from _section_breakdowns_to_sheet1data)
+            deprecation_warnings = [warning for warning in w if issubclass(warning.category, DeprecationWarning)]
+            assert len(deprecation_warnings) >= 1
+
+            # Check that validate_extraction's deprecation warning is present
+            validate_extraction_warnings = [
+                warning for warning in deprecation_warnings if "run_sheet1_validations" in str(warning.message)
+            ]
+            assert len(validate_extraction_warnings) == 1
+            assert "deprecated" in str(validate_extraction_warnings[0].message).lower()
 
 
 class TestRunPdfXbrlValidations:
@@ -2210,3 +2220,89 @@ class TestConfigDrivenSectionBreakdowns:
         assert data.quarter == "IIIQ2024"
         assert data.year == 2024
         assert data.quarter_num == 3
+
+
+# =============================================================================
+# Config-Driven Accessor Tests
+# =============================================================================
+
+
+class TestGetSectionConfig:
+    """Tests for get_section_config() accessor."""
+
+    def test_returns_valid_config_for_nota_21(self) -> None:
+        """get_section_config returns valid config for nota_21."""
+        config = get_section_config("nota_21")
+
+        assert config["title"] == "Costo de Venta"
+        assert "field_mappings" in config
+        assert "fallback_section" in config
+
+    def test_returns_valid_config_for_nota_22(self) -> None:
+        """get_section_config returns valid config for nota_22."""
+        config = get_section_config("nota_22")
+
+        assert config["title"] == "Gastos de Administración y Ventas"
+        assert "field_mappings" in config
+        assert config["fallback_section"] == "nota_21"
+
+    def test_returns_valid_config_for_ingresos(self) -> None:
+        """get_section_config returns valid config for ingresos."""
+        config = get_section_config("ingresos")
+
+        assert config["title"] == "Ingresos de actividades ordinarias"
+        assert "field_mappings" in config
+        assert "pdf_fallback" in config
+
+    def test_raises_value_error_for_invalid_sheet(self) -> None:
+        """get_section_config raises ValueError for invalid sheet."""
+        with pytest.raises(ValueError, match="not supported"):
+            get_section_config("nota_21", sheet="sheet2")
+
+    def test_raises_value_error_for_invalid_section(self) -> None:
+        """get_section_config raises ValueError for invalid section."""
+        with pytest.raises(ValueError, match="not found"):
+            get_section_config("invalid_section")
+
+
+class TestGetSectionFallback:
+    """Tests for get_section_fallback() accessor."""
+
+    def test_returns_fallback_for_nota_22(self) -> None:
+        """get_section_fallback returns nota_21 for nota_22."""
+        fallback = get_section_fallback("nota_22")
+        assert fallback == "nota_21"
+
+    def test_returns_none_for_nota_21(self) -> None:
+        """get_section_fallback returns None for nota_21 (no fallback)."""
+        fallback = get_section_fallback("nota_21")
+        assert fallback is None
+
+    def test_returns_none_for_ingresos(self) -> None:
+        """get_section_fallback returns None for ingresos (no fallback)."""
+        fallback = get_section_fallback("ingresos")
+        assert fallback is None
+
+
+class TestGetIngresosPdfFallbackConfig:
+    """Tests for get_ingresos_pdf_fallback_config() accessor."""
+
+    def test_returns_min_value_threshold(self) -> None:
+        """get_ingresos_pdf_fallback_config returns min_value_threshold."""
+        config = get_ingresos_pdf_fallback_config()
+
+        assert "min_value_threshold" in config
+        assert config["min_value_threshold"] == 1000
+
+    def test_returns_search_patterns(self) -> None:
+        """get_ingresos_pdf_fallback_config returns search_patterns."""
+        config = get_ingresos_pdf_fallback_config()
+
+        assert "search_patterns" in config
+        assert len(config["search_patterns"]) > 0
+
+    def test_returns_page_type(self) -> None:
+        """get_ingresos_pdf_fallback_config returns page_type."""
+        config = get_ingresos_pdf_fallback_config()
+
+        assert config["page_type"] == "estado_de_resultados"

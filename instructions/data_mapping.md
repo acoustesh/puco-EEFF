@@ -394,6 +394,7 @@ Keyword-based PDF field matching:
   "sections": {
     "nota_21": {
       "title": "Costo de Venta",
+      "fallback_section": null,
       "search_patterns": ["21. costo", "21 costo", "nota 21"],
       "table_identifiers": {
         "unique_items": ["energía eléctrica", "servicios mineros", "fletes"],
@@ -410,20 +411,66 @@ Keyword-based PDF field matching:
     },
     "nota_22": {
       "title": "Gastos de Administración y Ventas",
+      "fallback_section": "nota_21",
       "search_patterns": ["22. gastos", "22 gastos", "nota 22"],
       "field_mappings": {
         "ga_gratificacion": {"match_keywords": ["gratificación", "gratificacion"]},
         "ga_comercializacion": {"match_keywords": ["comercialización", "comercializacion"]}
+      }
+    },
+    "ingresos": {
+      "title": "Ingresos de actividades ordinarias",
+      "fallback_section": null,
+      "source": "xbrl_preferred",
+      "pdf_fallback": {
+        "page_type": "estado_de_resultados",
+        "min_value_threshold": 1000,
+        "search_patterns": ["estados de resultados", "ingresos de actividades ordinarias"]
       }
     }
   }
 }
 ```
 
+**Section fields:**
+- `title`: Human-readable section name
+- `fallback_section`: Section to try if this section's page isn't found (null for no fallback)
+- `search_patterns`: Patterns to find section in PDF
+- `field_mappings`: Keyword rules for mapping PDF labels to fields
+- `pdf_fallback.min_value_threshold`: Minimum value to accept when extracting from PDF (avoids false positives)
+
 **Matching rules:**
 - `match_keywords`: At least one keyword must match (case-insensitive)
 - `exclude_keywords`: If any match, skip this field mapping
 - Use unique identifiers to avoid overlapping matches
+
+### Config Accessors (Python API)
+
+Access config via type-safe accessors in `puco_eeff.sheets.sheet1`:
+
+```python
+from puco_eeff.sheets.sheet1 import (
+    get_section_config,          # Full section config with validation
+    get_section_fallback,        # Fallback section name (or None)
+    get_ingresos_pdf_fallback_config,  # PDF extraction settings for ingresos
+    get_sheet1_section_spec,     # Raw section spec (no validation)
+)
+
+# Get full section config (validates required keys)
+config = get_section_config("nota_21")
+# Raises ValueError if section not found
+# Raises KeyError if required keys missing
+
+# Get fallback section
+fallback = get_section_fallback("nota_22")  # Returns "nota_21"
+fallback = get_section_fallback("nota_21")  # Returns None
+
+# Get ingresos PDF fallback config
+pdf_config = get_ingresos_pdf_fallback_config()
+threshold = pdf_config["min_value_threshold"]  # 1000
+```
+
+**Error handling:** Config accessors fail fast with clear error messages if required keys are missing. This helps catch configuration issues early rather than during extraction.
 
 ### config/sheet1/xbrl_mappings.json (XBRL Facts)
 

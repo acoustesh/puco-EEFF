@@ -4,6 +4,7 @@
   "sections": {
     "nota_21": {
       "title": "Costo de Venta",
+      "fallback_section": null,
       "search_patterns": [
         "21. costo",
         "21 costo",
@@ -77,6 +78,7 @@
 
     "nota_22": {
       "title": "Gastos de Administración y Ventas",
+      "fallback_section": "nota_21",
       "search_patterns": [
         "22. gastos",
         "22 gastos",
@@ -129,9 +131,11 @@
 
     "ingresos": {
       "title": "Ingresos de actividades ordinarias",
+      "fallback_section": null,
       "source": "xbrl_preferred",
       "pdf_fallback": {
         "page_type": "estado_de_resultados",
+        "min_value_threshold": 1000,
         "search_patterns": [
           "estados de resultados",
           "estado de resultados",

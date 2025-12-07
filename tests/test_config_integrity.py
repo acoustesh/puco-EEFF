@@ -110,7 +110,7 @@ class TestSheet1ExtractionConfig:
         """nota_21 section should have all required fields."""
         nota_21 = extraction_config["sections"]["nota_21"]
 
-        required_fields = ["title", "search_patterns", "table_identifiers", "field_mappings"]
+        required_fields = ["title", "search_patterns", "table_identifiers", "field_mappings", "fallback_section"]
         for field in required_fields:
             assert field in nota_21, f"nota_21 missing required field: {field}"
 
@@ -118,9 +118,35 @@ class TestSheet1ExtractionConfig:
         """nota_22 section should have all required fields."""
         nota_22 = extraction_config["sections"]["nota_22"]
 
-        required_fields = ["title", "search_patterns", "table_identifiers", "field_mappings"]
+        required_fields = ["title", "search_patterns", "table_identifiers", "field_mappings", "fallback_section"]
         for field in required_fields:
             assert field in nota_22, f"nota_22 missing required field: {field}"
+
+    def test_ingresos_has_required_fields(self, extraction_config: dict) -> None:
+        """ingresos section should have all required fields including pdf_fallback."""
+        ingresos = extraction_config["sections"]["ingresos"]
+
+        required_fields = ["title", "fallback_section", "pdf_fallback", "field_mappings"]
+        for field in required_fields:
+            assert field in ingresos, f"ingresos missing required field: {field}"
+
+        # pdf_fallback should have min_value_threshold
+        pdf_fallback = ingresos["pdf_fallback"]
+        assert "min_value_threshold" in pdf_fallback, "ingresos.pdf_fallback missing min_value_threshold"
+        assert isinstance(pdf_fallback["min_value_threshold"], int)
+
+    def test_fallback_section_values(self, extraction_config: dict) -> None:
+        """fallback_section should have correct values for each section."""
+        sections = extraction_config["sections"]
+
+        # nota_21 has no fallback
+        assert sections["nota_21"]["fallback_section"] is None
+
+        # nota_22 falls back to nota_21
+        assert sections["nota_22"]["fallback_section"] == "nota_21"
+
+        # ingresos has no fallback
+        assert sections["ingresos"]["fallback_section"] is None
 
     def test_table_identifiers_structure(self, extraction_config: dict) -> None:
         """table_identifiers should have unique_items and exclude_items."""

@@ -194,10 +194,37 @@ All validation routes through the unified API `run_sheet1_validations()`:
 
 **Key functions:**
 - `sections_to_sheet1data()` (sheet1.py): Config-driven converter from `SectionBreakdown` to `Sheet1Data`
-- `run_sheet1_validations()` (cost_extractor.py): Unified validation entry point
+- `run_sheet1_validations()` (cost_extractor.py): Unified validation entry point (also re-exported from sheet1.py)
 - `_run_pdf_xbrl_validations()`: Compares PDF values against XBRL
 - `_run_sum_validations()`: Verifies line items sum to totals
 - `_run_cross_validations()`: Checks accounting formulas
+
+### Config Accessors
+
+The extraction system uses config-driven accessors from `puco_eeff.sheets.sheet1`:
+
+```python
+from puco_eeff.sheets.sheet1 import (
+    get_section_config,           # Full section config with validation
+    get_section_fallback,         # Fallback section name (or None)
+    get_ingresos_pdf_fallback_config,  # PDF extraction settings for ingresos
+    run_sheet1_validations,       # Unified validation entry point (re-export)
+)
+
+# Get full section config (validates required keys)
+config = get_section_config("nota_21")
+# config["title"], config["field_mappings"], config["fallback_section"], ...
+
+# Get fallback section for page lookup
+fallback = get_section_fallback("nota_22")  # Returns "nota_21"
+fallback = get_section_fallback("nota_21")  # Returns None
+
+# Get ingresos PDF fallback settings
+pdf_config = get_ingresos_pdf_fallback_config()
+threshold = pdf_config["min_value_threshold"]  # 1000
+```
+
+**Fail-fast validation:** These accessors raise `KeyError` if required config keys are missing, catching configuration issues early.
 
 > **📋 Config: Runtime vs Metadata**
 >

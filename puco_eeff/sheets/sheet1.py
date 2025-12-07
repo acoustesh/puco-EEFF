@@ -6,19 +6,33 @@ Estados Financieros PDF (Nota 21 & 22) with optional XBRL validation.
 Key Classes:
     Sheet1Data: Dataclass containing all 20 extracted values (27-row structure).
 
-Key Functions:
+Key Config Accessors:
+    get_section_config(): Canonical accessor for section config with validation.
+    get_section_fallback(): Get fallback section for page lookup.
+    get_ingresos_pdf_fallback_config(): Get PDF extraction settings for ingresos.
     get_sheet1_fields(): Load field definitions from config.
     get_sheet1_row_mapping(): Load row mapping from config.
     get_sheet1_sum_tolerance(): Get tolerance for validation comparisons.
     get_sheet1_total_validations(): Get sum validation rules from config.
     get_sheet1_cross_validations(): Get cross-validation rules from config.
-    validate_sheet1_against_reference(): Compare against known-good values.
+
+Key Functions:
+    sections_to_sheet1data(): Convert PDF sections to Sheet1Data (canonical).
+    match_concepto_to_field(): Match PDF label to field using keywords.
+    run_sheet1_validations(): Run all validations (re-exported from cost_extractor).
+    compare_to_reference(): Compare against known-good values.
 
 Configuration files:
 - config/sheet1/fields.json: Field definitions, row mapping (27 rows)
-- config/sheet1/extraction.json: PDF extraction rules (sections, patterns)
+- config/sheet1/extraction.json: PDF extraction rules (sections, patterns, fallbacks)
 - config/sheet1/xbrl_mappings.json: XBRL fact mappings, validation rules
 - config/sheet1/reference_data.json: Known-good values for validation
+
+New in 2024-12 refactor:
+- All hard-coded values moved to extraction.json
+- fallback_section: Section to try if page not found (nota_22 → nota_21)
+- min_value_threshold: Minimum value for ingresos PDF extraction
+- Validation re-exports for unified sheet1 namespace
 """
 
 from __future__ import annotations
@@ -165,6 +179,85 @@ def get_sheet1_section_spec(section_name: str) -> dict[str, Any]:
     if section is None:
         raise ValueError(f"Section '{section_name}' not found in sheet1/extraction.json")
     return section
+
+
+def get_section_config(section_name: str, *, sheet: str = "sheet1") -> dict[str, Any]:
+    """Get full section config with validation.
+
+    This is the canonical accessor for section configuration. Validates that
+    required keys exist and raises clear errors if config is malformed.
+
+    Args:
+        section_name: Section key (e.g., "nota_21", "nota_22", "ingresos")
+        sheet: Sheet name (currently only "sheet1" supported)
+
+    Returns:
+        Full section configuration dictionary.
+
+    Raises:
+        ValueError: If section not found or sheet not supported.
+        KeyError: If required config keys are missing.
+    """
+    if sheet != "sheet1":
+        raise ValueError(f"Sheet '{sheet}' not supported. Only 'sheet1' is implemented.")
+
+    section = get_sheet1_section_spec(section_name)
+
+    # Validate required keys exist
+    required_keys = ["title", "field_mappings"]
+    missing = [k for k in required_keys if k not in section]
+    if missing:
+        raise KeyError(f"Section '{section_name}' missing required keys: {missing}")
+
+    return section
+
+
+def get_section_fallback(section_name: str) -> str | None:
+    """Get fallback section for page lookup.
+
+    Used when a section's page cannot be found - tries the fallback section's page.
+    For example, nota_22 often shares a page with nota_21.
+
+    Args:
+        section_name: Section key (e.g., "nota_22")
+
+    Returns:
+        Fallback section name, or None if no fallback configured.
+
+    Raises:
+        KeyError: If fallback_section key is missing from config.
+    """
+    section = get_section_config(section_name)
+    if "fallback_section" not in section:
+        raise KeyError(
+            f"Section '{section_name}' missing 'fallback_section' key. "
+            f"Add it to config/sheet1/extraction.json (use null for no fallback)."
+        )
+    return section.get("fallback_section")
+
+
+def get_ingresos_pdf_fallback_config() -> dict[str, Any]:
+    """Get ingresos PDF fallback extraction configuration.
+
+    Returns configuration used when extracting ingresos from PDF instead of XBRL,
+    including minimum value threshold and search patterns.
+
+    Returns:
+        Dictionary with min_value_threshold, search_patterns, etc.
+
+    Raises:
+        KeyError: If required keys missing from config.
+    """
+    section = get_section_config("ingresos")
+    pdf_fallback = section.get("pdf_fallback", {})
+
+    # Validate required keys
+    if "min_value_threshold" not in pdf_fallback:
+        raise KeyError(
+            "ingresos.pdf_fallback missing 'min_value_threshold' key. Add it to config/sheet1/extraction.json."
+        )
+
+    return pdf_fallback
 
 
 def get_sheet1_section_field_mappings(section_name: str) -> dict[str, dict[str, Any]]:
@@ -700,3 +793,85 @@ def sections_to_sheet1data(
                     data.set_value(field_name, value)
 
     return data
+
+
+# =============================================================================
+# Validation Re-exports (for sheet1 namespace convenience)
+# =============================================================================
+# These functions are implemented in cost_extractor.py but can be imported
+# from sheet1 for convenience. Use lazy imports to avoid circular dependencies.
+
+
+def run_sheet1_validations(*args, **kwargs):
+    """Run all Sheet1 validations using config-driven rules.
+
+    This is a convenience re-export from puco_eeff.extractor.cost_extractor.
+    See the original function for full documentation.
+    """
+    from puco_eeff.extractor.cost_extractor import (
+        run_sheet1_validations as _run_sheet1_validations,
+    )
+
+    return _run_sheet1_validations(*args, **kwargs)
+
+
+def get_validation_types():
+    """Get validation type classes for type annotations.
+
+    Returns:
+        Tuple of (ValidationReport, ValidationResult, SumValidationResult, CrossValidationResult)
+
+    Example:
+        ValidationReport, ValidationResult, SumValidationResult, CrossValidationResult = get_validation_types()
+    """
+    from puco_eeff.extractor.cost_extractor import (
+        CrossValidationResult,
+        SumValidationResult,
+        ValidationReport,
+        ValidationResult,
+    )
+
+    return ValidationReport, ValidationResult, SumValidationResult, CrossValidationResult
+
+
+__all__ = [
+    # Config accessors
+    "get_sheet1_fields",
+    "get_sheet1_extraction_config",
+    "get_sheet1_xbrl_mappings",
+    "get_sheet1_reference_data",
+    "get_sheet1_value_fields",
+    "get_sheet1_metadata_fields",
+    "get_sheet1_detail_fields",
+    "get_sheet1_row_mapping",
+    "get_sheet1_section_spec",
+    "get_section_config",
+    "get_section_fallback",
+    "get_ingresos_pdf_fallback_config",
+    "get_sheet1_section_field_mappings",
+    "get_sheet1_extraction_sections",
+    "get_sheet1_section_search_patterns",
+    "get_sheet1_section_table_identifiers",
+    "get_sheet1_section_expected_items",
+    "get_sheet1_xbrl_fact_mapping",
+    "get_sheet1_validation_rules",
+    "get_sheet1_sum_tolerance",
+    "get_sheet1_total_validations",
+    "get_sheet1_cross_validations",
+    "get_sheet1_result_key_mapping",
+    "get_sheet1_pdf_xbrl_validations",
+    "get_sheet1_section_total_mapping",
+    "get_sheet1_reference_values",
+    # Data classes and types
+    "Sheet1Data",
+    # Matching/conversion
+    "match_concepto_to_field",
+    "sections_to_sheet1data",
+    # Utilities
+    "print_sheet1_report",
+    "save_sheet1_data",
+    "compare_to_reference",
+    # Validation (re-exported with lazy import)
+    "run_sheet1_validations",
+    "get_validation_types",
+]

@@ -460,6 +460,8 @@ from puco_eeff.sheets.sheet1 import (
     sections_to_sheet1data,
     get_sheet1_section_total_mapping,
     match_concepto_to_field,
+    get_section_config,
+    get_section_fallback,
 )
 from puco_eeff.extractor.cost_extractor import extract_pdf_section
 
@@ -475,12 +477,21 @@ for item in section.items:
 # Check section_total_mapping config
 mapping = get_sheet1_section_total_mapping()
 print(f"Section mapping: {mapping}")
+
+# Check full section config
+config = get_section_config("nota_21")
+print(f"Section config keys: {list(config.keys())}")
+
+# Check fallback section
+fallback = get_section_fallback("nota_22")
+print(f"Nota 22 fallback: {fallback}")  # Should be "nota_21"
 ```
 
 **Possible causes:**
 1. `match_keywords` in `extraction.json` don't match the PDF text
 2. `section_total_mapping` missing the section ID
 3. Item's `ytd_actual` is None
+4. `fallback_section` misconfigured (if page lookup fails)
 
 **Solutions:**
 1. Add/update keywords in `config/sheet1/extraction.json`:
@@ -499,3 +510,65 @@ print(f"Section mapping: {mapping}")
      "new_section": "new_field_name"
    }
    ```
+3. Check `fallback_section` in `config/sheet1/extraction.json`:
+   ```json
+   "sections": {
+     "nota_22": {
+       "fallback_section": "nota_21"  // Use null for no fallback
+     }
+   }
+   ```
+
+### Config Accessor Errors
+
+The new config accessors fail fast with clear error messages:
+
+#### KeyError: Missing Config Key
+
+```
+KeyError: Section 'nota_21' missing 'fallback_section' key.
+Add it to config/sheet1/extraction.json (use null for no fallback).
+```
+
+**Solution:** Add the required key to `config/sheet1/extraction.json`:
+```json
+{
+  "sections": {
+    "nota_21": {
+      "fallback_section": null  // Explicit null for no fallback
+    }
+  }
+}
+```
+
+#### KeyError: Missing min_value_threshold
+
+```
+KeyError: ingresos.pdf_fallback missing 'min_value_threshold' key.
+Add it to config/sheet1/extraction.json.
+```
+
+**Solution:** Add threshold to ingresos section:
+```json
+{
+  "sections": {
+    "ingresos": {
+      "pdf_fallback": {
+        "min_value_threshold": 1000
+      }
+    }
+  }
+}
+```
+
+#### ValueError: Unsupported Sheet
+
+```
+ValueError: Sheet 'sheet2' not supported. Only 'sheet1' is implemented.
+```
+
+**Solution:** Currently only `sheet1` config accessors are implemented. Use direct config loading for other sheets:
+```python
+from puco_eeff.config import load_sheet_config
+config = load_sheet_config("sheet2", "extraction")
+```
