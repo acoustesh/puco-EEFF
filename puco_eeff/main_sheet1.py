@@ -1,13 +1,33 @@
 #!/usr/bin/env python3
 """Sheet1 orchestrator - download files if needed, then extract and save.
 
+This module orchestrates the complete Sheet1 extraction workflow:
+1. Download files from CMF/Pucobre if needed
+2. Extract data from PDF (Nota 21/22) and XBRL
+3. Run validation (sum checks, cross-validations, reference checks)
+4. Save extracted data to JSON
+5. Print formatted report
+
 Usage:
     python -m puco_eeff.main_sheet1 --year 2024 --quarter 2
     python -m puco_eeff.main_sheet1 --year 2024 --quarter 2 --skip-download
     python -m puco_eeff.main_sheet1 --year 2024 --quarter 2 --no-save --quiet
 
-    # Or run directly:
-    python puco_eeff/main_sheet1.py --year 2024 --quarter 2
+    # With validation options:
+    python -m puco_eeff.main_sheet1 -y 2024 -q 2 --validate-reference
+    python -m puco_eeff.main_sheet1 -y 2024 -q 2 --fail-on-sum-mismatch
+    python -m puco_eeff.main_sheet1 -y 2024 -q 2 --fail-on-reference-mismatch
+
+CLI Flags:
+    --year, -y          Year to process (required)
+    --quarter, -q       Quarter(s) to process (default: all 4)
+    --skip-download, -s Use existing files, skip download
+    --no-save           Don't save JSON output
+    --quiet             Suppress report output
+    --no-headless       Show browser window during download
+    --validate-reference Enable reference data validation (opt-in)
+    --fail-on-sum-mismatch Exit with error code if sum validations fail
+    --fail-on-reference-mismatch Exit with error code if reference validation fails
 """
 
 from __future__ import annotations
@@ -26,11 +46,16 @@ from puco_eeff.config import (  # noqa: E402, I001
     get_period_paths,
     setup_logging,
 )
-from puco_eeff.extractor.cost_extractor import extract_sheet1  # noqa: E402
+from puco_eeff.extractor.cost_extractor import (  # noqa: E402
+    ValidationReport,
+    extract_sheet1,
+    format_validation_report,
+)
 from puco_eeff.sheets.sheet1 import (  # noqa: E402
     Sheet1Data,
     print_sheet1_report,
     save_sheet1_data,
+    validate_sheet1_against_reference,
 )
 
 logger = setup_logging(__name__)
@@ -137,14 +162,18 @@ def process_sheet1(
     save: bool = True,
     verbose: bool = True,
     headless: bool = True,
-) -> Sheet1Data | None:
+    validate_reference: bool = False,
+    fail_on_sum_mismatch: bool = False,
+    fail_on_reference_mismatch: bool = False,
+) -> tuple[Sheet1Data | None, ValidationReport | None]:
     """Process Sheet1: download if needed, extract, save, and report.
 
     Main entry point for Sheet1 processing. Orchestrates:
     1. Download files if they don't exist (unless skip_download=True)
-    2. Extract Sheet1 data from PDF/XBRL
-    3. Save to JSON (if save=True)
-    4. Print report (if verbose=True)
+    2. Extract Sheet1 data from PDF/XBRL (includes sum and cross-validations)
+    3. Run reference validation (if validate_reference=True)
+    4. Save to JSON (if save=True)
+    5. Print report (if verbose=True)
 
     Args:
         year: Year of the financial statement
@@ -153,9 +182,12 @@ def process_sheet1(
         save: If True, save extracted data to JSON
         verbose: If True, print extraction report
         headless: Run browser in headless mode for downloads
+        validate_reference: If True, validate against reference data
+        fail_on_sum_mismatch: If True, return None on sum validation failure
+        fail_on_reference_mismatch: If True, return None on reference mismatch
 
     Returns:
-        Sheet1Data if extraction successful, None otherwise
+        Tuple of (Sheet1Data, ValidationReport) if successful, (None, None) otherwise
     """
     logger.info(f"Processing Sheet1 for {year} Q{quarter}")
 
@@ -163,28 +195,59 @@ def process_sheet1(
     if not skip_download:
         if not ensure_files_downloaded(year, quarter, headless=headless):
             logger.error("Cannot proceed without required files")
-            return None
+            return None, None
     else:
         if not files_exist_for_period(year, quarter):
             logger.error(f"Files not found for {year} Q{quarter} and download skipped")
-            return None
+            return None, None
 
-    # Step 2: Extract Sheet1 data
-    data = extract_sheet1(year, quarter)
+    # Step 2: Extract Sheet1 data (includes sum and cross-validations)
+    data, report = extract_sheet1(year, quarter, return_report=True)
     if data is None:
         logger.error(f"Extraction failed for {year} Q{quarter}")
-        return None
+        return None, report
 
-    # Step 3: Save to JSON
+    # Step 3: Check sum validation failures (if strict mode)
+    if fail_on_sum_mismatch and report and report.has_sum_failures():
+        logger.error("Sum validation failed and --fail-on-sum-mismatch is set")
+        return None, report
+
+    # Step 4: Reference validation (opt-in)
+    if validate_reference or fail_on_reference_mismatch:
+        ref_issues = validate_sheet1_against_reference(data)
+        if report:
+            report.reference_issues = ref_issues if ref_issues is not None else []
+
+        if ref_issues is None:
+            logger.info(f"Reference validation skipped: no verified data for {data.quarter}")
+        elif len(ref_issues) == 0:
+            logger.info(f"✓ Reference validation passed: all values match {data.quarter}")
+        else:
+            # Prominent warning for reference mismatches
+            logger.warning("=" * 60)
+            logger.warning("⚠️  REFERENCE DATA MISMATCH - Values differ from known-good data!")
+            logger.warning("=" * 60)
+            for issue in ref_issues:
+                logger.warning(f"  • {issue}")
+            logger.warning("Review extraction or update reference_data.json if values are correct.")
+            logger.warning("=" * 60)
+
+            if fail_on_reference_mismatch:
+                logger.error("Reference mismatch and --fail-on-reference-mismatch is set")
+                return None, report
+
+    # Step 5: Save to JSON
     if save:
         output_path = save_sheet1_data(data)
         logger.info(f"Saved to: {output_path}")
 
-    # Step 4: Print report
+    # Step 6: Print report
     if verbose:
         print_sheet1_report(data)
+        if report:
+            print(format_validation_report(report))
 
-    return data
+    return data, report
 
 
 # =============================================================================
@@ -203,6 +266,8 @@ Examples:
   python -m puco_eeff.main_sheet1 --year 2024 --quarter 2        # Single quarter
   python -m puco_eeff.main_sheet1 --year 2024 -q 2 3             # Multiple quarters
   python -m puco_eeff.main_sheet1 --year 2024 --skip-download
+  python -m puco_eeff.main_sheet1 --year 2024 --validate-reference  # With reference check
+  python -m puco_eeff.main_sheet1 --year 2024 --fail-on-sum-mismatch  # Strict mode for CI
         """,
     )
     parser.add_argument("--year", "-y", type=int, required=True, help="Year (e.g., 2024)")
@@ -220,20 +285,43 @@ Examples:
     parser.add_argument("--quiet", action="store_true", help="Don't print report")
     parser.add_argument("--no-headless", action="store_true", help="Show browser window during download")
 
+    # Validation flags
+    parser.add_argument(
+        "--validate-reference",
+        action="store_true",
+        help="Run reference data validation (compare to known-good values)",
+    )
+    parser.add_argument(
+        "--fail-on-sum-mismatch",
+        action="store_true",
+        help="Exit with error if sum validation fails (for CI)",
+    )
+    parser.add_argument(
+        "--fail-on-reference-mismatch",
+        action="store_true",
+        help="Exit with error if reference validation fails (implies --validate-reference)",
+    )
+
     args = parser.parse_args()
+
+    # --fail-on-reference-mismatch implies --validate-reference
+    validate_reference = args.validate_reference or args.fail_on_reference_mismatch
 
     # Process each quarter
     success_count = 0
     for quarter in args.quarter:
-        result = process_sheet1(
+        data, report = process_sheet1(
             year=args.year,
             quarter=quarter,
             skip_download=args.skip_download,
             save=not args.no_save,
             verbose=not args.quiet,
             headless=not args.no_headless,
+            validate_reference=validate_reference,
+            fail_on_sum_mismatch=args.fail_on_sum_mismatch,
+            fail_on_reference_mismatch=args.fail_on_reference_mismatch,
         )
-        if result is not None:
+        if data is not None:
             success_count += 1
 
     return 0 if success_count > 0 else 1

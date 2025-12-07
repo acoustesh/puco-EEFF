@@ -35,6 +35,33 @@
     }
   },
 
+  "result_key_mapping": {
+    "_description": "Maps Sheet1 field names to XBRL result keys used in extract_xbrl_totals()",
+    "total_costo_venta": "cost_of_sales",
+    "total_gasto_admin": "admin_expense",
+    "ingresos_ordinarios": "ingresos",
+    "gross_profit": "gross_profit",
+    "profit_loss": "profit_loss"
+  },
+
+  "pdf_xbrl_validations": [
+    {
+      "field_name": "total_costo_venta",
+      "xbrl_key": "cost_of_sales",
+      "display_name": "Total Costo de Venta"
+    },
+    {
+      "field_name": "total_gasto_admin",
+      "xbrl_key": "admin_expense",
+      "display_name": "Total Gasto Admin"
+    },
+    {
+      "field_name": "ingresos_ordinarios",
+      "xbrl_key": "ingresos",
+      "display_name": "Ingresos Ordinarios"
+    }
+  ],
+
   "validation_rules": {
     "sum_tolerance": 1,
     "_sum_tolerance_note": "Allow ±1 difference due to rounding",

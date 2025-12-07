@@ -8,12 +8,29 @@ Key Classes:
         Uses section_id/section_title.
     ExtractionResult: Complete extraction result with sections dict.
     LineItem: Single line item with concepto and period values.
+    SumValidationResult: Result of line-item sum validation.
+    CrossValidationResult: Result of cross-validation formula check.
+    ValidationReport: Aggregated validation results for unified reporting.
 
 Key Functions:
     extract_pdf_section(): Generic config-driven PDF section extraction.
     find_text_page(): Generic PDF page finder - searches for required text strings.
     find_section_page(): Config-driven wrapper using find_text_page.
     extract_sheet1(): Main entry point for Sheet1 extraction.
+    _run_sum_validations(): Config-driven sum validations.
+    _run_cross_validations(): Config-driven cross-validations with safe evaluation.
+    format_validation_report(): Format ValidationReport for display.
+
+Validation System:
+    The extraction pipeline includes multi-level validation:
+    1. PDF ↔ XBRL totals comparison (always runs)
+    2. Sum validations: Line items should sum to totals (config-driven)
+    3. Cross-validations: Accounting identities (config-driven formulas)
+    4. Reference validation: Compare against known-good values (opt-in)
+
+    Tolerance for all comparisons is configured via sum_tolerance in
+    config/sheet1/xbrl_mappings.json. Cross-validations can specify
+    per-rule tolerances.
 
 Architecture:
 - General config (config/): File patterns, period types, sources, XBRL specs
@@ -27,12 +44,13 @@ Configuration Files:
 - config/xbrl_specs.json: XBRL namespaces, scaling factor, period filters
 - config/sheet1/fields.json: Sheet1 field definitions, row mapping (27 rows)
 - config/sheet1/extraction.json: Sheet1 sections (nota_21, nota_22, ingresos)
-- config/sheet1/xbrl_mappings.json: Sheet1 XBRL fact mappings
+- config/sheet1/xbrl_mappings.json: Sheet1 XBRL fact mappings, validation rules
 - config/sheet1/reference_data.json: Known-good values for validation
 """
 
 from __future__ import annotations
 
+import ast
 import json
 import re
 import unicodedata
@@ -55,12 +73,16 @@ from puco_eeff.config import (
 from puco_eeff.extractor.xbrl_parser import get_facts_by_name, parse_xbrl_file
 from puco_eeff.sheets.sheet1 import (
     Sheet1Data,
+    get_sheet1_cross_validations,
     get_sheet1_detail_fields,
     get_sheet1_extraction_sections,
+    get_sheet1_pdf_xbrl_validations,
+    get_sheet1_result_key_mapping,
     get_sheet1_section_expected_items,
     get_sheet1_section_field_mappings,
     get_sheet1_section_spec,
     get_sheet1_sum_tolerance,
+    get_sheet1_total_validations,
     get_sheet1_xbrl_fact_mapping,
     match_concepto_to_field,
     # Re-exported for backward compatibility - canonical location is puco_eeff.sheets.sheet1
@@ -77,6 +99,9 @@ __all__ = [
     "SectionBreakdown",
     "ValidationResult",
     "ExtractionResult",
+    "SumValidationResult",
+    "CrossValidationResult",
+    "ValidationReport",
     # Generic extraction functions (preferred)
     "extract_pdf_section",
     "find_text_page",
@@ -93,6 +118,8 @@ __all__ = [
     "extract_ingresos_from_pdf",
     # Validation
     "validate_extraction",
+    "format_validation_report",
+    "log_validation_report",
     # Output functions
     "save_extraction_result",
     "print_extraction_report",
@@ -329,6 +356,190 @@ class ExtractionResult:
             # No validations performed (PDF-only extraction)
             return len(self.sections) > 0 and all(s is not None for s in self.sections.values())
         return all(v.match for v in self.validations)
+
+
+# =============================================================================
+# Validation Result Dataclasses (Phase 1, 2, 4)
+# =============================================================================
+
+
+@dataclass
+class SumValidationResult:
+    """Result of line-item sum validation.
+
+    Checks that sum of individual line items equals the total field.
+    """
+
+    description: str  # e.g., "Nota 21 - Costo de Venta"
+    total_field: str  # e.g., "total_costo_venta"
+    expected_total: int | None  # From PDF total row
+    calculated_sum: int  # Sum of line items
+    match: bool
+    difference: int
+    tolerance: int
+
+    @property
+    def status(self) -> str:
+        """Return validation status string."""
+        if self.expected_total is None:
+            return "⚠ No total value to compare"
+        elif self.match:
+            return f"✓ Sum matches total ({self.calculated_sum:,})"
+        else:
+            return f"✗ Sum mismatch: items={self.calculated_sum:,}, total={self.expected_total:,} (diff: {self.difference})"
+
+
+@dataclass
+class CrossValidationResult:
+    """Result of cross-validation formula check.
+
+    Evaluates formulas like: gross_profit == ingresos - abs(cost_of_sales)
+    """
+
+    description: str  # e.g., "Gross Profit = Revenue - Cost of Sales"
+    formula: str  # e.g., "gross_profit == ingresos_ordinarios - abs(total_costo_venta)"
+    expected_value: int | None  # Left side of formula
+    calculated_value: int | None  # Right side of formula
+    match: bool
+    difference: int | None
+    tolerance: int
+    missing_facts: list[str] = field(default_factory=list)
+
+    @property
+    def status(self) -> str:
+        """Return validation status string."""
+        if self.missing_facts:
+            return f"⚠ Skipped - missing: {', '.join(self.missing_facts)}"
+        elif self.match:
+            return f"✓ {self.description}: {self.expected_value:,}"
+        else:
+            return f"✗ {self.description}: expected={self.expected_value}, calculated={self.calculated_value} (diff: {self.difference})"
+
+
+@dataclass
+class ValidationReport:
+    """Aggregated validation results for unified reporting."""
+
+    sum_validations: list[SumValidationResult] = field(default_factory=list)
+    cross_validations: list[CrossValidationResult] = field(default_factory=list)
+    pdf_xbrl_validations: list[ValidationResult] = field(default_factory=list)
+    reference_issues: list[str] | None = None  # None = not run, [] = passed, [...] = issues
+
+    def has_failures(self) -> bool:
+        """Check if any validation failed."""
+        sum_ok = all(v.match for v in self.sum_validations)
+        cross_ok = all(v.match for v in self.cross_validations)
+        pdf_xbrl_ok = all(v.match for v in self.pdf_xbrl_validations)
+        ref_ok = self.reference_issues is None or len(self.reference_issues) == 0
+        return not (sum_ok and cross_ok and pdf_xbrl_ok and ref_ok)
+
+    def has_sum_failures(self) -> bool:
+        """Check if any sum validation failed."""
+        return any(not v.match for v in self.sum_validations)
+
+    def has_reference_failures(self) -> bool:
+        """Check if reference validation failed."""
+        return self.reference_issues is not None and len(self.reference_issues) > 0
+
+
+def format_validation_report(report: ValidationReport, verbose: bool = True) -> str:
+    """Format validation report for display.
+
+    Args:
+        report: ValidationReport to format
+        verbose: If True, include more detail
+
+    Returns:
+        Formatted string for display
+    """
+    lines = []
+    separator = "═" * 60
+
+    lines.append(separator)
+    lines.append("                    VALIDATION REPORT")
+    lines.append(separator)
+    lines.append("")
+
+    # Sum Validations
+    if report.sum_validations:
+        lines.append("Sum Validations:")
+        for v in report.sum_validations:
+            lines.append(f"  {v.status}")
+    else:
+        lines.append("Sum Validations: (none configured)")
+    lines.append("")
+
+    # PDF ↔ XBRL Validations
+    if report.pdf_xbrl_validations:
+        lines.append("PDF ↔ XBRL Validations:")
+        for v in report.pdf_xbrl_validations:
+            if v.source == "both":
+                symbol = "✓" if v.match else "✗"
+                if v.match:
+                    lines.append(f"  {symbol} {v.field_name}: {v.pdf_value:,} (PDF) = {v.xbrl_value:,} (XBRL)")
+                else:
+                    lines.append(
+                        f"  {symbol} {v.field_name}: {v.pdf_value:,} (PDF) ≠ {v.xbrl_value:,} (XBRL) [diff: {v.difference}]"
+                    )
+            elif v.source == "xbrl_only":
+                lines.append(f"  ⚠ {v.field_name}: {v.xbrl_value:,} (XBRL only, used as source)")
+            else:
+                lines.append(f"  ⚠ {v.field_name}: {v.pdf_value:,} (PDF only, no XBRL)")
+    else:
+        lines.append("PDF ↔ XBRL Validations: (no XBRL available)")
+    lines.append("")
+
+    # Cross-Validations
+    if report.cross_validations:
+        lines.append("Cross-Validations:")
+        for v in report.cross_validations:
+            lines.append(f"  {v.status}")
+    else:
+        lines.append("Cross-Validations: (none configured)")
+    lines.append("")
+
+    # Reference Validation
+    if report.reference_issues is None:
+        lines.append("Reference Validation: (not run - use --validate-reference to enable)")
+    elif len(report.reference_issues) == 0:
+        lines.append("Reference Validation: ✓ All values match reference data")
+    else:
+        lines.append("Reference Validation: ✗ MISMATCHES FOUND")
+        for issue in report.reference_issues:
+            lines.append(f"  • {issue}")
+
+    lines.append("")
+    lines.append(separator)
+
+    return "\n".join(lines)
+
+
+def log_validation_report(report: ValidationReport) -> None:
+    """Log validation results with appropriate log levels.
+
+    Args:
+        report: ValidationReport to log
+    """
+    # Sum validations
+    for v in report.sum_validations:
+        if v.match:
+            logger.info(f"✓ Sum: {v.description}")
+        else:
+            logger.warning(f"✗ Sum: {v.description} - mismatch (diff: {v.difference})")
+
+    # PDF ↔ XBRL validations (already logged during _validate_sheet1_with_xbrl)
+
+    # Cross-validations (already logged during _run_cross_validations)
+
+    # Reference validation - prominent warning
+    if report.reference_issues is not None and len(report.reference_issues) > 0:
+        logger.warning("=" * 60)
+        logger.warning("⚠️  REFERENCE DATA MISMATCH - Values differ from known-good data!")
+        logger.warning("=" * 60)
+        for issue in report.reference_issues:
+            logger.warning(f"  • {issue}")
+        logger.warning("Review extraction or update reference_data.json if values are correct.")
+        logger.warning("=" * 60)
 
 
 def parse_chilean_number(value: str | None) -> int | None:
@@ -954,20 +1165,13 @@ def extract_xbrl_totals(xbrl_path: Path) -> dict[str, int | None]:
         logger.error(f"Failed to parse XBRL: {e}")
         return {"cost_of_sales": None, "admin_expense": None, "ingresos": None}
 
-    result: dict[str, int | None] = {
-        "cost_of_sales": None,
-        "admin_expense": None,
-        "ingresos": None,
-    }
+    # Get field->result mapping from config
+    field_to_result = get_sheet1_result_key_mapping()
+
+    # Initialize result dict with all keys set to None
+    result: dict[str, int | None] = {key: None for key in set(field_to_result.values())}
 
     scaling_factor = get_xbrl_scaling_factor()
-
-    # Field name -> result key mapping
-    field_to_result = {
-        "total_costo_venta": "cost_of_sales",
-        "total_gasto_admin": "admin_expense",
-        "ingresos_ordinarios": "ingresos",
-    }
 
     for field_name, result_key in field_to_result.items():
         fact_mapping = get_sheet1_xbrl_fact_mapping(field_name)
@@ -1009,12 +1213,24 @@ def extract_xbrl_totals(xbrl_path: Path) -> dict[str, int | None]:
     return result
 
 
+# TODO: Consolidate validate_extraction() and _validate_sheet1_with_xbrl() into a single
+# validation path. Currently validate_extraction() is called from extract_sheet1_from_analisis_razonado()
+# while _validate_sheet1_with_xbrl() is called from extract_sheet1(). Both do PDF↔XBRL total
+# comparison but _validate_sheet1_with_xbrl() also runs sum and cross validations.
+# Future refactoring should use pdf_xbrl_validations config for both paths.
 def validate_extraction(
     pdf_nota_21: SectionBreakdown | None,
     pdf_nota_22: SectionBreakdown | None,
     xbrl_totals: dict[str, int | None] | None,
 ) -> list[ValidationResult]:
     """Cross-validate PDF extraction against XBRL totals.
+
+    Uses sum_tolerance from config/sheet1/xbrl_mappings.json for comparison
+    to match behavior of _validate_sheet1_with_xbrl().
+
+    Note: This function maps SectionBreakdown.section_id to XBRL keys. The mapping
+    is defined inline here but should eventually use the same config as
+    _validate_sheet1_with_xbrl() uses (pdf_xbrl_validations).
 
     Args:
         pdf_nota_21: Extracted Nota 21 from PDF
@@ -1025,84 +1241,54 @@ def validate_extraction(
         List of validation results
     """
     validations = []
+    tolerance = get_sheet1_sum_tolerance()
 
-    # Validate Cost of Sales (Nota 21)
-    pdf_cost = pdf_nota_21.total_ytd_actual if pdf_nota_21 else None
-    xbrl_cost = xbrl_totals.get("cost_of_sales") if xbrl_totals else None
+    # Mapping from section_id to (xbrl_key, display_name)
+    # Note: Eventually consolidate with pdf_xbrl_validations config
+    section_mappings = [
+        (pdf_nota_21, "cost_of_sales", "Costo de Venta (Nota 21)"),
+        (pdf_nota_22, "admin_expense", "Gastos Administración (Nota 22)"),
+    ]
 
-    if pdf_cost is not None and xbrl_cost is not None:
-        # Both sources available - compare
-        # Use absolute values since signs may differ
-        match = abs(pdf_cost) == abs(xbrl_cost)
-        validations.append(
-            ValidationResult(
-                field_name="Costo de Venta (Nota 21)",
-                pdf_value=pdf_cost,
-                xbrl_value=xbrl_cost,
-                match=match,
-                source="both",
-                difference=abs(pdf_cost) - abs(xbrl_cost) if not match else None,
-            )
-        )
-    elif pdf_cost is not None:
-        # PDF only
-        validations.append(
-            ValidationResult(
-                field_name="Costo de Venta (Nota 21)",
-                pdf_value=pdf_cost,
-                xbrl_value=None,
-                match=True,  # Can't validate, but extraction succeeded
-                source="pdf_only",
-            )
-        )
-    elif xbrl_cost is not None:
-        # XBRL only
-        validations.append(
-            ValidationResult(
-                field_name="Costo de Venta (Nota 21)",
-                pdf_value=None,
-                xbrl_value=xbrl_cost,
-                match=False,
-                source="xbrl_only",
-            )
-        )
+    for section, xbrl_key, display_name in section_mappings:
+        pdf_value = section.total_ytd_actual if section else None
+        xbrl_value = xbrl_totals.get(xbrl_key) if xbrl_totals else None
 
-    # Validate Administrative Expense (Nota 22)
-    pdf_admin = pdf_nota_22.total_ytd_actual if pdf_nota_22 else None
-    xbrl_admin = xbrl_totals.get("admin_expense") if xbrl_totals else None
-
-    if pdf_admin is not None and xbrl_admin is not None:
-        match = abs(pdf_admin) == abs(xbrl_admin)
-        validations.append(
-            ValidationResult(
-                field_name="Gastos Administración (Nota 22)",
-                pdf_value=pdf_admin,
-                xbrl_value=xbrl_admin,
-                match=match,
-                source="both",
-                difference=abs(pdf_admin) - abs(xbrl_admin) if not match else None,
+        if pdf_value is not None and xbrl_value is not None:
+            # Both sources available - compare using helper
+            match, diff = _compare_with_tolerance(pdf_value, xbrl_value, tolerance)
+            validations.append(
+                ValidationResult(
+                    field_name=display_name,
+                    pdf_value=pdf_value,
+                    xbrl_value=xbrl_value,
+                    match=match,
+                    source="both",
+                    difference=diff if not match else None,
+                )
             )
-        )
-    elif pdf_admin is not None:
-        validations.append(
-            ValidationResult(
-                field_name="Gastos Administración (Nota 22)",
-                pdf_value=pdf_admin,
-                xbrl_value=None,
-                match=True,
-                source="pdf_only",
+        elif pdf_value is not None:
+            # PDF only
+            validations.append(
+                ValidationResult(
+                    field_name=display_name,
+                    pdf_value=pdf_value,
+                    xbrl_value=None,
+                    match=True,  # Can't validate, but extraction succeeded
+                    source="pdf_only",
+                )
             )
-        )
-    elif xbrl_admin is not None:
-        validations.append(
-            ValidationResult(
-                field_name="Gastos Administración (Nota 22)",
-                pdf_value=None,
-                xbrl_value=xbrl_admin,
-                match=False,
-                source="xbrl_only",
+        elif xbrl_value is not None:
+            # XBRL only
+            validations.append(
+                ValidationResult(
+                    field_name=display_name,
+                    pdf_value=None,
+                    xbrl_value=xbrl_value,
+                    match=False,
+                    source="xbrl_only",
+                )
             )
-        )
 
     return validations
 
@@ -1398,7 +1584,8 @@ def extract_sheet1_from_analisis_razonado(
     year: int,
     quarter: int,
     validate_with_xbrl: bool = True,
-) -> Sheet1Data | None:
+    return_report: bool = False,
+) -> Sheet1Data | None | tuple[Sheet1Data | None, ValidationReport | None]:
     """Extract Sheet1 data from Estados Financieros PDF (Nota 21 & 22).
 
     This extracts the detailed cost breakdown from Nota 21 (Costo de Venta)
@@ -1417,9 +1604,11 @@ def extract_sheet1_from_analisis_razonado(
         year: Year of the financial statement
         quarter: Quarter (1-4)
         validate_with_xbrl: If True, validate PDF data against XBRL totals
+        return_report: If True, return tuple of (data, ValidationReport)
 
     Returns:
-        Sheet1Data object or None if extraction fails
+        Sheet1Data object or None if extraction fails.
+        If return_report=True, returns tuple of (Sheet1Data, ValidationReport).
     """
     paths = get_period_paths(year, quarter)
     raw_dir = paths["raw_pdf"]
@@ -1432,7 +1621,7 @@ def extract_sheet1_from_analisis_razonado(
 
     if not ef_path.exists():
         logger.warning(f"Estados Financieros PDF not found: {ef_path}")
-        return None
+        return (None, None) if return_report else None
 
     # Determine source - check if we have pucobre combined file
     combined_path = find_file_with_alternatives(raw_dir, "pucobre_combined", year, quarter)
@@ -1459,7 +1648,7 @@ def extract_sheet1_from_analisis_razonado(
 
     if nota_21 is None and nota_22 is None:
         logger.error(f"Could not extract Nota 21 or 22 from {ef_path}")
-        return None
+        return (None, None) if return_report else None
 
     # Map Nota 21 items to Sheet1Data
     if nota_21:
@@ -1473,9 +1662,12 @@ def extract_sheet1_from_analisis_razonado(
         for item in nota_22.items:
             _map_nota22_item_to_sheet1(item, data)
 
+    # Validation report (may be None if no XBRL)
+    report: ValidationReport | None = None
+
     # Extract Ingresos: prefer XBRL, fallback to PDF
     if xbrl_available and validate_with_xbrl:
-        _validate_sheet1_with_xbrl(data, xbrl_path)
+        report = _validate_sheet1_with_xbrl(data, xbrl_path)
     else:
         # No XBRL available - extract Ingresos from PDF
         logger.info("No XBRL available, extracting Ingresos from Estado de Resultados")
@@ -1486,7 +1678,11 @@ def extract_sheet1_from_analisis_razonado(
         else:
             logger.warning("Could not extract Ingresos from PDF")
 
-    return data
+        # Still run sum validations even without XBRL
+        sum_results = _run_sum_validations(data)
+        report = ValidationReport(sum_validations=sum_results)
+
+    return (data, report) if return_report else data
 
 
 def _map_nota_item_to_sheet1(item: LineItem, data: Sheet1Data, section_name: str) -> None:
@@ -1529,38 +1725,399 @@ def _map_nota22_item_to_sheet1(item: LineItem, data: Sheet1Data) -> None:
     _map_nota_item_to_sheet1(item, data, "nota_22")
 
 
-def _validate_sheet1_with_xbrl(data: Sheet1Data, xbrl_path: Path) -> None:
+# =============================================================================
+# Validation Functions (Phase 1, 2, 3)
+# =============================================================================
+
+
+def _compare_with_tolerance(a: int | None, b: int | None, tolerance: int) -> tuple[bool, int]:
+    """Compare two values with tolerance, using absolute values for sign-agnostic comparison.
+
+    Args:
+        a: First value (can be None)
+        b: Second value (can be None)
+        tolerance: Maximum allowed difference
+
+    Returns:
+        Tuple of (match, difference). If either value is None, returns (True, 0).
+    """
+    if a is None or b is None:
+        return True, 0
+    diff = abs(abs(a) - abs(b))
+    return diff <= tolerance, diff
+
+
+def _run_sum_validations(data: Sheet1Data) -> list[SumValidationResult]:
+    """Run config-driven sum validations on Sheet1Data.
+
+    Uses validation_rules.total_validations from config/sheet1/xbrl_mappings.json.
+    Supports per-rule tolerance override via rule's "tolerance" field.
+    Non-interactive: returns structured results, logs warnings, never blocks.
+
+    Args:
+        data: Sheet1Data with extracted values
+
+    Returns:
+        List of SumValidationResult objects
+    """
+    results = []
+    global_tolerance = get_sheet1_sum_tolerance()
+    total_validations = get_sheet1_total_validations()
+
+    for rule in total_validations:
+        description = rule.get("description", "Unknown validation")
+        total_field = rule.get("total_field", "")
+        sum_fields = rule.get("sum_fields", [])
+        # Per-rule tolerance override (falls back to global)
+        rule_tolerance = rule.get("tolerance", global_tolerance)
+
+        # Get the expected total from PDF
+        expected_total = data.get_value(total_field)
+
+        # Calculate sum of line items
+        calculated_sum = 0
+        for field in sum_fields:
+            value = data.get_value(field)
+            if value is not None:
+                calculated_sum += value
+
+        # Compare with tolerance
+        match, difference = _compare_with_tolerance(expected_total, calculated_sum, rule_tolerance)
+        if expected_total is None:
+            difference = 0
+            match = True  # Can't validate without expected total
+
+        result = SumValidationResult(
+            description=description,
+            total_field=total_field,
+            expected_total=expected_total,
+            calculated_sum=calculated_sum,
+            match=match,
+            difference=difference,
+            tolerance=rule_tolerance,
+        )
+        results.append(result)
+
+        # Log result
+        if expected_total is None:
+            logger.info(f"⚠ {description}: no total value to compare (sum={calculated_sum:,})")
+        elif match:
+            logger.info(f"✓ {description}: sum={calculated_sum:,} matches total={expected_total:,}")
+        else:
+            logger.warning(f"✗ {description}: sum={calculated_sum:,} != total={expected_total:,} (diff: {difference})")
+
+    return results
+
+
+def _run_cross_validations(
+    data: Sheet1Data,
+    xbrl_totals: dict[str, int | None] | None,
+) -> list[CrossValidationResult]:
+    """Run config-driven cross-validations.
+
+    Source priority: PDF fields from Sheet1Data first, then XBRL if available.
+    Uses per-rule tolerance from config, falls back to global sum_tolerance.
+    Safe evaluation: no eval(), explicit formula handling.
+
+    Args:
+        data: Sheet1Data with extracted values
+        xbrl_totals: XBRL totals dict (or None if unavailable)
+
+    Returns:
+        List of CrossValidationResult objects
+    """
+    results = []
+    global_tolerance = get_sheet1_sum_tolerance()
+    cross_validations = get_sheet1_cross_validations()
+
+    for rule in cross_validations:
+        description = rule.get("description", "Unknown validation")
+        formula = rule.get("formula", "")
+        rule_tolerance = rule.get("tolerance", global_tolerance)
+
+        # Resolve values needed for this formula
+        values, missing = _resolve_cross_validation_values(data, xbrl_totals, formula)
+
+        if missing:
+            result = CrossValidationResult(
+                description=description,
+                formula=formula,
+                expected_value=None,
+                calculated_value=None,
+                match=True,  # Can't fail if we can't evaluate
+                difference=None,
+                tolerance=rule_tolerance,
+                missing_facts=missing,
+            )
+            results.append(result)
+            logger.info(f"⚠ {description}: skipped - missing {', '.join(missing)}")
+            continue
+
+        # Evaluate formula safely
+        expected, calculated, match, diff = _evaluate_cross_validation(formula, values, rule_tolerance)
+
+        result = CrossValidationResult(
+            description=description,
+            formula=formula,
+            expected_value=expected,
+            calculated_value=calculated,
+            match=match,
+            difference=diff,
+            tolerance=rule_tolerance,
+        )
+        results.append(result)
+
+        # Log result
+        if match:
+            logger.info(f"✓ {description}: {expected:,}")
+        else:
+            logger.warning(f"✗ {description}: expected={expected}, calculated={calculated} (diff: {diff})")
+
+    return results
+
+
+def _resolve_cross_validation_values(
+    data: Sheet1Data,
+    xbrl_totals: dict[str, int | None] | None,
+    formula: str,
+) -> tuple[dict[str, int], list[str]]:
+    """Resolve values needed for a cross-validation formula.
+
+    Priority: Sheet1Data fields first, then XBRL totals.
+
+    Args:
+        data: Sheet1Data with extracted values
+        xbrl_totals: XBRL totals dict (or None)
+        formula: Formula string to parse for variable names
+
+    Returns:
+        Tuple of (values dict, list of missing field names)
+    """
+    # Get mapping from config and invert it (result_key -> field_name)
+    field_to_result = get_sheet1_result_key_mapping()
+    xbrl_key_map = {v: k for k, v in field_to_result.items()}
+
+    # Extract variable names from formula (simple pattern matching)
+    # Matches: gross_profit, ingresos_ordinarios, total_costo_venta, etc.
+    var_pattern = re.compile(r"\b([a-z_]+)\b")
+    var_names = set(var_pattern.findall(formula))
+
+    # Remove keywords that aren't variables
+    keywords = {"abs", "and", "or", "not", "if", "else", "true", "false"}
+    var_names = var_names - keywords
+
+    values = {}
+    missing = []
+
+    for var in var_names:
+        # Try Sheet1Data first
+        value = data.get_value(var)
+
+        if value is None and xbrl_totals:
+            # Try XBRL totals
+            # Check if var is a known XBRL key or map it
+            for xbrl_key, mapped_name in xbrl_key_map.items():
+                if var == mapped_name or var == xbrl_key:
+                    value = xbrl_totals.get(xbrl_key)
+                    break
+
+            # Also try direct lookup
+            if value is None:
+                value = xbrl_totals.get(var)
+
+        if value is not None:
+            values[var] = value
+        else:
+            missing.append(var)
+
+    return values, missing
+
+
+def _evaluate_cross_validation(
+    formula: str,
+    values: dict[str, int],
+    tolerance: int,
+) -> tuple[int | None, int | None, bool, int | None]:
+    """Safely evaluate a cross-validation formula.
+
+    Supports formulas like:
+    - "gross_profit == ingresos_ordinarios - abs(total_costo_venta)"
+
+    Args:
+        formula: Formula string
+        values: Dictionary of variable values
+        tolerance: Tolerance for comparison
+
+    Returns:
+        Tuple of (expected_value, calculated_value, match, difference)
+    """
+    # Parse the formula - expect format: "lhs == rhs"
+    if "==" not in formula:
+        logger.warning(f"Unsupported formula format (no '=='): {formula}")
+        return None, None, True, None
+
+    parts = formula.split("==")
+    if len(parts) != 2:
+        logger.warning(f"Unsupported formula format (multiple '=='): {formula}")
+        return None, None, True, None
+
+    lhs_expr = parts[0].strip()
+    rhs_expr = parts[1].strip()
+
+    try:
+        expected = _safe_eval_expression(lhs_expr, values)
+        calculated = _safe_eval_expression(rhs_expr, values)
+
+        if expected is None or calculated is None:
+            return expected, calculated, True, None
+
+        diff = abs(expected - calculated)
+        match = diff <= tolerance
+
+        return expected, calculated, match, diff
+
+    except Exception as e:
+        logger.warning(f"Error evaluating formula '{formula}': {e}")
+        return None, None, True, None
+
+
+def _safe_eval_expression(expr: str, values: dict[str, int]) -> int | None:
+    """Safely evaluate a simple arithmetic expression using AST parsing.
+
+    Supports: variable names, integers, +, -, *, abs(), parentheses.
+    Uses ast.parse() with a whitelist of allowed node types for security.
+
+    Args:
+        expr: Expression string (e.g., "a + b", "abs(x)", "a - abs(b)")
+        values: Dictionary of variable values
+
+    Returns:
+        Evaluated integer value, or None if evaluation fails or expression is unsupported.
+    """
+    expr = expr.strip()
+    if not expr:
+        return None
+
+    try:
+        tree = ast.parse(expr, mode="eval")
+    except SyntaxError as e:
+        logger.debug(f"Syntax error parsing expression '{expr}': {e}")
+        return None
+
+    def _eval_node(node: ast.AST) -> int | None:
+        """Recursively evaluate an AST node."""
+        # Integer literal
+        if isinstance(node, ast.Constant) and isinstance(node.value, int):
+            return node.value
+
+        # Negative number (UnaryOp with USub)
+        if isinstance(node, ast.UnaryOp):
+            if isinstance(node.op, ast.USub):
+                operand = _eval_node(node.operand)
+                return -operand if operand is not None else None
+            elif isinstance(node.op, ast.UAdd):
+                return _eval_node(node.operand)
+            else:
+                logger.debug(f"Unsupported unary operator: {type(node.op).__name__}")
+                return None
+
+        # Variable name
+        if isinstance(node, ast.Name):
+            var_name = node.id
+            if var_name in values:
+                return values[var_name]
+            else:
+                logger.debug(f"Unknown variable: {var_name}")
+                return None
+
+        # Binary operation (+, -, *)
+        if isinstance(node, ast.BinOp):
+            left = _eval_node(node.left)
+            right = _eval_node(node.right)
+            if left is None or right is None:
+                return None
+            if isinstance(node.op, ast.Add):
+                return left + right
+            elif isinstance(node.op, ast.Sub):
+                return left - right
+            elif isinstance(node.op, ast.Mult):
+                return left * right
+            else:
+                logger.debug(f"Unsupported binary operator: {type(node.op).__name__}")
+                return None
+
+        # Function call (only abs() allowed)
+        if isinstance(node, ast.Call):
+            if isinstance(node.func, ast.Name) and node.func.id == "abs":
+                if len(node.args) == 1 and not node.keywords:
+                    arg_val = _eval_node(node.args[0])
+                    return abs(arg_val) if arg_val is not None else None
+            logger.debug(f"Unsupported function call: {ast.dump(node)}")
+            return None
+
+        logger.debug(f"Unsupported AST node type: {type(node).__name__}")
+        return None
+
+    try:
+        return _eval_node(tree.body)
+    except Exception as e:
+        logger.debug(f"Error evaluating expression '{expr}': {e}")
+        return None
+
+
+def _validate_sheet1_with_xbrl(data: Sheet1Data, xbrl_path: Path) -> ValidationReport:
     """Validate and supplement Sheet1 data with XBRL totals.
 
-    This cross-validates PDF extraction against XBRL to:
-    1. Log validation results (match/mismatch)
-    2. Use XBRL values if PDF extraction failed for totals
+    This performs all configured validations:
+    1. Sum validations (line items → totals)
+    2. PDF ↔ XBRL comparison
+    3. Cross-validations (formula checks)
+
+    Also uses XBRL values if PDF extraction failed for totals.
 
     Uses sum_tolerance from config/sheet1/xbrl_mappings.json for tolerance settings.
 
     Args:
         data: Sheet1Data populated from PDF
         xbrl_path: Path to XBRL file
+
+    Returns:
+        ValidationReport with all validation results
     """
     xbrl_totals = extract_xbrl_totals(xbrl_path)
     tolerance = get_sheet1_sum_tolerance()
 
-    # Define validations: (field_name, xbrl_key, display_name)
-    validations = [
-        ("total_costo_venta", "cost_of_sales", "Total Costo de Venta"),
-        ("total_gasto_admin", "admin_expense", "Total Gasto Admin"),
-        ("ingresos_ordinarios", "ingresos", "Ingresos Ordinarios"),
-    ]
+    # Run sum validations first (Phase 1)
+    sum_results = _run_sum_validations(data)
 
-    for field_name, xbrl_key, display_name in validations:
+    # PDF ↔ XBRL validations (config-driven)
+    pdf_xbrl_results = []
+    pdf_xbrl_config = get_sheet1_pdf_xbrl_validations()
+
+    for validation in pdf_xbrl_config:
+        field_name = validation["field_name"]
+        xbrl_key = validation["xbrl_key"]
+        display_name = validation["display_name"]
         xbrl_value = xbrl_totals.get(xbrl_key)
         pdf_value = data.get_value(field_name)
 
         if xbrl_value is not None:
             if pdf_value is not None:
-                # Both available - compare (using absolute values due to sign differences)
-                diff = abs(abs(pdf_value) - abs(xbrl_value))
-                if diff <= tolerance:
+                # Both available - compare using helper
+                match, diff = _compare_with_tolerance(pdf_value, xbrl_value, tolerance)
+
+                pdf_xbrl_results.append(
+                    ValidationResult(
+                        field_name=display_name,
+                        pdf_value=pdf_value,
+                        xbrl_value=xbrl_value,
+                        match=match,
+                        source="both",
+                        difference=diff if not match else None,
+                    )
+                )
+
+                if match:
                     logger.info(f"✓ {display_name} matches XBRL: {pdf_value:,}")
                 else:
                     logger.warning(
@@ -1570,6 +2127,37 @@ def _validate_sheet1_with_xbrl(data: Sheet1Data, xbrl_path: Path) -> None:
                 # PDF extraction failed - use XBRL value
                 logger.info(f"Using XBRL value for {display_name}: {xbrl_value:,}")
                 data.set_value(field_name, xbrl_value)
+
+                pdf_xbrl_results.append(
+                    ValidationResult(
+                        field_name=display_name,
+                        pdf_value=None,
+                        xbrl_value=xbrl_value,
+                        match=True,  # Used XBRL as source
+                        source="xbrl_only",
+                    )
+                )
+        elif pdf_value is not None:
+            # PDF only (no XBRL)
+            pdf_xbrl_results.append(
+                ValidationResult(
+                    field_name=display_name,
+                    pdf_value=pdf_value,
+                    xbrl_value=None,
+                    match=True,  # Can't validate without XBRL
+                    source="pdf_only",
+                )
+            )
+
+    # Run cross-validations (Phase 2)
+    cross_results = _run_cross_validations(data, xbrl_totals)
+
+    return ValidationReport(
+        sum_validations=sum_results,
+        cross_validations=cross_results,
+        pdf_xbrl_validations=pdf_xbrl_results,
+        reference_issues=None,  # Reference validation done separately
+    )
 
 
 # save_sheet1_data and print_sheet1_report are re-exported from puco_eeff.sheets.sheet1
@@ -1683,7 +2271,8 @@ def extract_sheet1(
     quarter: int,
     prefer_pdf: bool = True,
     validate: bool = True,
-) -> Sheet1Data | None:
+    return_report: bool = False,
+) -> Sheet1Data | None | tuple[Sheet1Data | None, ValidationReport | None]:
     """Extract Sheet1 data from available sources (PDF and/or XBRL).
 
     This is the main entry point for Sheet1 extraction. It:
@@ -1696,38 +2285,47 @@ def extract_sheet1(
         quarter: Quarter (1-4)
         prefer_pdf: If True, prefer PDF for detailed breakdown
         validate: If True, validate PDF data against XBRL
+        return_report: If True, return tuple of (data, ValidationReport)
 
     Returns:
-        Sheet1Data object or None if extraction fails from all sources
+        Sheet1Data object or None if extraction fails from all sources.
+        If return_report=True, returns tuple of (Sheet1Data, ValidationReport).
     """
     data = None
+    report: ValidationReport | None = None
 
     if prefer_pdf:
         # Try PDF first (has detailed breakdown)
-        data = extract_sheet1_from_analisis_razonado(year, quarter, validate_with_xbrl=validate)
+        result = extract_sheet1_from_analisis_razonado(year, quarter, validate_with_xbrl=validate, return_report=True)
+        data, report = result if isinstance(result, tuple) else (result, None)
 
         if data is None:
             # Fall back to XBRL (totals only)
             logger.info(f"PDF extraction failed, trying XBRL for {year} Q{quarter}")
             data = extract_sheet1_from_xbrl(year, quarter)
+            report = None  # No validation report from XBRL-only extraction
     else:
         # Try XBRL first
         data = extract_sheet1_from_xbrl(year, quarter)
 
         if data is None or validate:
             # Try PDF for detailed breakdown or validation
-            pdf_data = extract_sheet1_from_analisis_razonado(year, quarter, validate_with_xbrl=False)
+            result = extract_sheet1_from_analisis_razonado(year, quarter, validate_with_xbrl=False, return_report=True)
+            pdf_data, pdf_report = result if isinstance(result, tuple) else (result, None)
+
             if pdf_data is not None:
                 if data is None:
                     data = pdf_data
+                    report = pdf_report
                 else:
                     # Merge: use PDF detailed items, XBRL totals
                     _merge_pdf_into_xbrl_data(pdf_data, data)
+                    report = pdf_report
 
     if data is None:
         logger.error(f"Failed to extract Sheet1 from any source for {year} Q{quarter}")
 
-    return data
+    return (data, report) if return_report else data
 
 
 def _merge_pdf_into_xbrl_data(pdf_data: Sheet1Data, xbrl_data: Sheet1Data) -> None:

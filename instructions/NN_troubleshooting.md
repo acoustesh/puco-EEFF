@@ -347,3 +347,101 @@ This catches:
 2. Review audit files in `audit/YYYY_QN/`
 3. Run with `headless=False` to see browser actions
 4. Test individual components in a notebook
+
+---
+
+## Validation Issues
+
+### Sum Validation Mismatch
+```
+✗ Nota 21 - Costo de Venta: sum=-126000 != total=-126202 (diff: 202)
+```
+
+**Possible causes:**
+1. Rounding differences in PDF extraction
+2. Missing line items not captured
+3. PDF parsing picked up wrong values
+
+**Solutions:**
+1. Check tolerance in `config/sheet1/xbrl_mappings.json`:
+   ```json
+   "validation_rules": {
+     "sum_tolerance": 1  // Increase if rounding issues are common
+   }
+   ```
+2. Verify all line items are being extracted:
+   ```python
+   data = extract_sheet1(2024, 2, return_report=True)
+   # Check report.sum_validations for details
+   ```
+3. Review PDF manually and check if any items were skipped
+
+### Cross-Validation Skipped
+```
+⚠ Gross Profit = Revenue - Cost of Sales: Skipped - missing: gross_profit
+```
+
+**Cause:** Required field not available in Sheet1Data or XBRL
+
+**This is often expected** - `gross_profit` is an XBRL-only fact and not stored in Sheet1Data. Cross-validations are informational only.
+
+### Reference Validation Mismatch
+```
+✗ REFERENCE DATA MISMATCH - Values differ from known-good data!
+  • total_costo_venta: expected -126,202, actual -126,200
+```
+
+**Possible causes:**
+1. Reference data is outdated
+2. PDF extraction error
+3. Tolerance too strict
+
+**Solutions:**
+1. Verify extracted value against source PDF manually
+2. If extraction is correct, update `config/sheet1/reference_data.json`:
+   ```json
+   {
+     "2024_Q2": {
+       "verified": true,
+       "values": {
+         "total_costo_venta": -126200  // Update to new correct value
+       }
+     }
+   }
+   ```
+3. If extraction is wrong, debug PDF extraction
+
+### Tolerance Configuration
+
+The validation system uses configurable tolerances:
+
+| Validation Type | Config Location | Default |
+|-----------------|-----------------|---------|
+| Sum validations | `validation_rules.sum_tolerance` | 1 |
+| Cross-validations | Per-rule `tolerance` or global `sum_tolerance` | 1 |
+| Reference validation | Uses global `sum_tolerance` | 1 |
+
+To increase tolerance:
+```json
+// config/sheet1/xbrl_mappings.json
+{
+  "validation_rules": {
+    "sum_tolerance": 5  // Allow up to 5 MUSD difference
+  }
+}
+```
+
+### CLI Validation Flags
+
+Control validation behavior from command line:
+
+```bash
+# Run with reference validation (off by default)
+python -m puco_eeff.main_sheet1 -y 2024 -q 2 --validate-reference
+
+# Exit with error if sum validations fail (for CI/CD)
+python -m puco_eeff.main_sheet1 -y 2024 -q 2 --fail-on-sum-mismatch
+
+# Exit with error if reference validation fails
+python -m puco_eeff.main_sheet1 -y 2024 -q 2 --fail-on-reference-mismatch
+```

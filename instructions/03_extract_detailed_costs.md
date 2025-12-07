@@ -37,6 +37,9 @@ python -m puco_eeff.main_sheet1 -y 2024 --no-headless          # Show browser (d
 | `--no-save` | — | No | `False` | Don't save JSON output |
 | `--quiet` | — | No | `False` | Suppress report output |
 | `--no-headless` | — | No | `False` | Show browser window (default is headless) |
+| `--validate-reference` | — | No | `False` | Enable reference data validation |
+| `--fail-on-sum-mismatch` | — | No | `False` | Exit with error code if sum validations fail |
+| `--fail-on-reference-mismatch` | — | No | `False` | Exit with error code if reference validation fails |
 
 ---
 
@@ -153,9 +156,9 @@ The extraction is **fully config-driven** with no hardcoded values:
 >
 > | Status | Config Fields |
 > |--------|---------------|
-> | **Runtime-used** | `value_fields`, `row_mapping`, `field_mappings` (match_keywords, exclude_keywords, pdf_labels), `fact_mappings` (primary, fallbacks, apply_scaling), `sum_tolerance`, `search_patterns`, `table_identifiers`, `validation.has_totales_row`, `validation.min_detail_items` |
-> | **Metadata-only / Unused** | `layout`, `expected_position`, `period_overrides.page_numbers`, `cross_validations`, `total_validations.sum_fields`, `aggregate_facts` (only 3 of 8 facts are consumed via `fact_mappings`) |
-> | **Manual validation only** | `reference_data.json` — used by `validate_sheet1_against_reference()`, not automatic |
+> | **Runtime-used** | `value_fields`, `row_mapping`, `field_mappings` (match_keywords, exclude_keywords, pdf_labels), `fact_mappings` (primary, fallbacks, apply_scaling), `sum_tolerance`, `search_patterns`, `table_identifiers`, `validation.has_totales_row`, `validation.min_detail_items`, `total_validations`, `cross_validations` |
+> | **Metadata-only / Unused** | `layout`, `expected_position`, `period_overrides.page_numbers`, `aggregate_facts` (only 3 of 8 facts are consumed via `fact_mappings`) |
+> | **Opt-in validation** | `reference_data.json` — used by `validate_sheet1_against_reference()` when `--validate-reference` flag is passed |
 
 ---
 
@@ -527,25 +530,75 @@ Known-good values for validation:
 
 ### Automatic Validation (in `extract_sheet1(validate=True)`)
 
-The extractor **only** performs PDF↔XBRL total comparison:
+The extractor performs three types of automatic validation:
 
+#### 1. PDF↔XBRL Total Comparison (always runs)
 - ✓ `total_costo_venta` (PDF) ≈ `CostOfSales` (XBRL)
 - ✓ `total_gasto_admin` (PDF) ≈ `AdministrativeExpense` (XBRL)
 - ✓ `ingresos_ordinarios` (PDF fallback) ≈ `RevenueFromContractsWithCustomers` (XBRL)
 
-Tolerance is controlled by `sum_tolerance` in `config/sheet1/xbrl_mappings.json` (default: 1).
+#### 2. Sum Validations (always runs)
+Validates that extracted totals match the sum of their line items:
+- `total_costo_venta` = Σ(cv_gastos_personal, cv_materiales, ..., cv_convenios)
+- `total_gasto_admin` = Σ(ga_gastos_personal, ga_materiales, ..., ga_otros)
 
-> **⚠️ Not automatically run:**
-> - Line-item sum validations (`total_validations.sum_fields` in config is **unused**)
-> - Cross-validations (`cross_validations` in config is **unused**)
-> - Reference data checks (manual only)
-> - `SectionBreakdown.is_valid()` exists in code but is **never invoked** in production
->
-> *Future work: These validation rules are defined in config but not yet implemented in the extraction flow.*
+Rules are config-driven via `total_validations` in `config/sheet1/xbrl_mappings.json`.
 
-### Manual Validation
+#### 3. Cross-Validations (always runs)
+Validates accounting identities across different fields:
+- `gross_profit == ingresos_ordinarios - abs(total_costo_venta)`
 
-To compare against known-good reference values:
+Rules are config-driven via `cross_validations` in `config/sheet1/xbrl_mappings.json`. Each rule can specify its own tolerance, falling back to global `sum_tolerance`.
+
+> **Note:** Cross-validations may be skipped if required fields aren't available in the extracted data (e.g., `gross_profit` is an XBRL-only fact not stored in Sheet1Data).
+
+### Tolerance Configuration
+
+All validations use tolerance-based comparison:
+- **Global tolerance:** `sum_tolerance` in `config/sheet1/xbrl_mappings.json` (default: 1)
+- **Per-rule tolerance:** Individual `cross_validations` rules can override with their own `tolerance` field
+
+### Validation Report
+
+When extraction completes, a detailed report is printed:
+
+```
+═══════════════════════════════════════════════════════════════════════════
+                         VALIDATION REPORT - IIQ2024
+═══════════════════════════════════════════════════════════════════════════
+
+── Sum Validations ────────────────────────────────────────────────────────
+✓ Nota 21 - Costo de Venta: Sum of 11 fields = -126,202 vs total = -126,202
+✓ Nota 22 - Gastos de Administración y Ventas: Sum of 6 fields = -11,632 vs total = -11,632
+
+── Cross-Validations ──────────────────────────────────────────────────────
+⊘ Gross Profit = Revenue - Cost of Sales: Skipped - missing fields: gross_profit
+
+── Reference Validation ───────────────────────────────────────────────────
+✓ All values match reference data (within tolerance of 1)
+
+═══════════════════════════════════════════════════════════════════════════
+                              SUMMARY: 2 passed, 0 failed, 1 skipped
+═══════════════════════════════════════════════════════════════════════════
+```
+
+### Reference Validation (Opt-in)
+
+Reference validation compares extracted values against known-good values stored in `config/sheet1/reference_data.json`. **It must be explicitly enabled:**
+
+**CLI:**
+```bash
+python -m puco_eeff.main_sheet1 -y 2024 -q 2 --validate-reference
+```
+
+**Python API:**
+```python
+from puco_eeff.main_sheet1 import process_sheet1
+
+data, report = process_sheet1(year=2024, quarter=2, validate_reference=True)
+```
+
+To compare against known-good reference values programmatically:
 
 ```python
 from puco_eeff.sheets.sheet1 import validate_sheet1_against_reference
@@ -559,7 +612,22 @@ else:
     print("✓ All values match reference")
 ```
 
-Reference data is stored in `config/sheet1/reference_data.json` and is **not used automatically**—you must call `validate_sheet1_against_reference()` explicitly.
+### Fail-Fast Options
+
+For CI/CD pipelines, you can make the process exit with error codes on validation failures:
+
+```bash
+# Exit with error if sum validations fail
+python -m puco_eeff.main_sheet1 -y 2024 -q 2 --fail-on-sum-mismatch
+
+# Exit with error if reference validation fails (implies --validate-reference)
+python -m puco_eeff.main_sheet1 -y 2024 -q 2 --fail-on-reference-mismatch
+
+# Both
+python -m puco_eeff.main_sheet1 -y 2024 -q 2 --fail-on-sum-mismatch --fail-on-reference-mismatch
+```
+
+Reference data is stored in `config/sheet1/reference_data.json`.
 
 ---
 

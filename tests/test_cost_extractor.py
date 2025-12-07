@@ -5,6 +5,9 @@ Tests cover:
 2. ExtractionResult and SectionBreakdown dataclasses
 3. Validation logic between PDF and XBRL
 4. Full extraction scenarios (mock-based)
+5. Sum validations (Phase 1)
+6. Cross-validations (Phase 2)
+7. Validation report formatting (Phase 4)
 """
 
 from __future__ import annotations
@@ -16,13 +19,22 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from puco_eeff.extractor.cost_extractor import (
+    CrossValidationResult,
     ExtractionResult,
     LineItem,
     SectionBreakdown,
+    SumValidationResult,
+    ValidationReport,
     ValidationResult,
+    _evaluate_cross_validation,
+    _run_cross_validations,
+    _run_sum_validations,
+    _safe_eval_expression,
+    format_validation_report,
     parse_chilean_number,
     validate_extraction,
 )
+from puco_eeff.sheets.sheet1 import Sheet1Data
 
 if TYPE_CHECKING:
     pass
@@ -363,7 +375,7 @@ class TestValidateExtraction:
         assert all(not v.match for v in validations)
 
     def test_mismatch_shows_difference(self, nota_21: SectionBreakdown) -> None:
-        """Mismatch should include difference value."""
+        """Mismatch should include difference value (absolute)."""
         nota_21.total_ytd_actual = -100000
         xbrl_totals = {
             "cost_of_sales": -110000,
@@ -374,7 +386,7 @@ class TestValidateExtraction:
 
         cost_val = next(v for v in validations if "Costo" in v.field_name)
         assert cost_val.match is False
-        assert cost_val.difference == -10000  # 100000 - 110000
+        assert cost_val.difference == 10000  # abs(100000 - 110000)
 
 
 # =============================================================================
@@ -977,3 +989,629 @@ class TestIngresosPDFFallback:
                         assert result.total_gasto_admin == -5137
                         assert result.xbrl_available is False
                         mock_ingresos.assert_called_once()
+
+
+# =============================================================================
+# Tests for SumValidationResult dataclass (Phase 1)
+# =============================================================================
+
+
+class TestSumValidationResult:
+    """Tests for the SumValidationResult dataclass."""
+
+    def test_match_status_message(self) -> None:
+        """Match should show success message."""
+        result = SumValidationResult(
+            description="Nota 21 - Costo de Venta",
+            total_field="total_costo_venta",
+            expected_total=-126202,
+            calculated_sum=-126202,
+            match=True,
+            difference=0,
+            tolerance=1,
+        )
+        assert "✓" in result.status
+        assert "-126,202" in result.status
+
+    def test_mismatch_status_message(self) -> None:
+        """Mismatch should show error with difference."""
+        result = SumValidationResult(
+            description="Nota 21 - Costo de Venta",
+            total_field="total_costo_venta",
+            expected_total=-126202,
+            calculated_sum=-126000,
+            match=False,
+            difference=202,
+            tolerance=1,
+        )
+        assert "✗" in result.status
+        assert "diff: 202" in result.status
+
+    def test_no_total_status_message(self) -> None:
+        """Missing total should show warning."""
+        result = SumValidationResult(
+            description="Nota 21 - Costo de Venta",
+            total_field="total_costo_venta",
+            expected_total=None,
+            calculated_sum=-126000,
+            match=True,
+            difference=0,
+            tolerance=1,
+        )
+        assert "⚠" in result.status
+        assert "No total" in result.status
+
+
+class TestCrossValidationResult:
+    """Tests for the CrossValidationResult dataclass."""
+
+    def test_match_status_message(self) -> None:
+        """Match should show success."""
+        result = CrossValidationResult(
+            description="Gross Profit Check",
+            formula="gross_profit == ingresos - cost",
+            expected_value=52963,
+            calculated_value=52963,
+            match=True,
+            difference=0,
+            tolerance=1,
+        )
+        assert "✓" in result.status
+        assert "52,963" in result.status
+
+    def test_mismatch_status_message(self) -> None:
+        """Mismatch should show error."""
+        result = CrossValidationResult(
+            description="Gross Profit Check",
+            formula="gross_profit == ingresos - cost",
+            expected_value=52963,
+            calculated_value=53000,
+            match=False,
+            difference=37,
+            tolerance=1,
+        )
+        assert "✗" in result.status
+        assert "diff: 37" in result.status
+
+    def test_missing_facts_status_message(self) -> None:
+        """Missing facts should show skipped message."""
+        result = CrossValidationResult(
+            description="Gross Profit Check",
+            formula="gross_profit == ingresos - cost",
+            expected_value=None,
+            calculated_value=None,
+            match=True,
+            difference=None,
+            tolerance=1,
+            missing_facts=["gross_profit"],
+        )
+        assert "⚠" in result.status
+        assert "Skipped" in result.status
+        assert "gross_profit" in result.status
+
+
+# =============================================================================
+# Tests for ValidationReport dataclass (Phase 4)
+# =============================================================================
+
+
+class TestValidationReport:
+    """Tests for the ValidationReport dataclass."""
+
+    def test_has_failures_all_pass(self) -> None:
+        """No failures when all validations pass."""
+        report = ValidationReport(
+            sum_validations=[
+                SumValidationResult("Test", "field", 100, 100, True, 0, 1),
+            ],
+            cross_validations=[],
+            pdf_xbrl_validations=[],
+            reference_issues=[],
+        )
+        assert not report.has_failures()
+
+    def test_has_failures_sum_fails(self) -> None:
+        """has_failures True when sum validation fails."""
+        report = ValidationReport(
+            sum_validations=[
+                SumValidationResult("Test", "field", 100, 200, False, 100, 1),
+            ],
+            cross_validations=[],
+            pdf_xbrl_validations=[],
+            reference_issues=[],
+        )
+        assert report.has_failures()
+
+    def test_has_failures_reference_fails(self) -> None:
+        """has_failures True when reference validation fails."""
+        report = ValidationReport(
+            sum_validations=[],
+            cross_validations=[],
+            pdf_xbrl_validations=[],
+            reference_issues=["Field X mismatch"],
+        )
+        assert report.has_failures()
+
+    def test_has_failures_reference_not_run(self) -> None:
+        """No failure when reference validation not run (None)."""
+        report = ValidationReport(
+            sum_validations=[],
+            cross_validations=[],
+            pdf_xbrl_validations=[],
+            reference_issues=None,
+        )
+        assert not report.has_failures()
+
+    def test_has_sum_failures(self) -> None:
+        """has_sum_failures detects sum validation failures."""
+        report = ValidationReport(
+            sum_validations=[
+                SumValidationResult("Test1", "f1", 100, 100, True, 0, 1),
+                SumValidationResult("Test2", "f2", 100, 200, False, 100, 1),
+            ],
+        )
+        assert report.has_sum_failures()
+
+    def test_has_reference_failures(self) -> None:
+        """has_reference_failures detects reference validation failures."""
+        report = ValidationReport(
+            reference_issues=["Mismatch found"],
+        )
+        assert report.has_reference_failures()
+
+    def test_has_reference_failures_not_run(self) -> None:
+        """has_reference_failures False when not run."""
+        report = ValidationReport(reference_issues=None)
+        assert not report.has_reference_failures()
+
+
+# =============================================================================
+# Tests for _safe_eval_expression (Phase 2)
+# =============================================================================
+
+
+class TestSafeEvalExpression:
+    """Tests for the safe expression evaluator."""
+
+    def test_simple_variable(self) -> None:
+        """Evaluate a simple variable."""
+        values = {"x": 100}
+        assert _safe_eval_expression("x", values) == 100
+
+    def test_integer_literal(self) -> None:
+        """Evaluate an integer literal."""
+        assert _safe_eval_expression("42", {}) == 42
+
+    def test_addition(self) -> None:
+        """Evaluate addition."""
+        values = {"a": 10, "b": 20}
+        assert _safe_eval_expression("a + b", values) == 30
+
+    def test_subtraction(self) -> None:
+        """Evaluate subtraction."""
+        values = {"a": 100, "b": 30}
+        assert _safe_eval_expression("a - b", values) == 70
+
+    def test_abs_function(self) -> None:
+        """Evaluate abs() function."""
+        values = {"x": -50}
+        assert _safe_eval_expression("abs(x)", values) == 50
+
+    def test_complex_expression(self) -> None:
+        """Evaluate complex expression: a - abs(b)."""
+        values = {"a": 179165, "b": -126202}
+        assert _safe_eval_expression("a - abs(b)", values) == 52963
+
+    def test_missing_variable(self) -> None:
+        """Missing variable returns None."""
+        values = {"a": 10}
+        assert _safe_eval_expression("b", values) is None
+
+    def test_unknown_expression(self) -> None:
+        """Unknown expression returns None."""
+        values = {}
+        assert _safe_eval_expression("foo(bar)", values) is None
+
+
+# =============================================================================
+# Tests for _evaluate_cross_validation (Phase 2)
+# =============================================================================
+
+
+class TestEvaluateCrossValidation:
+    """Tests for cross-validation formula evaluation."""
+
+    def test_simple_equality_match(self) -> None:
+        """Simple equality that matches."""
+        values = {"a": 100, "b": 100}
+        expected, calculated, match, diff = _evaluate_cross_validation("a == b", values, tolerance=1)
+        assert expected == 100
+        assert calculated == 100
+        assert match is True
+        assert diff == 0
+
+    def test_expression_equality_match(self) -> None:
+        """Expression equality that matches."""
+        values = {"gross_profit": 52963, "ingresos": 179165, "cost": -126202}
+        formula = "gross_profit == ingresos - abs(cost)"
+        expected, calculated, match, diff = _evaluate_cross_validation(formula, values, tolerance=1)
+        assert expected == 52963
+        assert calculated == 52963
+        assert match is True
+        assert diff == 0
+
+    def test_mismatch_within_tolerance(self) -> None:
+        """Mismatch within tolerance should pass."""
+        values = {"a": 100, "b": 101}
+        expected, calculated, match, diff = _evaluate_cross_validation("a == b", values, tolerance=5)
+        assert match is True
+        assert diff == 1
+
+    def test_mismatch_outside_tolerance(self) -> None:
+        """Mismatch outside tolerance should fail."""
+        values = {"a": 100, "b": 110}
+        expected, calculated, match, diff = _evaluate_cross_validation("a == b", values, tolerance=5)
+        assert match is False
+        assert diff == 10
+
+    def test_invalid_formula_no_equals(self) -> None:
+        """Formula without == returns None values."""
+        values = {"a": 100}
+        expected, calculated, match, diff = _evaluate_cross_validation("a + b", values, tolerance=1)
+        assert expected is None
+        assert calculated is None
+        assert match is True  # Can't fail without valid formula
+
+
+# =============================================================================
+# Tests for _run_sum_validations (Phase 1)
+# =============================================================================
+
+
+class TestRunSumValidations:
+    """Tests for config-driven sum validations."""
+
+    @pytest.fixture
+    def sample_sheet1_data(self) -> Sheet1Data:
+        """Create sample Sheet1Data for testing."""
+        data = Sheet1Data(quarter="IIQ2024", year=2024, quarter_num=2)
+        # Set Nota 21 values
+        data.cv_gastos_personal = -19721
+        data.cv_materiales = -23219
+        data.cv_energia = -9589
+        data.cv_servicios_terceros = -25063
+        data.cv_depreciacion_amort = -21694
+        data.cv_deprec_leasing = -881
+        data.cv_deprec_arrend = -1577
+        data.cv_serv_mineros = -10804
+        data.cv_fletes = -5405
+        data.cv_gastos_diferidos = -1587
+        data.cv_convenios = -6662
+        data.total_costo_venta = -126202  # Exact sum
+        # Set Nota 22 values
+        data.ga_gastos_personal = -3818
+        data.ga_materiales = -129
+        data.ga_servicios_terceros = -4239
+        data.ga_gratificacion = -639
+        data.ga_comercializacion = -2156
+        data.ga_otros = -651
+        data.total_gasto_admin = -11632  # Exact sum
+        return data
+
+    def test_all_sums_match(self, sample_sheet1_data: Sheet1Data) -> None:
+        """All sum validations pass when totals match."""
+        results = _run_sum_validations(sample_sheet1_data)
+        assert len(results) >= 2  # At least Nota 21 and Nota 22
+        assert all(r.match for r in results)
+
+    def test_sum_mismatch_detected(self, sample_sheet1_data: Sheet1Data) -> None:
+        """Mismatch detected when total doesn't match sum."""
+        sample_sheet1_data.total_costo_venta = -100000  # Wrong total
+        results = _run_sum_validations(sample_sheet1_data)
+        nota21_result = next(r for r in results if "Costo" in r.description)
+        assert nota21_result.match is False
+        assert nota21_result.difference > 0
+
+    def test_missing_total_skips_validation(self, sample_sheet1_data: Sheet1Data) -> None:
+        """Missing total should not fail validation."""
+        sample_sheet1_data.total_costo_venta = None
+        results = _run_sum_validations(sample_sheet1_data)
+        nota21_result = next(r for r in results if "Costo" in r.description)
+        assert nota21_result.match is True  # Can't fail without expected total
+        assert nota21_result.expected_total is None
+
+
+# =============================================================================
+# Tests for _run_cross_validations (Phase 2)
+# =============================================================================
+
+
+class TestRunCrossValidations:
+    """Tests for config-driven cross-validations."""
+
+    @pytest.fixture
+    def sample_sheet1_data(self) -> Sheet1Data:
+        """Create sample Sheet1Data for testing."""
+        data = Sheet1Data(quarter="IIQ2024", year=2024, quarter_num=2)
+        data.ingresos_ordinarios = 179165
+        data.total_costo_venta = -126202
+        data.total_gasto_admin = -11632
+        return data
+
+    def test_cross_validation_with_xbrl(self, sample_sheet1_data: Sheet1Data) -> None:
+        """Cross-validation with XBRL data available."""
+        xbrl_totals = {
+            "ingresos": 179165,
+            "cost_of_sales": -126202,
+            "admin_expense": -11632,
+            "gross_profit": 52963,  # 179165 - 126202
+        }
+        results = _run_cross_validations(sample_sheet1_data, xbrl_totals)
+        # Should have at least one result (may skip if formula not evaluable)
+        assert isinstance(results, list)
+
+    def test_cross_validation_without_xbrl(self, sample_sheet1_data: Sheet1Data) -> None:
+        """Cross-validation skips when XBRL unavailable."""
+        results = _run_cross_validations(sample_sheet1_data, None)
+        # Results may be skipped due to missing facts
+        assert isinstance(results, list)
+        # All should either match or have missing_facts
+        for r in results:
+            assert r.match is True or len(r.missing_facts) > 0
+
+
+# =============================================================================
+# Tests for format_validation_report (Phase 4)
+# =============================================================================
+
+
+class TestFormatValidationReport:
+    """Tests for validation report formatting."""
+
+    def test_empty_report(self) -> None:
+        """Empty report formats correctly."""
+        report = ValidationReport()
+        output = format_validation_report(report)
+        assert "VALIDATION REPORT" in output
+        assert "Sum Validations:" in output
+
+    def test_report_with_sum_validations(self) -> None:
+        """Report includes sum validation results."""
+        report = ValidationReport(
+            sum_validations=[
+                SumValidationResult(
+                    description="Nota 21",
+                    total_field="total_costo_venta",
+                    expected_total=-126202,
+                    calculated_sum=-126202,
+                    match=True,
+                    difference=0,
+                    tolerance=1,
+                ),
+            ],
+        )
+        output = format_validation_report(report)
+        assert "Sum Validations:" in output
+        assert "✓" in output
+
+    def test_report_with_reference_not_run(self) -> None:
+        """Report shows reference not run."""
+        report = ValidationReport(reference_issues=None)
+        output = format_validation_report(report)
+        assert "--validate-reference" in output
+
+    def test_report_with_reference_passed(self) -> None:
+        """Report shows reference passed."""
+        report = ValidationReport(reference_issues=[])
+        output = format_validation_report(report)
+        assert "All values match" in output
+
+    def test_report_with_reference_failed(self) -> None:
+        """Report shows reference failures."""
+        report = ValidationReport(reference_issues=["Field X: expected 100, got 200"])
+        output = format_validation_report(report)
+        assert "MISMATCHES FOUND" in output
+        assert "Field X" in output
+
+    def test_report_with_pdf_xbrl_validations(self) -> None:
+        """Report includes PDF/XBRL validation results."""
+        report = ValidationReport(
+            pdf_xbrl_validations=[
+                ValidationResult(
+                    field_name="Total Costo de Venta",
+                    pdf_value=-126202,
+                    xbrl_value=-126202,
+                    match=True,
+                    difference=0,
+                    source="both",
+                ),
+            ],
+        )
+        output = format_validation_report(report)
+        assert "PDF ↔ XBRL" in output
+        assert "-126,202" in output
+
+
+# =============================================================================
+# Tests for AST-based safe evaluator (Phase 2 improved)
+# =============================================================================
+
+
+class TestSafeEvalExpressionAST:
+    """Tests for AST-based expression evaluator edge cases."""
+
+    def test_no_spaces_addition(self) -> None:
+        """Addition without spaces: a+b (AST handles this)."""
+        values = {"a": 10, "b": 20}
+        # The old evaluator would fail on this, AST handles it
+        assert _safe_eval_expression("a+b", values) == 30
+
+    def test_no_spaces_subtraction(self) -> None:
+        """Subtraction without spaces: a-b (AST handles this)."""
+        values = {"a": 100, "b": 30}
+        assert _safe_eval_expression("a-b", values) == 70
+
+    def test_mixed_spacing(self) -> None:
+        """Mixed spacing: a +b or a- b."""
+        values = {"a": 10, "b": 5}
+        assert _safe_eval_expression("a +b", values) == 15
+        assert _safe_eval_expression("a- b", values) == 5
+
+    def test_parentheses_grouping(self) -> None:
+        """Parentheses for grouping: (a + b) - c."""
+        values = {"a": 10, "b": 20, "c": 5}
+        assert _safe_eval_expression("(a + b) - c", values) == 25
+
+    def test_nested_abs(self) -> None:
+        """Nested abs: abs(a - b)."""
+        values = {"a": 10, "b": 30}
+        assert _safe_eval_expression("abs(a - b)", values) == 20
+
+    def test_negative_literal(self) -> None:
+        """Negative integer literal: -100."""
+        values = {}
+        assert _safe_eval_expression("-100", values) == -100
+
+    def test_unary_plus(self) -> None:
+        """Unary plus: +50."""
+        values = {}
+        assert _safe_eval_expression("+50", values) == 50
+
+    def test_multiplication(self) -> None:
+        """Multiplication: a * b."""
+        values = {"a": 7, "b": 6}
+        assert _safe_eval_expression("a * b", values) == 42
+
+    def test_unsupported_division(self) -> None:
+        """Division not supported - returns None."""
+        values = {"a": 10, "b": 2}
+        # Division is not in whitelist
+        assert _safe_eval_expression("a / b", values) is None
+
+    def test_unsupported_function(self) -> None:
+        """Unknown functions return None."""
+        values = {"x": 10}
+        assert _safe_eval_expression("sqrt(x)", values) is None
+        assert _safe_eval_expression("max(x, 5)", values) is None
+
+    def test_syntax_error(self) -> None:
+        """Syntax errors return None."""
+        values = {"a": 10}
+        assert _safe_eval_expression("a + + b", values) is None
+        assert _safe_eval_expression("(a", values) is None
+
+    def test_empty_expression(self) -> None:
+        """Empty expression returns None."""
+        assert _safe_eval_expression("", {}) is None
+        assert _safe_eval_expression("   ", {}) is None
+
+
+# =============================================================================
+# Tests for _compare_with_tolerance helper (Phase 3)
+# =============================================================================
+
+
+class TestCompareWithTolerance:
+    """Tests for the tolerance comparison helper."""
+
+    def test_exact_match(self) -> None:
+        """Exact match should return True with diff 0."""
+        from puco_eeff.extractor.cost_extractor import _compare_with_tolerance
+
+        match, diff = _compare_with_tolerance(100, 100, tolerance=1)
+        assert match is True
+        assert diff == 0
+
+    def test_within_tolerance(self) -> None:
+        """Within tolerance should return True."""
+        from puco_eeff.extractor.cost_extractor import _compare_with_tolerance
+
+        match, diff = _compare_with_tolerance(100, 101, tolerance=5)
+        assert match is True
+        assert diff == 1
+
+    def test_outside_tolerance(self) -> None:
+        """Outside tolerance should return False."""
+        from puco_eeff.extractor.cost_extractor import _compare_with_tolerance
+
+        match, diff = _compare_with_tolerance(100, 110, tolerance=5)
+        assert match is False
+        assert diff == 10
+
+    def test_sign_agnostic(self) -> None:
+        """Sign should not matter (absolute comparison)."""
+        from puco_eeff.extractor.cost_extractor import _compare_with_tolerance
+
+        match, diff = _compare_with_tolerance(-100, 100, tolerance=1)
+        assert match is True
+        assert diff == 0
+
+    def test_none_values(self) -> None:
+        """None values should return True with diff 0."""
+        from puco_eeff.extractor.cost_extractor import _compare_with_tolerance
+
+        match, diff = _compare_with_tolerance(None, 100, tolerance=1)
+        assert match is True
+        assert diff == 0
+
+        match, diff = _compare_with_tolerance(100, None, tolerance=1)
+        assert match is True
+        assert diff == 0
+
+
+# =============================================================================
+# Tests for per-rule tolerance (Phase 4)
+# =============================================================================
+
+
+class TestPerRuleTolerance:
+    """Tests for per-rule tolerance in validations."""
+
+    @pytest.fixture
+    def sample_data_with_rounding(self) -> Sheet1Data:
+        """Sheet1Data with small rounding differences."""
+        data = Sheet1Data(quarter="IIQ2024", year=2024, quarter_num=2)
+        # Set values where sum differs from total by 3
+        data.cv_gastos_personal = -19721
+        data.cv_materiales = -23219
+        data.cv_energia = -9589
+        data.cv_servicios_terceros = -25063
+        data.cv_depreciacion_amort = -21694
+        data.cv_deprec_leasing = -881
+        data.cv_deprec_arrend = -1577
+        data.cv_serv_mineros = -10804
+        data.cv_fletes = -5405
+        data.cv_gastos_diferidos = -1587
+        data.cv_convenios = -6662
+        # Sum = -126202, but set total to differ by 3
+        data.total_costo_venta = -126205  # 3 more than actual sum
+        return data
+
+    def test_per_rule_tolerance_in_cross_validation(self) -> None:
+        """Cross-validation uses per-rule tolerance when specified."""
+        data = Sheet1Data(quarter="IIQ2024", year=2024, quarter_num=2)
+        data.ingresos_ordinarios = 100
+        data.total_costo_venta = -50
+
+        xbrl_totals = {"gross_profit": 52}  # Should be 50, diff is 2
+
+        # With global tolerance=1, this would fail
+        # With per-rule tolerance=5, it should pass
+        with (
+            patch("puco_eeff.extractor.cost_extractor.get_sheet1_cross_validations") as mock_cross,
+            patch("puco_eeff.extractor.cost_extractor.get_sheet1_sum_tolerance") as mock_tolerance,
+        ):
+            mock_tolerance.return_value = 1  # Global tolerance
+            mock_cross.return_value = [
+                {
+                    "description": "Test cross-validation",
+                    "formula": "gross_profit == ingresos_ordinarios - abs(total_costo_venta)",
+                    "tolerance": 5,  # Per-rule override
+                }
+            ]
+
+            results = _run_cross_validations(data, xbrl_totals)
+
+            assert len(results) == 1
+            assert results[0].match is True
+            assert results[0].tolerance == 5

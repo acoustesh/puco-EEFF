@@ -172,19 +172,96 @@ GASTOS ADM Y VENTAS (Nota 22):
 
 ## Validation Rules
 
-### Cross-Validation Between Sources
+### Automatic Validation (Always Runs)
 
-1. **XBRL vs PDF Totals**:
-   - `CostOfSales` (XBRL) = Sum of Nota 21 line items
-   - `AdministrativeExpense` (XBRL) = Sum of Nota 22 line items
+The extraction process performs three types of automatic validation:
 
-2. **Income Statement Check**:
-   - `GrossProfit` = `Revenue` - `CostOfSales`
-   - Should match within rounding tolerance (±1 MUSD)
+#### 1. PDF ↔ XBRL Total Comparison
+- `CostOfSales` (XBRL) = `total_costo_venta` (PDF)
+- `AdministrativeExpense` (XBRL) = `total_gasto_admin` (PDF)
+- `RevenueFromContractsWithCustomers` (XBRL) = `ingresos_ordinarios` (PDF fallback)
 
-3. **Line Item Sum Check**:
-   - Sum all Nota 21 items = "Totales" row
-   - Sum all Nota 22 items = "Totales" row
+#### 2. Sum Validations (Config-Driven)
+Validates that extracted totals match the sum of their line items.
+Configured in `config/sheet1/xbrl_mappings.json`:
+
+```json
+{
+  "validation_rules": {
+    "sum_tolerance": 1,
+    "total_validations": [
+      {
+        "total_field": "total_costo_venta",
+        "sum_fields": ["cv_gastos_personal", "cv_materiales", "cv_energia", "..."],
+        "description": "Nota 21 - Costo de Venta"
+      },
+      {
+        "total_field": "total_gasto_admin",
+        "sum_fields": ["ga_gastos_personal", "ga_materiales", "..."],
+        "description": "Nota 22 - Gastos de Administración y Ventas"
+      }
+    ]
+  }
+}
+```
+
+#### 3. Cross-Validations (Accounting Identities)
+Validates relationships between fields. Example:
+
+```json
+{
+  "cross_validations": [
+    {
+      "description": "Gross Profit = Revenue - Cost of Sales",
+      "formula": "gross_profit == ingresos_ordinarios - abs(total_costo_venta)",
+      "tolerance": 1
+    }
+  ]
+}
+```
+
+**Formula evaluation:** Safe parsing (no `eval()`), supports: variables, integers, `+`, `-`, `abs()`.
+
+### Opt-in Reference Validation
+
+Compare extracted values against known-good reference data. Enabled via `--validate-reference` flag:
+
+```bash
+python -m puco_eeff.main_sheet1 -y 2024 -q 2 --validate-reference
+```
+
+Reference data stored in `config/sheet1/reference_data.json`.
+
+### Validation Tolerance
+
+All validations use tolerance-based comparison (default: 1 MUSD):
+- **Global tolerance:** `validation_rules.sum_tolerance`
+- **Per-rule tolerance:** Individual cross-validation rules can override
+
+### Validation Report
+
+Running extraction produces a validation report:
+
+```
+═══════════════════════════════════════════════════════════════
+                    VALIDATION REPORT
+═══════════════════════════════════════════════════════════════
+
+Sum Validations:
+  ✓ Nota 21 - Costo de Venta: Sum matches total (-126,202)
+  ✓ Nota 22 - Gastos de Administración y Ventas: Sum matches total (-11,632)
+
+PDF ↔ XBRL Validations:
+  ✓ Total Costo de Venta: -126,202 (PDF) = -126,202 (XBRL)
+  ✓ Total Gasto Admin: -11,632 (PDF) = -11,632 (XBRL)
+
+Cross-Validations:
+  ⚠ Gross Profit = Revenue - Cost of Sales: Skipped - missing: gross_profit
+
+Reference Validation: (not run - use --validate-reference to enable)
+
+═══════════════════════════════════════════════════════════════
+```
 
 ## Period-Specific Notes
 

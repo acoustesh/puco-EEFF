@@ -14,6 +14,7 @@ Modules:
 from puco_eeff.sheets.sheet1 import (
     Sheet1Data,
     format_quarter_label,
+    get_sheet1_cross_validations,
     get_sheet1_detail_fields,
     get_sheet1_extraction_config,
     get_sheet1_extraction_sections,
@@ -27,6 +28,7 @@ from puco_eeff.sheets.sheet1 import (
     get_sheet1_section_spec,
     get_sheet1_section_table_identifiers,
     get_sheet1_sum_tolerance,
+    get_sheet1_total_validations,
     get_sheet1_validation_rules,
     get_sheet1_value_fields,
     get_sheet1_xbrl_fact_mapping,
@@ -41,6 +43,7 @@ from puco_eeff.sheets.sheet1 import (
 __all__ = [
     "Sheet1Data",
     "format_quarter_label",
+    "get_sheet1_cross_validations",
     "get_sheet1_detail_fields",
     "get_sheet1_extraction_config",
     "get_sheet1_extraction_sections",
@@ -54,6 +57,7 @@ __all__ = [
     "get_sheet1_section_spec",
     "get_sheet1_section_table_identifiers",
     "get_sheet1_sum_tolerance",
+    "get_sheet1_total_validations",
     "get_sheet1_validation_rules",
     "get_sheet1_value_fields",
     "get_sheet1_xbrl_fact_mapping",

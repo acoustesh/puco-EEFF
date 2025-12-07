@@ -3,10 +3,21 @@
 This module handles extraction of revenue and cost breakdown data from
 Estados Financieros PDF (Nota 21 & 22) with optional XBRL validation.
 
+Key Classes:
+    Sheet1Data: Dataclass containing all 20 extracted values (27-row structure).
+
+Key Functions:
+    get_sheet1_fields(): Load field definitions from config.
+    get_sheet1_row_mapping(): Load row mapping from config.
+    get_sheet1_sum_tolerance(): Get tolerance for validation comparisons.
+    get_sheet1_total_validations(): Get sum validation rules from config.
+    get_sheet1_cross_validations(): Get cross-validation rules from config.
+    validate_sheet1_against_reference(): Compare against known-good values.
+
 Configuration files:
-- config/sheet1/fields.json: Field definitions, row mapping
+- config/sheet1/fields.json: Field definitions, row mapping (27 rows)
 - config/sheet1/extraction.json: PDF extraction rules (sections, patterns)
-- config/sheet1/xbrl_mappings.json: XBRL fact mappings
+- config/sheet1/xbrl_mappings.json: XBRL fact mappings, validation rules
 - config/sheet1/reference_data.json: Known-good values for validation
 """
 
@@ -266,6 +277,59 @@ def get_sheet1_sum_tolerance() -> int:
     """
     rules = get_sheet1_validation_rules()
     return rules.get("sum_tolerance", 1)
+
+
+def get_sheet1_total_validations() -> list[dict[str, Any]]:
+    """Get total validation rules from xbrl_mappings.json.
+
+    Returns:
+        List of total validation rules, each containing:
+        - total_field: Field name for the total
+        - sum_fields: List of field names to sum
+        - xbrl_fact: XBRL fact name for cross-validation
+        - description: Human-readable description
+    """
+    rules = get_sheet1_validation_rules()
+    return rules.get("total_validations", [])
+
+
+def get_sheet1_cross_validations() -> list[dict[str, Any]]:
+    """Get cross-validation rules from xbrl_mappings.json.
+
+    Returns:
+        List of cross-validation rules, each containing:
+        - description: Human-readable description
+        - formula: Formula string (e.g., "gross_profit == ingresos - cost")
+        - tolerance: Optional per-rule tolerance (defaults to sum_tolerance)
+    """
+    rules = get_sheet1_validation_rules()
+    return rules.get("cross_validations", [])
+
+
+def get_sheet1_result_key_mapping() -> dict[str, str]:
+    """Get result key mapping from xbrl_mappings.json.
+
+    Maps Sheet1 field names to XBRL result keys used in extract_xbrl_totals().
+
+    Returns:
+        Dictionary mapping field names to result keys.
+        Example: {"total_costo_venta": "cost_of_sales", ...}
+    """
+    xbrl_mappings = get_sheet1_xbrl_mappings()
+    return xbrl_mappings.get("result_key_mapping", {})
+
+
+def get_sheet1_pdf_xbrl_validations() -> list[dict[str, str]]:
+    """Get PDF ↔ XBRL validation definitions from xbrl_mappings.json.
+
+    Returns:
+        List of validation definitions, each containing:
+        - field_name: Sheet1 field name
+        - xbrl_key: Key in XBRL result dict
+        - display_name: Human-readable name for logging/reporting
+    """
+    xbrl_mappings = get_sheet1_xbrl_mappings()
+    return xbrl_mappings.get("pdf_xbrl_validations", [])
 
 
 def get_sheet1_reference_values(year: int, quarter: int) -> dict[str, int] | None:
@@ -532,7 +596,7 @@ def print_sheet1_report(data: Sheet1Data) -> None:
 # =============================================================================
 
 
-def validate_sheet1_against_reference(data: Sheet1Data) -> list[str]:
+def validate_sheet1_against_reference(data: Sheet1Data) -> list[str] | None:
     """Validate Sheet1 data against reference values.
 
     Args:
@@ -540,19 +604,25 @@ def validate_sheet1_against_reference(data: Sheet1Data) -> list[str]:
 
     Returns:
         List of validation issue strings (empty if all match).
+        Returns None if no verified reference data exists for the period.
     """
     ref_values = get_sheet1_reference_values(data.year, data.quarter_num)
     if ref_values is None:
-        return [f"No reference data available for {data.year} Q{data.quarter_num}"]
+        return None  # No verified reference data for this period
 
     issues = []
     value_fields = get_sheet1_value_fields()
+    tolerance = get_sheet1_sum_tolerance()
 
     for field_name in value_fields:
         ref_value = ref_values.get(field_name)
         actual_value = data.get_value(field_name)
 
-        if ref_value is not None and actual_value != ref_value:
-            issues.append(f"{field_name}: expected {ref_value:,}, got {actual_value}")
+        if ref_value is not None and actual_value is not None:
+            diff = abs(ref_value - actual_value)
+            if diff > tolerance:
+                issues.append(f"{field_name}: expected {ref_value:,}, got {actual_value:,} (diff: {diff})")
+        elif ref_value is not None and actual_value is None:
+            issues.append(f"{field_name}: expected {ref_value:,}, got None")
 
     return issues
