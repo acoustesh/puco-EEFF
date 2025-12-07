@@ -5,13 +5,20 @@ Tests cover:
 2. ExtractionResult and SectionBreakdown dataclasses
 3. Validation logic between PDF and XBRL
 4. Full extraction scenarios (mock-based)
-5. Sum validations (Phase 1)
-6. Cross-validations (Phase 2)
-7. Validation report formatting (Phase 4)
+5. Sum validations (line items → totals)
+6. Cross-validations (accounting formula checks)
+7. Validation report formatting
+8. Unified validation API (run_sheet1_validations)
+9. Backward compatibility (validate_extraction deprecation)
+10. PDF↔XBRL validation helper (_run_pdf_xbrl_validations)
+11. Config-driven section conversion (sections_to_sheet1data)
+12. ExtractionResult.validation_report field
+13. Config-driven _section_breakdowns_to_sheet1data
 """
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
@@ -28,13 +35,20 @@ from puco_eeff.extractor.cost_extractor import (
     ValidationResult,
     _evaluate_cross_validation,
     _run_cross_validations,
+    _run_pdf_xbrl_validations,
     _run_sum_validations,
     _safe_eval_expression,
+    _section_breakdowns_to_sheet1data,
     format_validation_report,
     parse_chilean_number,
+    run_sheet1_validations,
     validate_extraction,
 )
-from puco_eeff.sheets.sheet1 import Sheet1Data
+from puco_eeff.sheets.sheet1 import (
+    Sheet1Data,
+    get_sheet1_section_total_mapping,
+    sections_to_sheet1data,
+)
 
 if TYPE_CHECKING:
     pass
@@ -307,12 +321,13 @@ class TestExtractionResult:
 
 
 # =============================================================================
-# Tests for validate_extraction function
+# Tests for validate_extraction function (Deprecated)
 # =============================================================================
 
 
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 class TestValidateExtraction:
-    """Tests for the validate_extraction function."""
+    """Tests for the validate_extraction function (deprecated)."""
 
     @pytest.fixture
     def nota_21(self) -> SectionBreakdown:
@@ -362,7 +377,7 @@ class TestValidateExtraction:
         assert all(v.match for v in validations)  # Can't fail if no XBRL
 
     def test_xbrl_only_pdf_failed(self) -> None:
-        """XBRL-only when PDF extraction failed."""
+        """XBRL-only when PDF extraction failed - XBRL used as source."""
         xbrl_totals = {
             "cost_of_sales": -170862,
             "admin_expense": -17363,
@@ -372,7 +387,8 @@ class TestValidateExtraction:
 
         assert len(validations) == 2
         assert all(v.source == "xbrl_only" for v in validations)
-        assert all(not v.match for v in validations)
+        # match=True because XBRL was successfully used as source (not a validation failure)
+        assert all(v.match for v in validations)
 
     def test_mismatch_shows_difference(self, nota_21: SectionBreakdown) -> None:
         """Mismatch should include difference value (absolute)."""
@@ -1615,3 +1631,582 @@ class TestPerRuleTolerance:
             assert len(results) == 1
             assert results[0].match is True
             assert results[0].tolerance == 5
+
+
+# =============================================================================
+# Tests for unified validation API (run_sheet1_validations)
+# =============================================================================
+
+
+class TestRunSheetValidations:
+    """Tests for the unified run_sheet1_validations function."""
+
+    @pytest.fixture
+    def sample_sheet1_data(self) -> Sheet1Data:
+        """Create sample Sheet1Data for testing."""
+        data = Sheet1Data(quarter="IIQ2024", year=2024, quarter_num=2)
+        data.ingresos_ordinarios = 179165
+        # Nota 21 values
+        data.cv_gastos_personal = -19721
+        data.cv_materiales = -23219
+        data.cv_energia = -9589
+        data.cv_servicios_terceros = -25063
+        data.cv_depreciacion_amort = -21694
+        data.cv_deprec_leasing = -881
+        data.cv_deprec_arrend = -1577
+        data.cv_serv_mineros = -10804
+        data.cv_fletes = -5405
+        data.cv_gastos_diferidos = -1587
+        data.cv_convenios = -6662
+        data.total_costo_venta = -126202
+        # Nota 22 values
+        data.ga_gastos_personal = -3818
+        data.ga_materiales = -129
+        data.ga_servicios_terceros = -4239
+        data.ga_gratificacion = -639
+        data.ga_comercializacion = -2156
+        data.ga_otros = -651
+        data.total_gasto_admin = -11632
+        return data
+
+    @pytest.fixture
+    def sample_xbrl_totals(self) -> dict[str, int | None]:
+        """Sample XBRL totals matching the PDF data."""
+        return {
+            "ingresos": 179165,
+            "cost_of_sales": -126202,
+            "admin_expense": -11632,
+            "gross_profit": 52963,
+        }
+
+    def test_all_validations_enabled(
+        self, sample_sheet1_data: Sheet1Data, sample_xbrl_totals: dict[str, int | None]
+    ) -> None:
+        """Run all validations with both sources matching."""
+        report = run_sheet1_validations(sample_sheet1_data, sample_xbrl_totals)
+
+        assert isinstance(report, ValidationReport)
+        assert len(report.sum_validations) >= 2  # At least Nota 21 and 22
+        assert len(report.pdf_xbrl_validations) >= 2
+        assert not report.has_failures()
+
+    def test_sum_validations_only(self, sample_sheet1_data: Sheet1Data) -> None:
+        """Run only sum validations (no XBRL)."""
+        report = run_sheet1_validations(
+            sample_sheet1_data,
+            None,
+            run_sum_validations=True,
+            run_pdf_xbrl_validations=False,
+            run_cross_validations=False,
+        )
+
+        assert len(report.sum_validations) >= 2
+        assert len(report.pdf_xbrl_validations) == 0
+        assert len(report.cross_validations) == 0
+
+    def test_pdf_xbrl_validations_only(
+        self, sample_sheet1_data: Sheet1Data, sample_xbrl_totals: dict[str, int | None]
+    ) -> None:
+        """Run only PDF↔XBRL validations."""
+        report = run_sheet1_validations(
+            sample_sheet1_data,
+            sample_xbrl_totals,
+            run_sum_validations=False,
+            run_pdf_xbrl_validations=True,
+            run_cross_validations=False,
+        )
+
+        assert len(report.sum_validations) == 0
+        assert len(report.pdf_xbrl_validations) >= 2
+        assert len(report.cross_validations) == 0
+
+    def test_xbrl_fallback_enabled(self) -> None:
+        """XBRL fallback sets missing PDF values."""
+        data = Sheet1Data(quarter="IIQ2024", year=2024, quarter_num=2)
+        data.total_costo_venta = -100000
+        # ingresos_ordinarios is None
+
+        xbrl_totals = {
+            "ingresos": 200000,
+            "cost_of_sales": -100000,
+            "admin_expense": -20000,
+        }
+
+        report = run_sheet1_validations(
+            data,
+            xbrl_totals,
+            run_sum_validations=False,
+            run_pdf_xbrl_validations=True,
+            run_cross_validations=False,
+            use_xbrl_fallback=True,
+        )
+
+        # XBRL value should have been set on data
+        assert data.ingresos_ordinarios == 200000
+
+    def test_xbrl_fallback_disabled(self) -> None:
+        """XBRL fallback disabled does not modify data."""
+        data = Sheet1Data(quarter="IIQ2024", year=2024, quarter_num=2)
+        data.total_costo_venta = -100000
+        # ingresos_ordinarios is None
+
+        xbrl_totals = {
+            "ingresos": 200000,
+            "cost_of_sales": -100000,
+        }
+
+        report = run_sheet1_validations(
+            data,
+            xbrl_totals,
+            run_sum_validations=False,
+            run_pdf_xbrl_validations=True,
+            run_cross_validations=False,
+            use_xbrl_fallback=False,
+        )
+
+        # Data should not be modified
+        assert data.ingresos_ordinarios is None
+
+    def test_pdf_only_no_xbrl(self, sample_sheet1_data: Sheet1Data) -> None:
+        """PDF-only validation when XBRL unavailable."""
+        report = run_sheet1_validations(sample_sheet1_data, None)
+
+        # Sum validations should still run
+        assert len(report.sum_validations) >= 2
+        # PDF↔XBRL results should be empty or all pdf_only
+        for v in report.pdf_xbrl_validations:
+            assert v.source == "pdf_only"
+
+
+class TestSectionBreakdownsToSheet1Data:
+    """Tests for _section_breakdowns_to_sheet1data helper."""
+
+    def test_converts_nota_21_total(self) -> None:
+        """Converts Nota 21 total to Sheet1Data."""
+        nota_21 = SectionBreakdown(section_id="nota_21", section_title="Costo de Venta")
+        nota_21.total_ytd_actual = -126202
+
+        data = _section_breakdowns_to_sheet1data(nota_21, None, 2024, 2)
+
+        assert data.total_costo_venta == -126202
+        assert data.total_gasto_admin is None
+        assert data.year == 2024
+        assert data.quarter_num == 2
+
+    def test_converts_nota_22_total(self) -> None:
+        """Converts Nota 22 total to Sheet1Data."""
+        nota_22 = SectionBreakdown(section_id="nota_22", section_title="Gastos Admin")
+        nota_22.total_ytd_actual = -11632
+
+        data = _section_breakdowns_to_sheet1data(None, nota_22, 2024, 2)
+
+        assert data.total_costo_venta is None
+        assert data.total_gasto_admin == -11632
+
+    def test_converts_both_notas(self) -> None:
+        """Converts both Notas to Sheet1Data."""
+        nota_21 = SectionBreakdown(section_id="nota_21", section_title="Costo de Venta")
+        nota_21.total_ytd_actual = -126202
+        nota_22 = SectionBreakdown(section_id="nota_22", section_title="Gastos Admin")
+        nota_22.total_ytd_actual = -11632
+
+        data = _section_breakdowns_to_sheet1data(nota_21, nota_22, 2024, 2)
+
+        assert data.total_costo_venta == -126202
+        assert data.total_gasto_admin == -11632
+
+    def test_handles_none_inputs(self) -> None:
+        """Handles None inputs gracefully."""
+        data = _section_breakdowns_to_sheet1data(None, None, 0, 0)
+
+        assert data.total_costo_venta is None
+        assert data.total_gasto_admin is None
+
+
+class TestValidateExtractionDeprecation:
+    """Tests for validate_extraction deprecation warning."""
+
+    def test_emits_deprecation_warning(self) -> None:
+        """validate_extraction emits DeprecationWarning."""
+        nota_21 = SectionBreakdown(section_id="nota_21", section_title="Costo de Venta")
+        nota_21.total_ytd_actual = -100000
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            validate_extraction(nota_21, None, None)
+
+            assert len(w) == 1
+            assert issubclass(w[0].category, DeprecationWarning)
+            assert "deprecated" in str(w[0].message).lower()
+            assert "run_sheet1_validations" in str(w[0].message)
+
+
+class TestRunPdfXbrlValidations:
+    """Tests for _run_pdf_xbrl_validations helper."""
+
+    @pytest.fixture
+    def sample_data(self) -> Sheet1Data:
+        """Sample Sheet1Data for testing."""
+        data = Sheet1Data(quarter="IIQ2024", year=2024, quarter_num=2)
+        data.total_costo_venta = -126202
+        data.total_gasto_admin = -11632
+        data.ingresos_ordinarios = 179165
+        return data
+
+    def test_both_sources_match(self, sample_data: Sheet1Data) -> None:
+        """Both PDF and XBRL values match."""
+        xbrl_totals = {
+            "cost_of_sales": -126202,
+            "admin_expense": -11632,
+            "ingresos": 179165,
+        }
+
+        results = _run_pdf_xbrl_validations(sample_data, xbrl_totals, use_fallback=False)
+
+        assert len(results) >= 2
+        assert all(r.match for r in results if r.source == "both")
+
+    def test_pdf_only_when_no_xbrl(self, sample_data: Sheet1Data) -> None:
+        """Returns pdf_only results when no XBRL available."""
+        results = _run_pdf_xbrl_validations(sample_data, None, use_fallback=False)
+
+        assert len(results) >= 2
+        assert all(r.source == "pdf_only" for r in results)
+        assert all(r.match for r in results)
+
+    def test_xbrl_only_with_fallback(self) -> None:
+        """Uses XBRL value when PDF missing and fallback enabled."""
+        data = Sheet1Data(quarter="IIQ2024", year=2024, quarter_num=2)
+        # No ingresos_ordinarios set
+
+        xbrl_totals = {
+            "ingresos": 200000,
+            "cost_of_sales": None,
+            "admin_expense": None,
+        }
+
+        results = _run_pdf_xbrl_validations(data, xbrl_totals, use_fallback=True)
+
+        # Should have set ingresos on data
+        assert data.ingresos_ordinarios == 200000
+
+        # Result should be xbrl_only
+        ingresos_result = next((r for r in results if "Ingresos" in r.field_name), None)
+        assert ingresos_result is not None
+        assert ingresos_result.source == "xbrl_only"
+
+
+# =============================================================================
+# Tests for sections_to_sheet1data (config-driven converter in sheet1.py)
+# =============================================================================
+
+
+class TestSectionsToSheet1Data:
+    """Tests for sections_to_sheet1data helper in sheet1.py."""
+
+    def test_converts_nota_21_total(self) -> None:
+        """Converts Nota 21 section to Sheet1Data total_costo_venta."""
+        nota_21 = SectionBreakdown(section_id="nota_21", section_title="Costo de Venta")
+        nota_21.total_ytd_actual = -126202
+        sections = {"nota_21": nota_21}
+
+        data = sections_to_sheet1data(sections, 2024, 2)
+
+        assert data.total_costo_venta == -126202
+        assert data.total_gasto_admin is None
+        assert data.year == 2024
+        assert data.quarter_num == 2
+        assert data.quarter == "IIQ2024"  # Roman numeral format
+
+    def test_converts_nota_22_total(self) -> None:
+        """Converts Nota 22 section to Sheet1Data total_gasto_admin."""
+        nota_22 = SectionBreakdown(section_id="nota_22", section_title="Gastos Admin")
+        nota_22.total_ytd_actual = -11632
+        sections = {"nota_22": nota_22}
+
+        data = sections_to_sheet1data(sections, 2024, 2)
+
+        assert data.total_costo_venta is None
+        assert data.total_gasto_admin == -11632
+
+    def test_converts_both_sections(self) -> None:
+        """Converts both Notas to Sheet1Data."""
+        nota_21 = SectionBreakdown(section_id="nota_21", section_title="Costo de Venta")
+        nota_21.total_ytd_actual = -126202
+        nota_22 = SectionBreakdown(section_id="nota_22", section_title="Gastos Admin")
+        nota_22.total_ytd_actual = -11632
+        sections = {"nota_21": nota_21, "nota_22": nota_22}
+
+        data = sections_to_sheet1data(sections, 2024, 2)
+
+        assert data.total_costo_venta == -126202
+        assert data.total_gasto_admin == -11632
+        assert data.year == 2024
+        assert data.quarter_num == 2
+
+    def test_handles_empty_sections(self) -> None:
+        """Handles empty sections dict gracefully."""
+        data = sections_to_sheet1data({}, 2024, 1)
+
+        assert data.total_costo_venta is None
+        assert data.total_gasto_admin is None
+        assert data.year == 2024
+        assert data.quarter_num == 1
+
+    def test_converts_line_items_to_detail_fields(self) -> None:
+        """Converts line items from sections to detail fields in Sheet1Data."""
+        nota_21 = SectionBreakdown(section_id="nota_21", section_title="Costo de Venta")
+        nota_21.total_ytd_actual = -50000
+        nota_21.items = [
+            LineItem(concepto="Gastos en personal", ytd_actual=-20000),
+            LineItem(concepto="Materiales y repuestos", ytd_actual=-15000),
+            LineItem(concepto="Energía eléctrica", ytd_actual=-10000),
+        ]
+        sections = {"nota_21": nota_21}
+
+        data = sections_to_sheet1data(sections, 2024, 3)
+
+        # Check total and detail fields are populated
+        assert data.total_costo_venta == -50000
+        assert data.cv_gastos_personal == -20000
+        assert data.cv_materiales == -15000
+        assert data.cv_energia == -10000
+
+    def test_converts_nota_22_line_items(self) -> None:
+        """Converts Nota 22 line items to gasto_admin detail fields."""
+        nota_22 = SectionBreakdown(section_id="nota_22", section_title="Gastos Admin")
+        nota_22.total_ytd_actual = -8000
+        nota_22.items = [
+            LineItem(concepto="Gastos en personal", ytd_actual=-3000),
+            LineItem(concepto="Servicios de terceros", ytd_actual=-2500),
+            LineItem(concepto="Gastos comercializacion", ytd_actual=-2500),
+        ]
+        sections = {"nota_22": nota_22}
+
+        data = sections_to_sheet1data(sections, 2024, 4)
+
+        assert data.total_gasto_admin == -8000
+        assert data.ga_gastos_personal == -3000
+        assert data.ga_servicios_terceros == -2500
+        assert data.ga_comercializacion == -2500
+
+    def test_skips_items_without_value(self) -> None:
+        """Skips line items that have None ytd_actual."""
+        nota_21 = SectionBreakdown(section_id="nota_21", section_title="Costo de Venta")
+        nota_21.total_ytd_actual = -20000
+        nota_21.items = [
+            LineItem(concepto="Gastos en personal", ytd_actual=-20000),
+            LineItem(concepto="Materiales y repuestos", ytd_actual=None),  # Should be skipped
+        ]
+        sections = {"nota_21": nota_21}
+
+        data = sections_to_sheet1data(sections, 2024, 1)
+
+        assert data.cv_gastos_personal == -20000
+        assert data.cv_materiales is None  # Not set because value was None
+
+    def test_uses_config_mapping(self) -> None:
+        """Verifies that section_total_mapping config is used."""
+        mapping = get_sheet1_section_total_mapping()
+
+        # Verify config structure
+        assert "nota_21" in mapping
+        assert "nota_22" in mapping
+        assert mapping["nota_21"] == "total_costo_venta"
+        assert mapping["nota_22"] == "total_gasto_admin"
+
+    def test_ignores_unknown_sections(self) -> None:
+        """Unknown section IDs are silently ignored."""
+        unknown = SectionBreakdown(section_id="nota_99", section_title="Unknown")
+        unknown.total_ytd_actual = -9999
+        sections = {"nota_99": unknown}
+
+        data = sections_to_sheet1data(sections, 2024, 1)
+
+        # Should not raise, just ignore the unknown section
+        assert data.total_costo_venta is None
+        assert data.total_gasto_admin is None
+
+
+# =============================================================================
+# Tests for ExtractionResult.validation_report field
+# =============================================================================
+
+
+class TestExtractionResultValidationReport:
+    """Tests for the validation_report field on ExtractionResult."""
+
+    @patch("puco_eeff.extractor.cost_extractor.get_period_paths")
+    @patch("puco_eeff.extractor.cost_extractor.extract_pdf_section")
+    @patch("puco_eeff.extractor.cost_extractor.extract_xbrl_totals")
+    def test_validation_report_populated(
+        self,
+        mock_xbrl: MagicMock,
+        mock_extract_pdf_section: MagicMock,
+        mock_paths_fn: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        """extract_detailed_costs populates validation_report field."""
+        from puco_eeff.extractor.cost_extractor import extract_detailed_costs
+
+        # Setup paths
+        raw_pdf = tmp_path / "raw" / "pdf"
+        raw_pdf.mkdir(parents=True)
+        raw_xbrl = tmp_path / "raw" / "xbrl"
+        raw_xbrl.mkdir(parents=True)
+        processed = tmp_path / "processed"
+        processed.mkdir(parents=True)
+
+        mock_paths_fn.return_value = {
+            "raw_pdf": raw_pdf,
+            "raw_xbrl": raw_xbrl,
+            "processed": processed,
+            "audit": tmp_path / "audit",
+        }
+
+        # Create PDF and XBRL files
+        (raw_pdf / "estados_financieros_2024_Q2.pdf").write_text("pdf")
+        (raw_xbrl / "estados_financieros_2024_Q2.xbrl").write_text("xbrl")
+
+        # Mock section extraction
+        def extract_section_side_effect(path, section_name):
+            if section_name == "nota_21":
+                breakdown = SectionBreakdown(section_id="nota_21", section_title="Costo")
+                breakdown.total_ytd_actual = -100000
+                return breakdown
+            elif section_name == "nota_22":
+                breakdown = SectionBreakdown(section_id="nota_22", section_title="Admin")
+                breakdown.total_ytd_actual = -20000
+                return breakdown
+            return None
+
+        mock_extract_pdf_section.side_effect = extract_section_side_effect
+        mock_xbrl.return_value = {
+            "cost_of_sales": -100000,
+            "admin_expense": -20000,
+        }
+
+        # Run extraction
+        result = extract_detailed_costs(2024, 2)
+
+        # Verify validation_report is populated
+        assert result.validation_report is not None
+        assert isinstance(result.validation_report, ValidationReport)
+        assert result.validation_report.pdf_xbrl_validations is not None
+        assert len(result.validation_report.pdf_xbrl_validations) >= 2
+
+    @patch("puco_eeff.extractor.cost_extractor.get_period_paths")
+    @patch("puco_eeff.extractor.cost_extractor.extract_pdf_section")
+    def test_validation_report_pdf_only(
+        self,
+        mock_extract_pdf_section: MagicMock,
+        mock_paths_fn: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        """validation_report works without XBRL (pdf_only source)."""
+        from puco_eeff.extractor.cost_extractor import extract_detailed_costs
+
+        # Setup paths - no XBRL
+        raw_pdf = tmp_path / "raw" / "pdf"
+        raw_pdf.mkdir(parents=True)
+        processed = tmp_path / "processed"
+        processed.mkdir(parents=True)
+
+        mock_paths_fn.return_value = {
+            "raw_pdf": raw_pdf,
+            "raw_xbrl": tmp_path / "raw" / "xbrl",
+            "processed": processed,
+            "audit": tmp_path / "audit",
+        }
+
+        # Create PDF but no XBRL - add pucobre marker
+        (raw_pdf / "estados_financieros_2024_Q1.pdf").write_text("pdf")
+        (raw_pdf / "pucobre_combined_2024_Q1.pdf").write_text("combined")
+
+        # Mock section extraction
+        def extract_section_side_effect(path, section_name):
+            if section_name == "nota_21":
+                breakdown = SectionBreakdown(section_id="nota_21", section_title="Costo")
+                breakdown.total_ytd_actual = -50000
+                return breakdown
+            return None
+
+        mock_extract_pdf_section.side_effect = extract_section_side_effect
+
+        # Run extraction
+        result = extract_detailed_costs(2024, 1)
+
+        # Verify validation_report reflects pdf_only
+        assert result.validation_report is not None
+        assert result.xbrl_available is False
+        assert all(v.source == "pdf_only" for v in result.validation_report.pdf_xbrl_validations)
+
+    def test_validation_report_is_same_as_validations(self) -> None:
+        """validation_report.pdf_xbrl_validations equals result.validations."""
+        # This is a design invariant to verify
+        report = ValidationReport(
+            pdf_xbrl_validations=[
+                ValidationResult(
+                    field_name="Total Costo",
+                    pdf_value=-100,
+                    xbrl_value=-100,
+                    match=True,
+                    source="both",
+                )
+            ],
+            sum_validations=[],
+            cross_validations=[],
+        )
+        result = ExtractionResult(
+            source="cmf",
+            xbrl_available=True,
+            sections={},
+            validations=report.pdf_xbrl_validations,
+            validation_report=report,
+            year=2024,
+            quarter=2,
+        )
+
+        assert result.validations is result.validation_report.pdf_xbrl_validations
+
+
+# =============================================================================
+# Tests for config-driven _section_breakdowns_to_sheet1data
+# =============================================================================
+
+
+class TestConfigDrivenSectionBreakdowns:
+    """Tests that _section_breakdowns_to_sheet1data uses config mapping."""
+
+    def test_uses_config_mapping_for_nota_21(self) -> None:
+        """_section_breakdowns_to_sheet1data uses config for nota_21 → total_costo_venta."""
+        mapping = get_sheet1_section_total_mapping()
+        assert mapping["nota_21"] == "total_costo_venta"
+
+        nota_21 = SectionBreakdown(section_id="nota_21", section_title="Test")
+        nota_21.total_ytd_actual = -99999
+
+        data = _section_breakdowns_to_sheet1data(nota_21, None, 2024, 4)
+
+        assert data.total_costo_venta == -99999
+
+    def test_uses_config_mapping_for_nota_22(self) -> None:
+        """_section_breakdowns_to_sheet1data uses config for nota_22 → total_gasto_admin."""
+        mapping = get_sheet1_section_total_mapping()
+        assert mapping["nota_22"] == "total_gasto_admin"
+
+        nota_22 = SectionBreakdown(section_id="nota_22", section_title="Test")
+        nota_22.total_ytd_actual = -88888
+
+        data = _section_breakdowns_to_sheet1data(None, nota_22, 2024, 4)
+
+        assert data.total_gasto_admin == -88888
+
+    def test_period_label_format(self) -> None:
+        """_section_breakdowns_to_sheet1data uses correct period label format."""
+        data = _section_breakdowns_to_sheet1data(None, None, 2024, 3)
+
+        # Uses Roman numeral format (e.g., "IIIQ2024"), not "unknown" or "2024Q3"
+        assert data.quarter == "IIIQ2024"
+        assert data.year == 2024
+        assert data.quarter_num == 3

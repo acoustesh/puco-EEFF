@@ -332,6 +332,21 @@ def get_sheet1_pdf_xbrl_validations() -> list[dict[str, str]]:
     return xbrl_mappings.get("pdf_xbrl_validations", [])
 
 
+def get_sheet1_section_total_mapping() -> dict[str, str]:
+    """Get section_id to total field name mapping from xbrl_mappings.json.
+
+    Used to map PDF section IDs (nota_21, nota_22) to Sheet1Data total fields.
+
+    Returns:
+        Dictionary mapping section_id to total field name.
+        Example: {"nota_21": "total_costo_venta", "nota_22": "total_gasto_admin"}
+    """
+    xbrl_mappings = get_sheet1_xbrl_mappings()
+    mapping = xbrl_mappings.get("section_total_mapping", {})
+    # Filter out _description metadata key
+    return {k: v for k, v in mapping.items() if not k.startswith("_")}
+
+
 def get_sheet1_reference_values(year: int, quarter: int) -> dict[str, int] | None:
     """Get reference values for a specific period.
 
@@ -626,3 +641,62 @@ def validate_sheet1_against_reference(data: Sheet1Data) -> list[str] | None:
             issues.append(f"{field_name}: expected {ref_value:,}, got None")
 
     return issues
+
+
+# =============================================================================
+# Section-to-Sheet1Data Conversion (Config-Driven)
+# =============================================================================
+
+
+def sections_to_sheet1data(
+    sections: dict[str, Any],
+    year: int,
+    quarter: int,
+) -> Sheet1Data:
+    """Convert extracted PDF sections to Sheet1Data using config-driven mapping.
+
+    Creates a Sheet1Data populated with totals from SectionBreakdown objects,
+    using section_total_mapping from config to map section_id to field names.
+
+    This function uses duck typing - section objects must have:
+    - section_id: str (e.g., "nota_21", "nota_22")
+    - total_ytd_actual: int | None
+    - items: list of LineItem-like objects with concepto and ytd_actual
+
+    Args:
+        sections: Dict mapping section_id to SectionBreakdown-like objects
+        year: Year for period label
+        quarter: Quarter for period label
+
+    Returns:
+        Sheet1Data with fields populated from sections
+    """
+    quarter_label = format_quarter_label(year, quarter)
+    data = Sheet1Data(quarter=quarter_label, year=year, quarter_num=quarter)
+
+    # Get config-driven mapping from section_id to total field
+    section_total_mapping = get_sheet1_section_total_mapping()
+
+    for section_id, section in sections.items():
+        if section is None:
+            continue
+
+        # Set total field using config mapping
+        if section_id in section_total_mapping:
+            total_field = section_total_mapping[section_id]
+            total_value = getattr(section, "total_ytd_actual", None)
+            if total_value is not None:
+                data.set_value(total_field, total_value)
+
+        # Set detail fields from items using keyword matching
+        items = getattr(section, "items", [])
+        for item in items:
+            concepto = getattr(item, "concepto", "")
+            value = getattr(item, "ytd_actual", None)
+
+            if concepto and value is not None:
+                field_name = match_concepto_to_field(concepto, section_id)
+                if field_name:
+                    data.set_value(field_name, value)
+
+    return data

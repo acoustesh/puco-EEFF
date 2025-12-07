@@ -4,6 +4,7 @@ Key exports:
     SectionBreakdown: Generic container for PDF section data
     extract_pdf_section: Generic config-driven PDF section extraction
     extract_sheet1: Main entry point for Sheet1 extraction
+    run_sheet1_validations: Unified validation entry point
     ValidationReport: Aggregated validation results
     SumValidationResult: Result of line-item sum validation
     CrossValidationResult: Result of cross-validation formula check
@@ -31,6 +32,7 @@ from puco_eeff.extractor.cost_extractor import (
     format_validation_report,
     print_extraction_report,
     print_sheet1_report,
+    run_sheet1_validations,
     save_extraction_result,
     save_sheet1_data,
     validate_extraction,
@@ -62,7 +64,8 @@ __all__ = [
     "extract_ingresos_from_pdf",
     "extract_xbrl_totals",
     # Validation
-    "validate_extraction",
+    "run_sheet1_validations",
+    "validate_extraction",  # Deprecated, use run_sheet1_validations()
     "format_validation_report",
     # PDF/XBRL utilities
     "extract_tables_from_pdf",

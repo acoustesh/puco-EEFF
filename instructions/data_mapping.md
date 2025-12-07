@@ -172,14 +172,33 @@ GASTOS ADM Y VENTAS (Nota 22):
 
 ## Validation Rules
 
-### Automatic Validation (Always Runs)
+### Unified Validation API
 
-The extraction process performs three types of automatic validation:
+All validation is handled by `run_sheet1_validations()`, a single entry point that runs three types of config-driven validations:
+
+```python
+from puco_eeff.extractor.cost_extractor import run_sheet1_validations
+
+report = run_sheet1_validations(
+    data,                          # Sheet1Data with extracted values
+    xbrl_totals,                   # XBRL totals dict (or None)
+    run_sum_validations=True,      # Enable sum checks (default: True)
+    run_pdf_xbrl_validations=True, # Enable PDF↔XBRL comparison (default: True)
+    run_cross_validations=True,    # Enable cross-validation formulas (default: True)
+    use_xbrl_fallback=True,        # Set missing PDF values from XBRL (default: True)
+)
+
+# Check for failures
+if report.has_failures():
+    print(f"Failed: {len([v for v in report.sum_validations if not v.match])} sum validations")
+```
 
 #### 1. PDF ↔ XBRL Total Comparison
 - `CostOfSales` (XBRL) = `total_costo_venta` (PDF)
 - `AdministrativeExpense` (XBRL) = `total_gasto_admin` (PDF)
 - `RevenueFromContractsWithCustomers` (XBRL) = `ingresos_ordinarios` (PDF fallback)
+
+Configured via `pdf_xbrl_validations` in `config/sheet1/xbrl_mappings.json`.
 
 #### 2. Sum Validations (Config-Driven)
 Validates that extracted totals match the sum of their line items.
@@ -220,7 +239,11 @@ Validates relationships between fields. Example:
 }
 ```
 
-**Formula evaluation:** Safe parsing (no `eval()`), supports: variables, integers, `+`, `-`, `abs()`.
+**Formula evaluation:** Safe AST-based parsing (no `eval()`), supports: variables, integers, `+`, `-`, `abs()`.
+
+### Deprecated Functions
+
+> **⚠️ Deprecation:** `validate_extraction()` is deprecated. Use `run_sheet1_validations()` instead.
 
 ### Opt-in Reference Validation
 
@@ -404,10 +427,15 @@ Keyword-based PDF field matching:
 
 ### config/sheet1/xbrl_mappings.json (XBRL Facts)
 
-XBRL fact name mappings and validation:
+XBRL fact name mappings, section-to-field mappings, and validation:
 
 ```json
 {
+  "section_total_mapping": {
+    "_description": "Maps PDF section_id to Sheet1Data total field name",
+    "nota_21": "total_costo_venta",
+    "nota_22": "total_gasto_admin"
+  },
   "fact_mappings": {
     "ingresos_ordinarios": {
       "primary": "RevenueFromContractsWithCustomers",
@@ -437,6 +465,7 @@ XBRL fact name mappings and validation:
 ```
 
 **Key fields:**
+- `section_total_mapping`: Maps PDF section IDs (nota_21, nota_22) to Sheet1Data total field names. Used by `sections_to_sheet1data()` to convert extraction results to Sheet1Data.
 - `apply_scaling`: Set to `true` for fields that need conversion from USD to MUS$ (÷1000)
 - `fallbacks`: Alternative XBRL fact names tried if primary not found
 - `context_type`: "duration" for YTD values, "instant" for balance sheet values

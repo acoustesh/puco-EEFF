@@ -44,6 +44,12 @@
     "profit_loss": "profit_loss"
   },
 
+  "section_total_mapping": {
+    "_description": "Maps PDF section_id to Sheet1Data total field name",
+    "nota_21": "total_costo_venta",
+    "nota_22": "total_gasto_admin"
+  },
+
   "pdf_xbrl_validations": [
     {
       "field_name": "total_costo_venta",

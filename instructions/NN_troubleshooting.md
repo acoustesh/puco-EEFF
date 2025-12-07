@@ -445,3 +445,57 @@ python -m puco_eeff.main_sheet1 -y 2024 -q 2 --fail-on-sum-mismatch
 # Exit with error if reference validation fails
 python -m puco_eeff.main_sheet1 -y 2024 -q 2 --fail-on-reference-mismatch
 ```
+
+---
+
+## Section-to-Sheet1Data Conversion Issues
+
+### Field Not Populated From Section
+
+If a field from a PDF section isn't being populated in Sheet1Data:
+
+**Debug the conversion:**
+```python
+from puco_eeff.sheets.sheet1 import (
+    sections_to_sheet1data,
+    get_sheet1_section_total_mapping,
+    match_concepto_to_field,
+)
+from puco_eeff.extractor.cost_extractor import extract_pdf_section
+
+# Extract a section
+pdf_path = "data/raw/pdf/estados_financieros_2024_Q2.pdf"
+section = extract_pdf_section(pdf_path, "nota_21")
+
+# Check what items were extracted
+for item in section.items:
+    matched_field = match_concepto_to_field(item.concepto, "nota_21")
+    print(f"'{item.concepto}' -> {matched_field}: {item.ytd_actual}")
+
+# Check section_total_mapping config
+mapping = get_sheet1_section_total_mapping()
+print(f"Section mapping: {mapping}")
+```
+
+**Possible causes:**
+1. `match_keywords` in `extraction.json` don't match the PDF text
+2. `section_total_mapping` missing the section ID
+3. Item's `ytd_actual` is None
+
+**Solutions:**
+1. Add/update keywords in `config/sheet1/extraction.json`:
+   ```json
+   "field_mappings": {
+     "cv_energia": {
+       "match_keywords": ["energía", "energia", "eléctrica", "electrica"]
+     }
+   }
+   ```
+2. Update `section_total_mapping` in `config/sheet1/xbrl_mappings.json`:
+   ```json
+   "section_total_mapping": {
+     "nota_21": "total_costo_venta",
+     "nota_22": "total_gasto_admin",
+     "new_section": "new_field_name"
+   }
+   ```

@@ -76,7 +76,7 @@ Extract **Nota 21 (Costo de Venta)** and **Nota 22 (Gastos de Administración)**
 | **Section totals** | PDF "Totales" row | XBRL backfills if missing | XBRL validates existing PDF totals |
 | **`ingresos_ordinarios`** | **XBRL preferred** | PDF via `extract_ingresos_from_pdf()` | Unlike other fields, XBRL is primary |
 
-> **Note:** There is **no automatic sum reconciliation** (line items → total). The system trusts the PDF's "Totales" row and validates it against XBRL, but does not verify that line items sum to the total.
+> **Note:** Sum validation (line items → total) is now performed automatically via the unified validation API. The system verifies that extracted line items sum to the extracted total.
 
 ## Quick Start (Python API)
 
@@ -152,11 +152,58 @@ The extraction is **fully config-driven** with no hardcoded values:
 └────────────────────────────────────────────────────────────────────┘
 ```
 
+### Validation Call Graph
+
+All validation routes through the unified API `run_sheet1_validations()`:
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                      VALIDATION CALL GRAPH                          │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  extract_detailed_costs()                                           │
+│       │                                                             │
+│       ├──► extract_pdf_section("nota_21")  ──► SectionBreakdown    │
+│       ├──► extract_pdf_section("nota_22")  ──► SectionBreakdown    │
+│       ├──► extract_xbrl_totals()           ──► dict[str, int]      │
+│       │                                                             │
+│       │    ┌─────────────────────────────────────────────────────┐ │
+│       └──► │ sections_to_sheet1data(sections, year, quarter)     │ │
+│            │   Uses config: section_total_mapping                 │ │
+│            │   Returns: Sheet1Data with totals + detail fields   │ │
+│            └─────────────────────────────────────────────────────┘ │
+│                                    │                                │
+│                                    ▼                                │
+│            ┌─────────────────────────────────────────────────────┐ │
+│            │ run_sheet1_validations(sheet1_data, xbrl_totals)    │ │
+│            │   ├── _run_pdf_xbrl_validations()                   │ │
+│            │   ├── _run_sum_validations()                        │ │
+│            │   └── _run_cross_validations()                      │ │
+│            │   Returns: ValidationReport                          │ │
+│            └─────────────────────────────────────────────────────┘ │
+│                                    │                                │
+│                                    ▼                                │
+│            ExtractionResult(                                        │
+│                sections=...,                                        │
+│                validations=report.pdf_xbrl_validations,            │
+│                validation_report=report                             │
+│            )                                                        │
+│                                                                     │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+**Key functions:**
+- `sections_to_sheet1data()` (sheet1.py): Config-driven converter from `SectionBreakdown` to `Sheet1Data`
+- `run_sheet1_validations()` (cost_extractor.py): Unified validation entry point
+- `_run_pdf_xbrl_validations()`: Compares PDF values against XBRL
+- `_run_sum_validations()`: Verifies line items sum to totals
+- `_run_cross_validations()`: Checks accounting formulas
+
 > **📋 Config: Runtime vs Metadata**
 >
 > | Status | Config Fields |
 > |--------|---------------|
-> | **Runtime-used** | `value_fields`, `row_mapping`, `field_mappings` (match_keywords, exclude_keywords, pdf_labels), `fact_mappings` (primary, fallbacks, apply_scaling), `sum_tolerance`, `search_patterns`, `table_identifiers`, `validation.has_totales_row`, `validation.min_detail_items`, `total_validations`, `cross_validations` |
+> | **Runtime-used** | `value_fields`, `row_mapping`, `field_mappings` (match_keywords, exclude_keywords, pdf_labels), `fact_mappings` (primary, fallbacks, apply_scaling), `section_total_mapping`, `sum_tolerance`, `search_patterns`, `table_identifiers`, `validation.has_totales_row`, `validation.min_detail_items`, `total_validations`, `cross_validations` |
 > | **Metadata-only / Unused** | `layout`, `expected_position`, `period_overrides.page_numbers`, `aggregate_facts` (only 3 of 8 facts are consumed via `fact_mappings`) |
 > | **Opt-in validation** | `reference_data.json` — used by `validate_sheet1_against_reference()` when `--validate-reference` flag is passed |
 
@@ -402,10 +449,15 @@ PDF extraction rules with keyword-based field matching. All Nota 21/22 fields ar
 
 ### config/sheet1/xbrl_mappings.json
 
-XBRL fact mappings and validation rules (includes extra facts used for cross-checks):
+XBRL fact mappings, validation rules, and section-to-field mappings:
 
 ```json
 {
+  "section_total_mapping": {
+    "_description": "Maps PDF section_id to Sheet1Data total field name",
+    "nota_21": "total_costo_venta",
+    "nota_22": "total_gasto_admin"
+  },
   "fact_mappings": {
     "ingresos_ordinarios": {"primary": "RevenueFromContractsWithCustomers", "fallbacks": ["Revenue", "IngresosPorActividadesOrdinarias"], "context_type": "duration", "apply_scaling": true},
     "total_costo_venta": {"primary": "CostOfSales", "fallbacks": ["CostoDeVentas"], "context_type": "duration", "apply_scaling": true},
@@ -425,6 +477,12 @@ XBRL fact mappings and validation rules (includes extra facts used for cross-che
   },
   "aggregate_facts": ["RevenueFromContractsWithCustomers", "Revenue", "CostOfSales", "GrossProfit", "AdministrativeExpense", "SellingExpense", "ProfitLoss", "ProfitLossBeforeTax"]
 }
+```
+
+**Config keys:**
+- `section_total_mapping`: Maps PDF section IDs (nota_21, nota_22) to Sheet1Data total field names. Used by `sections_to_sheet1data()` to convert extraction results.
+- `fact_mappings`: Maps Sheet1 field names to XBRL fact names for validation.
+- `validation_rules`: Defines sum validations, cross-validations, and tolerances.
 ```
 
 ### config/sheet1/reference_data.json
@@ -528,29 +586,57 @@ Known-good values for validation:
 
 ## Validation
 
-### Automatic Validation (in `extract_sheet1(validate=True)`)
+The extraction pipeline includes a unified validation system with config-driven rules.
 
-The extractor performs three types of automatic validation:
+### Unified Validation API
 
-#### 1. PDF↔XBRL Total Comparison (always runs)
+All validation is handled by a single entry point: `run_sheet1_validations()`. This function runs three types of config-driven validations:
+
+```python
+from puco_eeff.extractor.cost_extractor import run_sheet1_validations, extract_xbrl_totals
+from puco_eeff.sheets.sheet1 import Sheet1Data
+
+# Run all validations
+report = run_sheet1_validations(
+    data,                          # Sheet1Data with extracted values
+    xbrl_totals,                   # XBRL totals dict (or None)
+    run_sum_validations=True,      # Enable sum checks
+    run_pdf_xbrl_validations=True, # Enable PDF↔XBRL comparison
+    run_cross_validations=True,    # Enable cross-validation formulas
+    use_xbrl_fallback=True,        # Set missing PDF values from XBRL
+)
+
+# Check results
+if report.has_failures():
+    print("Validation failures detected")
+```
+
+#### 1. PDF↔XBRL Total Comparison
+Compares extracted PDF values against XBRL totals:
 - ✓ `total_costo_venta` (PDF) ≈ `CostOfSales` (XBRL)
 - ✓ `total_gasto_admin` (PDF) ≈ `AdministrativeExpense` (XBRL)
 - ✓ `ingresos_ordinarios` (PDF fallback) ≈ `RevenueFromContractsWithCustomers` (XBRL)
 
-#### 2. Sum Validations (always runs)
+When `use_xbrl_fallback=True`, missing PDF values are automatically populated from XBRL.
+
+#### 2. Sum Validations
 Validates that extracted totals match the sum of their line items:
 - `total_costo_venta` = Σ(cv_gastos_personal, cv_materiales, ..., cv_convenios)
 - `total_gasto_admin` = Σ(ga_gastos_personal, ga_materiales, ..., ga_otros)
 
 Rules are config-driven via `total_validations` in `config/sheet1/xbrl_mappings.json`.
 
-#### 3. Cross-Validations (always runs)
+#### 3. Cross-Validations
 Validates accounting identities across different fields:
 - `gross_profit == ingresos_ordinarios - abs(total_costo_venta)`
 
 Rules are config-driven via `cross_validations` in `config/sheet1/xbrl_mappings.json`. Each rule can specify its own tolerance, falling back to global `sum_tolerance`.
 
 > **Note:** Cross-validations may be skipped if required fields aren't available in the extracted data (e.g., `gross_profit` is an XBRL-only fact not stored in Sheet1Data).
+
+### Deprecated Function
+
+> **⚠️ Deprecation:** `validate_extraction()` is deprecated. Use `run_sheet1_validations()` instead. The old function still works but emits a `DeprecationWarning`.
 
 ### Tolerance Configuration
 
