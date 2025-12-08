@@ -9,6 +9,7 @@ This module provides functions to:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -182,36 +183,35 @@ _GASTO_ADMIN_FIELDS = [
 ]
 
 
-def validate_costo_venta_total(
-    data: dict[str, Any],
-    config: dict | None = None,
-) -> ValidationResult:
-    """Validate that Costo de Venta items sum to total.
+def _make_total_validator(
+    item_fields: list[str],
+    total_field: str,
+    name: str,
+) -> Callable[[dict[str, Any], dict | None], ValidationResult]:
+    """Factory to create total validation functions without duplicated bodies."""
 
-    Args:
-        data: Dictionary of field_name -> value
-        config: Configuration dict (unused, kept for API compatibility)
+    def _validator(data: dict[str, Any], config: dict | None = None) -> ValidationResult:
+        """Validate section total via factory-configured helper."""
+        return _validate_section_total(data, item_fields, total_field)
 
-    Returns:
-        ValidationResult with comparison
-    """
-    return _validate_section_total(data, _COSTO_VENTA_FIELDS, "total_costo_venta")
+    # Preserve introspection-friendly attributes
+    _validator.__name__ = name
+    _validator.__doc__ = (
+        f"Validate that {total_field} items sum to the reported total using {_validate_section_total.__name__}."
+    )
+    return _validator
 
 
-def validate_gasto_admin_total(
-    data: dict[str, Any],
-    config: dict | None = None,
-) -> ValidationResult:
-    """Validate that Gasto Admin items sum to total.
-
-    Args:
-        data: Dictionary of field_name -> value
-        config: Configuration dict (unused, kept for API compatibility)
-
-    Returns:
-        ValidationResult with comparison
-    """
-    return _validate_section_total(data, _GASTO_ADMIN_FIELDS, "total_gasto_admin")
+validate_costo_venta_total = _make_total_validator(
+    _COSTO_VENTA_FIELDS,
+    "total_costo_venta",
+    "validate_costo_venta_total",
+)
+validate_gasto_admin_total = _make_total_validator(
+    _GASTO_ADMIN_FIELDS,
+    "total_gasto_admin",
+    "validate_gasto_admin_total",
+)
 
 
 def validate_balance_sheet(

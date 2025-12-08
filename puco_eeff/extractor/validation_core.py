@@ -8,11 +8,6 @@ Key Classes:
     ExtractionResult: Complete extraction result with optional validation.
     SumValidationResult: Result of line-item sum validation.
     CrossValidationResult: Result of cross-validation formula check.
-    ValidationReport: Aggregated validation results for unified reporting.
-
-Key Functions:
-    format_validation_report(): Format ValidationReport for display.
-    log_validation_report(): Log validation results with appropriate levels.
 """
 
 from __future__ import annotations
@@ -20,6 +15,7 @@ from __future__ import annotations
 import ast
 import re
 from dataclasses import dataclass, field
+from functools import singledispatch
 from pathlib import Path
 
 from puco_eeff.config import setup_logging
@@ -35,7 +31,6 @@ from puco_eeff.sheets.sheet1 import (
 
 logger = setup_logging(__name__)
 
-# Public API exports
 __all__ = [
     # Dataclasses
     "ValidationResult",
@@ -62,7 +57,17 @@ __all__ = [
 
 
 @dataclass
-class ValidationResult:
+class _StatusMixin:
+    """Mixin providing a shared status property via singledispatch."""
+
+    @property
+    def status(self) -> str:
+        """Format result status via singledispatch."""
+        return format_status(self)
+
+
+@dataclass
+class ValidationResult(_StatusMixin):
     """Result of cross-validation between PDF and XBRL."""
 
     field_name: str
@@ -71,18 +76,6 @@ class ValidationResult:
     match: bool
     source: str
     difference: int | None = None
-
-    @property
-    def status(self) -> str:
-        """Return validation status string."""
-        if self.source == "pdf_only":
-            return "⚠ PDF only (no XBRL)"
-        elif self.source == "xbrl_only":
-            return "⚠ XBRL only (PDF extraction failed)"
-        elif self.match:
-            return "✓ Match"
-        else:
-            return f"✗ Mismatch (diff: {self.difference:,})"
 
 
 @dataclass
@@ -112,7 +105,7 @@ class ExtractionResult:
 
 
 @dataclass
-class SumValidationResult:
+class SumValidationResult(_StatusMixin):
     """Result of line-item sum validation."""
 
     description: str
@@ -123,19 +116,9 @@ class SumValidationResult:
     difference: int
     tolerance: int
 
-    @property
-    def status(self) -> str:
-        """Return validation status string."""
-        if self.expected_total is None:
-            return "⚠ No total value to compare"
-        elif self.match:
-            return f"✓ Sum matches total ({self.calculated_sum:,})"
-        else:
-            return f"✗ Sum mismatch: items={self.calculated_sum:,}, total={self.expected_total:,} (diff: {self.difference})"
-
 
 @dataclass
-class CrossValidationResult:
+class CrossValidationResult(_StatusMixin):
     """Result of cross-validation formula check."""
 
     description: str
@@ -147,16 +130,6 @@ class CrossValidationResult:
     tolerance: int
     missing_facts: list[str] = field(default_factory=list)
 
-    @property
-    def status(self) -> str:
-        """Return validation status string."""
-        if self.missing_facts:
-            return f"⚠ Skipped - missing: {', '.join(self.missing_facts)}"
-        elif self.match:
-            return f"✓ {self.description}: {self.expected_value:,}"
-        else:
-            return f"✗ {self.description}: expected={self.expected_value}, calculated={self.calculated_value} (diff: {self.difference})"
-
 
 @dataclass
 class ValidationReport:
@@ -167,17 +140,23 @@ class ValidationReport:
     pdf_xbrl_validations: list[ValidationResult] = field(default_factory=list)
     reference_issues: list[str] | None = None
 
+    def _has_validation_failures(self, validations: list) -> bool:
+        """Check if any validation in the given list failed."""
+        return any(not v.match for v in validations)
+
     def has_failures(self) -> bool:
         """Check if any validation failed."""
-        sum_ok = all(v.match for v in self.sum_validations)
-        cross_ok = all(v.match for v in self.cross_validations)
-        pdf_xbrl_ok = all(v.match for v in self.pdf_xbrl_validations)
-        ref_ok = self.reference_issues is None or len(self.reference_issues) == 0
-        return not (sum_ok and cross_ok and pdf_xbrl_ok and ref_ok)
+        return (
+            self._has_validation_failures(self.sum_validations)
+            or self._has_validation_failures(self.cross_validations)
+            or self._has_validation_failures(self.pdf_xbrl_validations)
+            or self.has_reference_failures()
+        )
 
     def has_sum_failures(self) -> bool:
-        """Check if any sum validation failed."""
-        return any(not v.match for v in self.sum_validations)
+        """Check if any sum validation failed (convenience wrapper)."""
+        # Delegates to has_failures logic to avoid duplication
+        return self._has_validation_failures(self.sum_validations)
 
     def has_reference_failures(self) -> bool:
         """Check if reference validation failed."""
@@ -185,19 +164,72 @@ class ValidationReport:
 
 
 # =============================================================================
+# Status formatting helpers
+# =============================================================================
+
+
+def _format_match_status(match: bool, success_msg: str, failure_msg: str) -> str:
+    """Shared helper to format match/mismatch status."""
+    return success_msg if match else failure_msg
+
+
+@singledispatch
+def format_status(result) -> str:
+    """Format validation status for supported result types."""
+    return ""  # Fallback for unexpected objects
+
+
+@format_status.register
+def _format_validation_result_status(result: ValidationResult) -> str:
+    """Format ValidationResult status."""
+    if result.source == "pdf_only":
+        return "⚠ PDF only (no XBRL)"
+    if result.source == "xbrl_only":
+        return "⚠ XBRL only (PDF extraction failed)"
+    return _format_match_status(result.match, "✓ Match", f"✗ Mismatch (diff: {result.difference:,})")
+
+
+@format_status.register
+def _format_sum_validation_status(result: SumValidationResult) -> str:
+    """Format SumValidationResult status."""
+    if result.expected_total is None:
+        return "⚠ No total value to compare"
+    success = f"✓ Sum matches total ({result.calculated_sum:,})"
+    failure = (
+        f"✗ Sum mismatch: items={result.calculated_sum:,}, total={result.expected_total:,} (diff: {result.difference})"
+    )
+    return _format_match_status(result.match, success, failure)
+
+
+@format_status.register
+def _format_cross_validation_status(result: CrossValidationResult) -> str:
+    """Format CrossValidationResult status."""
+    if result.missing_facts:
+        return f"⚠ Skipped - missing: {', '.join(result.missing_facts)}"
+    success = f"✓ {result.description}: {result.expected_value:,}"
+    failure = (
+        f"✗ {result.description}: expected={result.expected_value}, "
+        f"calculated={result.calculated_value} (diff: {result.difference})"
+    )
+    return _format_match_status(result.match, success, failure)
+
+
+# =============================================================================
 # Validation Report Formatting
 # =============================================================================
 
 
-def _format_sum_validations(report: ValidationReport) -> list[str]:
-    """Format sum validations section."""
-    lines = []
-    if report.sum_validations:
-        lines.append("Sum Validations:")
-        for v in report.sum_validations:
-            lines.append(f"  {v.status}")
-    else:
-        lines.append("Sum Validations: (none configured)")
+def _format_section(
+    header: str,
+    items: list,
+    formatter: callable,
+    empty_line: str,
+) -> list[str]:
+    """Generic formatter for validation sections."""
+    if not items:
+        return [empty_line]
+    lines = [header]
+    lines.extend(formatter(item) for item in items)
     return lines
 
 
@@ -211,30 +243,6 @@ def _format_pdf_xbrl_validation_item(v: ValidationResult) -> str:
     if v.source == "xbrl_only":
         return f"  ⚠ {v.field_name}: {v.xbrl_value:,} (XBRL only, used as source)"
     return f"  ⚠ {v.field_name}: {v.pdf_value:,} (PDF only, no XBRL)"
-
-
-def _format_pdf_xbrl_validations(report: ValidationReport) -> list[str]:
-    """Format PDF-XBRL validations section."""
-    lines = []
-    if report.pdf_xbrl_validations:
-        lines.append("PDF ↔ XBRL Validations:")
-        for v in report.pdf_xbrl_validations:
-            lines.append(_format_pdf_xbrl_validation_item(v))
-    else:
-        lines.append("PDF ↔ XBRL Validations: (no XBRL available)")
-    return lines
-
-
-def _format_cross_validations(report: ValidationReport) -> list[str]:
-    """Format cross-validations section."""
-    lines = []
-    if report.cross_validations:
-        lines.append("Cross-Validations:")
-        for v in report.cross_validations:
-            lines.append(f"  {v.status}")
-    else:
-        lines.append("Cross-Validations: (none configured)")
-    return lines
 
 
 def _format_reference_validations(report: ValidationReport) -> list[str]:
@@ -256,14 +264,30 @@ def format_validation_report(report: ValidationReport, verbose: bool = True) -> 
     separator = "═" * 60
     lines = [separator, "                    VALIDATION REPORT", separator, ""]
 
-    lines.extend(_format_sum_validations(report))
-    lines.append("")
+    sections = [
+        (
+            "Sum Validations:",
+            report.sum_validations,
+            lambda v: f"  {v.status}",
+            "Sum Validations: (none configured)",
+        ),
+        (
+            "PDF ↔ XBRL Validations:",
+            report.pdf_xbrl_validations,
+            _format_pdf_xbrl_validation_item,
+            "PDF ↔ XBRL Validations: (no XBRL available)",
+        ),
+        (
+            "Cross-Validations:",
+            report.cross_validations,
+            lambda v: f"  {v.status}",
+            "Cross-Validations: (none configured)",
+        ),
+    ]
 
-    lines.extend(_format_pdf_xbrl_validations(report))
-    lines.append("")
-
-    lines.extend(_format_cross_validations(report))
-    lines.append("")
+    for header, items, formatter, empty_line in sections:
+        lines.extend(_format_section(header, items, formatter, empty_line))
+        lines.append("")
 
     lines.extend(_format_reference_validations(report))
     lines.extend(["", separator])
@@ -535,32 +559,37 @@ def _eval_constant(node: ast.Constant, values: dict[str, int]) -> int | None:
     return node.value if isinstance(node.value, int) else None
 
 
-def _eval_unary(node: ast.UnaryOp, values: dict[str, int]) -> int | None:
-    """Evaluate a unary operation node."""
-    operand = _eval_ast_node(node.operand, values)
-    if operand is None:
+def _eval_numeric_op(node: ast.UnaryOp | ast.BinOp, values: dict[str, int]) -> int | None:
+    """Evaluate unary or binary arithmetic nodes in a single helper."""
+    if isinstance(node, ast.UnaryOp):
+        operand = _eval_ast_node(node.operand, values)
+        if operand is None:
+            return None
+        if isinstance(node.op, ast.USub):
+            return -operand
+        if isinstance(node.op, ast.UAdd):
+            return operand
         return None
-    if isinstance(node.op, ast.USub):
-        return -operand
-    if isinstance(node.op, ast.UAdd):
-        return operand
+
+    if isinstance(node, ast.BinOp):
+        left = _eval_ast_node(node.left, values)
+        right = _eval_ast_node(node.right, values)
+        if left is None or right is None:
+            return None
+        if isinstance(node.op, ast.Add):
+            return left + right
+        if isinstance(node.op, ast.Sub):
+            return left - right
+        if isinstance(node.op, ast.Mult):
+            return left * right
+        return None
+
     return None
 
 
 def _eval_name(node: ast.Name, values: dict[str, int]) -> int | None:
     """Evaluate a variable name node."""
     return values.get(node.id)
-
-
-def _eval_binop(node: ast.BinOp, values: dict[str, int]) -> int | None:
-    """Evaluate a binary operation node."""
-    left = _eval_ast_node(node.left, values)
-    right = _eval_ast_node(node.right, values)
-    if left is None or right is None:
-        return None
-    op_map = {ast.Add: lambda l, r: l + r, ast.Sub: lambda l, r: l - r, ast.Mult: lambda l, r: l * r}
-    op_func = op_map.get(type(node.op))
-    return op_func(left, right) if op_func else None
 
 
 def _eval_call(node: ast.Call, values: dict[str, int]) -> int | None:
@@ -576,9 +605,9 @@ def _eval_call(node: ast.Call, values: dict[str, int]) -> int | None:
 # Dispatch table for AST node evaluation
 _AST_EVALUATORS: dict[type, callable] = {
     ast.Constant: _eval_constant,
-    ast.UnaryOp: _eval_unary,
+    ast.UnaryOp: _eval_numeric_op,
+    ast.BinOp: _eval_numeric_op,
     ast.Name: _eval_name,
-    ast.BinOp: _eval_binop,
     ast.Call: _eval_call,
 }
 

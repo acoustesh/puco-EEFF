@@ -28,6 +28,7 @@ import tempfile
 import time
 import warnings
 import zlib
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -135,7 +136,7 @@ def load_baselines() -> dict:
             "similarity_threshold_pair": 0.90,
             "similarity_threshold_neighbor": 0.85,
             "cc_threshold": 15,
-            "min_loc_for_similarity": 15,
+            "min_loc_for_similarity": 1,
         },
     }
 
@@ -987,6 +988,124 @@ def _load_all_complexity_maps() -> tuple[dict[str, int], dict[str, int]]:
 
 
 # =============================================================================
+# Shared test helpers
+# =============================================================================
+
+
+def _run_similarity_checks(
+    *,
+    baselines: dict,
+    functions: list[FunctionInfo],
+    update_baselines: bool,
+    cached_only: bool,
+    threshold_pair: float,
+    threshold_neighbor: float,
+    load_complexity_maps: Callable[[], tuple[dict[str, int], dict[str, int]]],
+) -> None:
+    """Common workflow for similarity tests across different scopes."""
+    if len(functions) < 2:
+        pytest.skip("Not enough functions to compare")
+
+    uncached_functions: list[FunctionInfo] = []
+    for func in functions:
+        cached = get_cached_embedding(baselines, func.hash)
+        if cached is not None:
+            func.embedding = cached
+        else:
+            uncached_functions.append(func)
+
+    if cached_only and uncached_functions:
+        uncached_names = [f"{f.file}:{f.name}" for f in uncached_functions]
+        pytest.skip(
+            f"--cached-only mode: {len(uncached_functions)} functions lack "
+            f"cached embeddings:\n  "
+            + "\n  ".join(uncached_names[:10])
+            + (f"\n  ... and {len(uncached_names) - 10} more" if len(uncached_names) > 10 else "")
+        )
+
+    if uncached_functions:
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key or api_key.startswith("your_") or api_key.startswith("sk-xxx") or len(api_key) < 20:
+            pytest.skip(
+                "OPENAI_API_KEY not set (or invalid) and some functions lack cached embeddings. "
+                "Set a valid API key or run with --cached-only to skip."
+            )
+
+        texts = [f.text for f in uncached_functions]
+        try:
+            new_embeddings = get_embeddings_batch(texts)
+        except Exception as e:
+            error_msg = str(e).lower()
+            if "401" in error_msg or "authentication" in error_msg or "api key" in error_msg:
+                pytest.skip(
+                    f"Invalid OPENAI_API_KEY and some functions lack cached embeddings. "
+                    f"Set a valid API key or run with --cached-only to skip. Error: {e}"
+                )
+            pytest.fail(f"Failed to get embeddings from OpenAI: {e}")
+
+        for func, embedding in zip(uncached_functions, new_embeddings, strict=True):
+            func.embedding = embedding
+            baselines.setdefault("embeddings", {})[func.hash] = embedding
+
+        for func in functions:
+            baselines.setdefault("function_hashes", {})[f"{func.file}:{func.name}:{func.start_line}"] = func.hash
+
+        save_baselines(baselines)
+
+    if update_baselines:
+        pytest.skip("Updated embedding baselines")
+
+    pair_violations: list[str] = []
+    neighbor_violations: list[str] = []
+
+    for i, func_a in enumerate(functions):
+        if func_a.embedding is None:
+            continue
+
+        similar_neighbors = []
+
+        for j, func_b in enumerate(functions):
+            if i >= j or func_b.embedding is None:
+                continue
+
+            similarity = compute_cosine_similarity(func_a.embedding, func_b.embedding)
+
+            if similarity >= threshold_pair:
+                pair_violations.append(
+                    f"{func_a.file}:{func_a.start_line} {func_a.name}() vs "
+                    f"{func_b.file}:{func_b.start_line} {func_b.name}() - "
+                    f"similarity: {similarity:.1%}"
+                )
+
+            if similarity >= threshold_neighbor:
+                similar_neighbors.append((func_b.file, func_b.name, func_b.start_line, similarity))
+
+        if len(similar_neighbors) >= 2:
+            neighbor_info = ", ".join(f"{f}:{n}() ({s:.1%})" for f, n, _, s in similar_neighbors[:3])
+            neighbor_violations.append(
+                f"{func_a.file}:{func_a.start_line} {func_a.name}() has "
+                f"{len(similar_neighbors)} similar functions: {neighbor_info}"
+            )
+
+    all_violations: list[str] = []
+    if pair_violations:
+        all_violations.append(f"High similarity pairs (>={threshold_pair:.0%}):\n  " + "\n  ".join(pair_violations))
+    if neighbor_violations:
+        all_violations.append(
+            f"Functions with multiple similar neighbors (>={threshold_neighbor:.0%}):\n  "
+            + "\n  ".join(neighbor_violations)
+        )
+
+    if all_violations:
+        error_msg = "\n\n".join(all_violations)
+        cc_map, cog_map = load_complexity_maps()
+        refactor_msg = get_refactor_priority_message(functions, cc_map, cog_map)
+        if refactor_msg:
+            error_msg += refactor_msg
+        pytest.fail(error_msg)
+
+
+# =============================================================================
 # Tests
 # =============================================================================
 
@@ -1002,7 +1121,7 @@ def _get_refactor_priority_suffix() -> str:
     try:
         baselines = load_baselines()
         config = baselines.get("config", {})
-        min_loc = config.get("min_loc_for_similarity", 15)
+        min_loc = config.get("min_loc_for_similarity", 1)
 
         # Get refactor index config values
         threshold = config.get("refactor_index_threshold", DEFAULT_REFACTOR_INDEX_THRESHOLD)
@@ -1415,124 +1534,21 @@ class TestFunctionSimilarity:
         """
         baselines = load_baselines()
         config = baselines.get("config", {})
-        min_loc = config.get("min_loc_for_similarity", 15)
+        min_loc = config.get("min_loc_for_similarity", 1)
         threshold_pair = config.get("similarity_threshold_pair", 0.90)
         threshold_neighbor = config.get("similarity_threshold_neighbor", 0.85)
 
         # Extract functions from ALL puco_eeff directories
         functions = extract_all_function_infos(min_loc=min_loc)
-
-        if len(functions) < 2:
-            pytest.skip("Not enough functions to compare")
-
-        # Check cache status
-        uncached_functions: list[FunctionInfo] = []
-        for func in functions:
-            cached = get_cached_embedding(baselines, func.hash)
-            if cached is not None:
-                func.embedding = cached
-            else:
-                uncached_functions.append(func)
-
-        # Handle cached-only mode
-        if cached_only and uncached_functions:
-            uncached_names = [f"{f.file}:{f.name}" for f in uncached_functions]
-            pytest.skip(
-                f"--cached-only mode: {len(uncached_functions)} functions lack "
-                f"cached embeddings:\n  "
-                + "\n  ".join(uncached_names[:10])
-                + (f"\n  ... and {len(uncached_names) - 10} more" if len(uncached_names) > 10 else "")
-            )
-
-        # Get embeddings for uncached functions
-        if uncached_functions:
-            api_key = os.environ.get("OPENAI_API_KEY")
-            if not api_key or api_key.startswith("your_") or api_key.startswith("sk-xxx") or len(api_key) < 20:
-                pytest.skip(
-                    "OPENAI_API_KEY not set (or invalid) and some functions lack cached embeddings. "
-                    "Set a valid API key or run with --cached-only to skip."
-                )
-
-            texts = [f.text for f in uncached_functions]
-            try:
-                new_embeddings = get_embeddings_batch(texts)
-            except Exception as e:
-                error_msg = str(e).lower()
-                if "401" in error_msg or "authentication" in error_msg or "api key" in error_msg:
-                    pytest.skip(
-                        f"Invalid OPENAI_API_KEY and some functions lack cached embeddings. "
-                        f"Set a valid API key or run with --cached-only to skip. Error: {e}"
-                    )
-                pytest.fail(f"Failed to get embeddings from OpenAI: {e}")
-
-            # Update functions and cache
-            for func, embedding in zip(uncached_functions, new_embeddings, strict=True):
-                func.embedding = embedding
-                baselines.setdefault("embeddings", {})[func.hash] = embedding
-
-            # Update hash mappings
-            for func in functions:
-                baselines.setdefault("function_hashes", {})[f"{func.file}:{func.name}:{func.start_line}"] = func.hash
-
-            save_baselines(baselines)
-
-        if update_baselines:
-            pytest.skip("Updated embedding baselines")
-
-        # Build similarity matrix and check violations
-        pair_violations: list[str] = []
-        neighbor_violations: list[str] = []
-
-        # Check all pairs
-        for i, func_a in enumerate(functions):
-            if func_a.embedding is None:
-                continue
-
-            similar_neighbors = []
-
-            for j, func_b in enumerate(functions):
-                if i >= j or func_b.embedding is None:
-                    continue
-
-                similarity = compute_cosine_similarity(func_a.embedding, func_b.embedding)
-
-                # Check pair threshold
-                if similarity >= threshold_pair:
-                    pair_violations.append(
-                        f"{func_a.file}:{func_a.start_line} {func_a.name}() vs "
-                        f"{func_b.file}:{func_b.start_line} {func_b.name}() - "
-                        f"similarity: {similarity:.1%}"
-                    )
-
-                # Track neighbors for neighbor threshold check
-                if similarity >= threshold_neighbor:
-                    similar_neighbors.append((func_b.file, func_b.name, func_b.start_line, similarity))
-
-            # Check if function has too many similar neighbors
-            if len(similar_neighbors) >= 2:
-                neighbor_info = ", ".join(f"{f}:{n}() ({s:.1%})" for f, n, _, s in similar_neighbors[:3])
-                neighbor_violations.append(
-                    f"{func_a.file}:{func_a.start_line} {func_a.name}() has "
-                    f"{len(similar_neighbors)} similar functions: {neighbor_info}"
-                )
-
-        all_violations = []
-        if pair_violations:
-            all_violations.append(f"High similarity pairs (>={threshold_pair:.0%}):\n  " + "\n  ".join(pair_violations))
-        if neighbor_violations:
-            all_violations.append(
-                f"Functions with multiple similar neighbors (>={threshold_neighbor:.0%}):\n  "
-                + "\n  ".join(neighbor_violations)
-            )
-
-        if all_violations:
-            error_msg = "\n\n".join(all_violations)
-            # Compute refactor priority using the already-loaded functions and embeddings
-            cc_map, cog_map = _load_all_complexity_maps()
-            refactor_msg = get_refactor_priority_message(functions, cc_map, cog_map)
-            if refactor_msg:
-                error_msg += refactor_msg
-            pytest.fail(error_msg)
+        _run_similarity_checks(
+            baselines=baselines,
+            functions=functions,
+            update_baselines=update_baselines,
+            cached_only=cached_only,
+            threshold_pair=threshold_pair,
+            threshold_neighbor=threshold_neighbor,
+            load_complexity_maps=_load_all_complexity_maps,
+        )
 
     def test_function_similarity(
         self,
@@ -1549,123 +1565,18 @@ class TestFunctionSimilarity:
         """
         baselines = load_baselines()
         config = baselines.get("config", {})
-        min_loc = config.get("min_loc_for_similarity", 15)
+        min_loc = config.get("min_loc_for_similarity", 1)
         threshold_pair = config.get("similarity_threshold_pair", 0.90)
         threshold_neighbor = config.get("similarity_threshold_neighbor", 0.85)
 
         # Extract functions meeting LOC threshold
         functions = extract_function_infos(min_loc=min_loc)
-
-        if len(functions) < 2:
-            pytest.skip("Not enough functions to compare")
-
-        # Check cache status
-        uncached_functions: list[FunctionInfo] = []
-        for func in functions:
-            cached = get_cached_embedding(baselines, func.hash)
-            if cached is not None:
-                func.embedding = cached
-            else:
-                uncached_functions.append(func)
-
-        # Handle cached-only mode
-        if cached_only and uncached_functions:
-            uncached_names = [f"{f.file}:{f.name}" for f in uncached_functions]
-            pytest.skip(
-                f"--cached-only mode: {len(uncached_functions)} functions lack "
-                f"cached embeddings:\n  "
-                + "\n  ".join(uncached_names[:10])
-                + (f"\n  ... and {len(uncached_names) - 10} more" if len(uncached_names) > 10 else "")
-            )
-
-        # Get embeddings for uncached functions
-        if uncached_functions:
-            api_key = os.environ.get("OPENAI_API_KEY")
-            # Check for missing, placeholder, or obviously invalid API keys
-            if not api_key or api_key.startswith("your_") or api_key.startswith("sk-xxx") or len(api_key) < 20:
-                pytest.skip(
-                    "OPENAI_API_KEY not set (or invalid) and some functions lack cached embeddings. "
-                    "Set a valid API key or run with --cached-only to skip."
-                )
-
-            texts = [f.text for f in uncached_functions]
-            try:
-                new_embeddings = get_embeddings_batch(texts)
-            except Exception as e:
-                # Handle auth errors gracefully - treat as missing API key
-                error_msg = str(e).lower()
-                if "401" in error_msg or "authentication" in error_msg or "api key" in error_msg:
-                    pytest.skip(
-                        f"Invalid OPENAI_API_KEY and some functions lack cached embeddings. "
-                        f"Set a valid API key or run with --cached-only to skip. Error: {e}"
-                    )
-                pytest.fail(f"Failed to get embeddings from OpenAI: {e}")
-
-            # Update functions and cache
-            for func, embedding in zip(uncached_functions, new_embeddings, strict=True):
-                func.embedding = embedding
-                baselines.setdefault("embeddings", {})[func.hash] = embedding
-
-            # Update hash mappings
-            for func in functions:
-                baselines.setdefault("function_hashes", {})[f"{func.file}:{func.name}:{func.start_line}"] = func.hash
-
-            save_baselines(baselines)
-
-        if update_baselines:
-            pytest.skip("Updated embedding baselines")
-
-        # Build similarity matrix and check violations
-        pair_violations: list[str] = []
-        neighbor_violations: list[str] = []
-
-        # Check all pairs
-        for i, func_a in enumerate(functions):
-            if func_a.embedding is None:
-                continue
-
-            similar_neighbors = []
-
-            for j, func_b in enumerate(functions):
-                if i >= j or func_b.embedding is None:
-                    continue
-
-                similarity = compute_cosine_similarity(func_a.embedding, func_b.embedding)
-
-                # Check pair threshold
-                if similarity >= threshold_pair:
-                    pair_violations.append(
-                        f"{func_a.file}:{func_a.start_line} {func_a.name}() vs "
-                        f"{func_b.file}:{func_b.start_line} {func_b.name}() - "
-                        f"similarity: {similarity:.1%}"
-                    )
-
-                # Track neighbors for neighbor threshold check
-                if similarity >= threshold_neighbor:
-                    similar_neighbors.append((func_b.file, func_b.name, func_b.start_line, similarity))
-
-            # Check if function has too many similar neighbors
-            if len(similar_neighbors) >= 2:
-                neighbor_info = ", ".join(f"{f}:{n}() ({s:.1%})" for f, n, _, s in similar_neighbors[:3])
-                neighbor_violations.append(
-                    f"{func_a.file}:{func_a.start_line} {func_a.name}() has "
-                    f"{len(similar_neighbors)} similar functions: {neighbor_info}"
-                )
-
-        all_violations = []
-        if pair_violations:
-            all_violations.append(f"High similarity pairs (>={threshold_pair:.0%}):\n  " + "\n  ".join(pair_violations))
-        if neighbor_violations:
-            all_violations.append(
-                f"Functions with multiple similar neighbors (>={threshold_neighbor:.0%}):\n  "
-                + "\n  ".join(neighbor_violations)
-            )
-
-        if all_violations:
-            error_msg = "\n\n".join(all_violations)
-            # Compute refactor priority using the already-loaded functions and embeddings
-            cc_map, cog_map = _load_complexity_maps()
-            refactor_msg = get_refactor_priority_message(functions, cc_map, cog_map)
-            if refactor_msg:
-                error_msg += refactor_msg
-            pytest.fail(error_msg)
+        _run_similarity_checks(
+            baselines=baselines,
+            functions=functions,
+            update_baselines=update_baselines,
+            cached_only=cached_only,
+            threshold_pair=threshold_pair,
+            threshold_neighbor=threshold_neighbor,
+            load_complexity_maps=_load_complexity_maps,
+        )

@@ -46,7 +46,6 @@ from typing import Any
 from puco_eeff.config import (
     CONFIG_DIR,
     format_period_display,
-    get_config,
     get_period_paths,
 )
 
@@ -614,22 +613,6 @@ class Sheet1Data:
 # =============================================================================
 
 
-def quarter_to_roman(quarter: int) -> str:
-    """Convert quarter number to Roman numeral format.
-
-    Args:
-        quarter: Quarter number (1-4)
-
-    Returns:
-        Roman numeral string (I, II, III, IV)
-    """
-    config = get_config()
-    period_types = config.get("period_types", {})
-    quarterly_config = period_types.get("quarterly", {})
-    roman_map = quarterly_config.get("roman_numerals", {"1": "I", "2": "II", "3": "III", "4": "IV"})
-    return roman_map.get(str(quarter), str(quarter))
-
-
 def format_quarter_label(year: int, quarter: int) -> str:
     """Format quarter label as used in Sheet1 headers.
 
@@ -870,7 +853,6 @@ __all__ = [
     # Utilities
     "print_sheet1_report",
     "save_sheet1_data",
-    "compare_to_reference",
     # Validation (re-exported with lazy import)
     "run_sheet1_validations",
     "get_validation_types",

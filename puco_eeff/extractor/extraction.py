@@ -26,8 +26,8 @@ import pdfplumber
 
 from puco_eeff.config import (
     format_period_display,
-    get_config,
     get_xbrl_scaling_factor,
+    quarter_to_roman,
     setup_logging,
 )
 from puco_eeff.extractor.table_parser import (
@@ -536,23 +536,6 @@ def extract_xbrl_totals(xbrl_path: Path) -> dict[str, int | None]:
 # =============================================================================
 # Period Formatting
 # =============================================================================
-
-
-def quarter_to_roman(quarter: int) -> str:
-    """Convert quarter number to Roman numeral format."""
-    config = get_config()
-    period_types = config.get("period_types", {})
-    quarterly_config = period_types.get("quarterly", {})
-    roman_map = quarterly_config.get("roman_numerals")
-
-    if roman_map is None:
-        raise ValueError("roman_numerals not found in config/config.json period_types.quarterly.")
-
-    result = roman_map.get(str(quarter))
-    if result is None:
-        raise ValueError(f"Quarter {quarter} not found in roman_numerals mapping.")
-
-    return result
 
 
 def format_period_label(year: int, period: int, period_type: str = "quarterly") -> str:

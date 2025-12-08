@@ -18,27 +18,11 @@ from typing import Any
 
 import pandas as pd
 
-from puco_eeff.config import DATA_DIR, setup_logging
+from puco_eeff.config import DATA_DIR, quarter_to_roman, setup_logging
 
 logger = setup_logging(__name__)
 
-# Quarter to Roman numeral mapping
-QUARTER_TO_ROMAN = {1: "I", 2: "II", 3: "III", 4: "IV"}
 ROMAN_TO_QUARTER = {"I": 1, "II": 2, "III": 3, "IV": 4}
-
-
-def quarter_to_roman(quarter: int) -> str:
-    """Convert quarter number to Roman numeral.
-
-    Args:
-        quarter: Quarter number (1-4)
-
-    Returns:
-        Roman numeral string (I, II, III, IV)
-    """
-    if quarter not in QUARTER_TO_ROMAN:
-        raise ValueError(f"Invalid quarter: {quarter}. Must be 1-4.")
-    return QUARTER_TO_ROMAN[quarter]
 
 
 def roman_to_quarter(roman: str) -> int:

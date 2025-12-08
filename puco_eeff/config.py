@@ -262,6 +262,30 @@ def format_period_key(
         return f"{year}_Q{period}"
 
 
+def quarter_to_roman(quarter: int) -> str:
+    """Convert a quarter number to Roman numeral.
+
+    Uses the canonical period type config to allow custom numerals while
+    enforcing the 1-4 domain. This helper is the single implementation
+    shared across modules; other modules should import from here.
+
+    Args:
+        quarter: Quarter number (1-4)
+
+    Returns:
+        Roman numeral string (I, II, III, IV)
+
+    Raises:
+        ValueError: If quarter is not 1-4
+    """
+    if quarter not in (1, 2, 3, 4):
+        raise ValueError(f"Invalid quarter: {quarter}. Must be 1-4.")
+
+    type_config = get_period_type_config("quarterly")
+    roman_map = type_config.get("roman_numerals", {"1": "I", "2": "II", "3": "III", "4": "IV"})
+    return roman_map[str(quarter)]
+
+
 def format_period_display(
     year: int,
     period: int,
