@@ -89,6 +89,7 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    # Note: Baseline updates require manual PR—CI will not auto-commit changes
 
     steps:
       - uses: actions/checkout@v4
@@ -111,6 +112,15 @@ jobs:
           path: .venv
           key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
 
+      - name: Cache test baselines
+        uses: actions/cache@v4
+        with:
+          path: tests/baselines/
+          key: baselines-${{ runner.os }}-py3.12-${{ hashFiles('poetry.lock') }}-${{ hashFiles('tests/baselines/extractor_metrics.json') }}
+          restore-keys: |
+            baselines-${{ runner.os }}-py3.12-${{ hashFiles('poetry.lock') }}-
+            baselines-${{ runner.os }}-py3.12-
+
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
         run: poetry install --no-interaction --no-root
@@ -119,4 +129,6 @@ jobs:
         run: poetry install --no-interaction
 
       - name: Run pytest
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: poetry run pytest tests/ -v --tb=short
