@@ -39,7 +39,6 @@ from puco_eeff.extractor.validation_core import (
     ValidationResult,
     format_validation_report,
     run_sheet1_validations,
-    validate_extraction,
 )
 from puco_eeff.extractor.xbrl_parser import get_facts_by_name, parse_xbrl_file
 from puco_eeff.sheets.sheet1 import Sheet1Data, print_sheet1_report, save_sheet1_data
@@ -67,7 +66,6 @@ __all__ = [
     "extract_xbrl_totals",
     # Validation
     "run_sheet1_validations",
-    "validate_extraction",  # Deprecated, use run_sheet1_validations()
     "format_validation_report",
     # PDF/XBRL utilities
     "extract_tables_from_pdf",

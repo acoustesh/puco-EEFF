@@ -152,6 +152,27 @@ def _resolve_xbrl_path(raw_xbrl_dir: Path, year: int, quarter: int) -> tuple[Pat
     return xbrl_path, xbrl_available
 
 
+def _populate_sheet1_from_nota(data: Sheet1Data, nota: SectionBreakdown, section_name: str, total_field: str) -> None:
+    """Populate Sheet1Data from a single Nota section."""
+    data.set_value(total_field, nota.total_ytd_actual)
+    for item in nota.items:
+        _map_nota_item_to_sheet1(item, data, section_name)
+
+
+def _extract_ingresos_fallback(data: Sheet1Data, ef_path: Path) -> ValidationReport:
+    """Extract Ingresos from PDF and return sum-only validation report."""
+    logger.info("No XBRL available, extracting Ingresos from Estado de Resultados")
+    ingresos_value = extract_ingresos_from_pdf(ef_path)
+    if ingresos_value is not None:
+        data.ingresos_ordinarios = ingresos_value
+        logger.info(f"Set Ingresos from PDF: {ingresos_value:,}")
+    else:
+        logger.warning("Could not extract Ingresos from PDF")
+
+    sum_results = _run_sum_validations(data)
+    return ValidationReport(sum_validations=sum_results)
+
+
 def extract_sheet1_from_analisis_razonado(
     year: int,
     quarter: int,
@@ -188,30 +209,15 @@ def extract_sheet1_from_analisis_razonado(
         return (None, None) if return_report else None
 
     if nota_21:
-        data.total_costo_venta = nota_21.total_ytd_actual
-        for item in nota_21.items:
-            _map_nota_item_to_sheet1(item, data, "nota_21")
+        _populate_sheet1_from_nota(data, nota_21, "nota_21", "total_costo_venta")
 
     if nota_22:
-        data.total_gasto_admin = nota_22.total_ytd_actual
-        for item in nota_22.items:
-            _map_nota_item_to_sheet1(item, data, "nota_22")
-
-    report: ValidationReport | None = None
+        _populate_sheet1_from_nota(data, nota_22, "nota_22", "total_gasto_admin")
 
     if xbrl_available and validate_with_xbrl and xbrl_path:
         report = _validate_sheet1_with_xbrl(data, xbrl_path)
     else:
-        logger.info("No XBRL available, extracting Ingresos from Estado de Resultados")
-        ingresos_value = extract_ingresos_from_pdf(ef_path)
-        if ingresos_value is not None:
-            data.ingresos_ordinarios = ingresos_value
-            logger.info(f"Set Ingresos from PDF: {ingresos_value:,}")
-        else:
-            logger.warning("Could not extract Ingresos from PDF")
-
-        sum_results = _run_sum_validations(data)
-        report = ValidationReport(sum_validations=sum_results)
+        report = _extract_ingresos_fallback(data, ef_path)
 
     return (data, report) if return_report else data
 
@@ -388,6 +394,57 @@ def _breakdown_to_dict(breakdown: SectionBreakdown) -> dict:
     }
 
 
+def _save_legacy_extraction_result(result: ExtractionResult, output_dir: Path | None) -> Path:
+    """Save ExtractionResult in legacy format (detailed_costs.json)."""
+    if output_dir is None:
+        paths = get_period_paths(result.year, result.quarter)
+        output_dir = paths["processed"]
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / "detailed_costs.json"
+
+    nota_21 = result.sections.get("nota_21")
+    nota_22 = result.sections.get("nota_22")
+    data = {
+        "period": f"{result.year}_Q{result.quarter}",
+        "source": result.source,
+        "pdf_path": str(result.pdf_path) if result.pdf_path else None,
+        "xbrl_path": str(result.xbrl_path) if result.xbrl_path else None,
+        "xbrl_available": result.xbrl_available,
+        "nota_21": _breakdown_to_dict(nota_21) if nota_21 else None,
+        "nota_22": _breakdown_to_dict(nota_22) if nota_22 else None,
+        "validations": [
+            {
+                "field": v.field_name,
+                "pdf_value": v.pdf_value,
+                "xbrl_value": v.xbrl_value,
+                "match": v.match,
+                "source": v.source,
+                "status": v.status,
+            }
+            for v in result.validations
+        ],
+    }
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+    logger.info(f"Saved extraction result to: {output_path}")
+    return output_path
+
+
+def _build_validation_summary(report: ValidationReport) -> dict:
+    """Build validation summary dictionary from report."""
+    return {
+        "sum_validations": len(report.sum_validations),
+        "pdf_xbrl_validations": len(report.pdf_xbrl_validations),
+        "cross_validations": len(report.cross_validations),
+        "sum_passed": sum(1 for v in report.sum_validations if v.match),
+        "pdf_xbrl_passed": sum(1 for v in report.pdf_xbrl_validations if v.match),
+        "cross_passed": sum(1 for v in report.cross_validations if v.match),
+    }
+
+
 def save_extraction_result(
     data_or_result: Sheet1Data | ExtractionResult,
     year_or_output_dir: int | Path | None = None,
@@ -402,44 +459,8 @@ def save_extraction_result(
     """
     # Legacy signature: save_extraction_result(ExtractionResult, output_dir)
     if isinstance(data_or_result, ExtractionResult):
-        result = data_or_result
         output_dir = year_or_output_dir if isinstance(year_or_output_dir, Path) else None
-
-        if output_dir is None:
-            paths = get_period_paths(result.year, result.quarter)
-            output_dir = paths["processed"]
-
-        output_dir.mkdir(parents=True, exist_ok=True)
-        output_path = output_dir / "detailed_costs.json"
-
-        nota_21 = result.sections.get("nota_21")
-        nota_22 = result.sections.get("nota_22")
-        data = {
-            "period": f"{result.year}_Q{result.quarter}",
-            "source": result.source,
-            "pdf_path": str(result.pdf_path) if result.pdf_path else None,
-            "xbrl_path": str(result.xbrl_path) if result.xbrl_path else None,
-            "xbrl_available": result.xbrl_available,
-            "nota_21": _breakdown_to_dict(nota_21) if nota_21 else None,
-            "nota_22": _breakdown_to_dict(nota_22) if nota_22 else None,
-            "validations": [
-                {
-                    "field": v.field_name,
-                    "pdf_value": v.pdf_value,
-                    "xbrl_value": v.xbrl_value,
-                    "match": v.match,
-                    "source": v.source,
-                    "status": v.status,
-                }
-                for v in result.validations
-            ],
-        }
-
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-
-        logger.info(f"Saved extraction result to: {output_path}")
-        return output_path
+        return _save_legacy_extraction_result(data_or_result, output_dir)
 
     # New signature: save_extraction_result(Sheet1Data, year, quarter, report)
     data = data_or_result
@@ -455,14 +476,7 @@ def save_extraction_result(
 
     result_dict = asdict(data)
     if report:
-        result_dict["_validation_summary"] = {
-            "sum_validations": len(report.sum_validations),
-            "pdf_xbrl_validations": len(report.pdf_xbrl_validations),
-            "cross_validations": len(report.cross_validations),
-            "sum_passed": sum(1 for v in report.sum_validations if v.match),
-            "pdf_xbrl_passed": sum(1 for v in report.pdf_xbrl_validations if v.match),
-            "cross_passed": sum(1 for v in report.cross_validations if v.match),
-        }
+        result_dict["_validation_summary"] = _build_validation_summary(report)
 
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(result_dict, f, indent=2, ensure_ascii=False, default=str)

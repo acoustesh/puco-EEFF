@@ -13,12 +13,10 @@ Tests cover:
 10. PDF↔XBRL validation helper (_run_pdf_xbrl_validations)
 11. Config-driven section conversion (sections_to_sheet1data)
 12. ExtractionResult.validation_report field
-13. Config-driven _section_breakdowns_to_sheet1data
 """
 
 from __future__ import annotations
 
-import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
@@ -41,10 +39,8 @@ from puco_eeff.extractor.validation_core import (
     _run_pdf_xbrl_validations,
     _run_sum_validations,
     _safe_eval_expression,
-    _section_breakdowns_to_sheet1data,
     format_validation_report,
     run_sheet1_validations,
-    validate_extraction,
 )
 from puco_eeff.sheets.sheet1 import (
     Sheet1Data,
@@ -326,56 +322,49 @@ class TestExtractionResult:
 
 
 # =============================================================================
-# Tests for validate_extraction function (Deprecated)
+# Tests for PDF↔XBRL validation
 # =============================================================================
 
 
-@pytest.mark.filterwarnings("ignore::DeprecationWarning")
-class TestValidateExtraction:
-    """Tests for the validate_extraction function (deprecated)."""
+class TestPdfXbrlValidation:
+    """Tests for PDF↔XBRL validation using _run_pdf_xbrl_validations."""
 
     @pytest.fixture
-    def nota_21(self) -> SectionBreakdown:
-        """Sample Nota 21 breakdown."""
-        breakdown = SectionBreakdown(section_id="nota_21", section_title="Costo de Venta")
-        breakdown.total_ytd_actual = -170862
-        return breakdown
+    def sample_data_both(self) -> Sheet1Data:
+        """Sample Sheet1Data with both cost sections."""
+        data = Sheet1Data(quarter="IIQ2024", year=2024, quarter_num=2)
+        data.total_costo_venta = -170862
+        data.total_gasto_admin = -17363
+        return data
 
-    @pytest.fixture
-    def nota_22(self) -> SectionBreakdown:
-        """Sample Nota 22 breakdown."""
-        breakdown = SectionBreakdown(section_id="nota_22", section_title="Gastos Admin")
-        breakdown.total_ytd_actual = -17363
-        return breakdown
-
-    def test_both_sources_match(self, nota_21: SectionBreakdown, nota_22: SectionBreakdown) -> None:
+    def test_both_sources_match(self, sample_data_both: Sheet1Data) -> None:
         """Both PDF and XBRL values match."""
         xbrl_totals = {
             "cost_of_sales": -170862,
             "admin_expense": -17363,
         }
 
-        validations = validate_extraction(nota_21, nota_22, xbrl_totals)
+        validations = _run_pdf_xbrl_validations(sample_data_both, xbrl_totals, use_fallback=False)
 
         assert len(validations) == 2
         assert all(v.match for v in validations)
         assert all(v.source == "both" for v in validations)
 
-    def test_sign_difference_should_match(self, nota_21: SectionBreakdown, nota_22: SectionBreakdown) -> None:
+    def test_sign_difference_should_match(self, sample_data_both: Sheet1Data) -> None:
         """Absolute values should match even with sign difference."""
         xbrl_totals = {
             "cost_of_sales": 170862,  # Positive vs PDF negative
             "admin_expense": 17363,
         }
 
-        validations = validate_extraction(nota_21, nota_22, xbrl_totals)
+        validations = _run_pdf_xbrl_validations(sample_data_both, xbrl_totals, use_fallback=False)
 
         # Should match because we compare absolute values
         assert all(v.match for v in validations)
 
-    def test_pdf_only_no_xbrl(self, nota_21: SectionBreakdown, nota_22: SectionBreakdown) -> None:
+    def test_pdf_only_no_xbrl(self, sample_data_both: Sheet1Data) -> None:
         """PDF-only extraction when no XBRL available."""
-        validations = validate_extraction(nota_21, nota_22, None)
+        validations = _run_pdf_xbrl_validations(sample_data_both, None, use_fallback=False)
 
         assert len(validations) == 2
         assert all(v.source == "pdf_only" for v in validations)
@@ -383,27 +372,30 @@ class TestValidateExtraction:
 
     def test_xbrl_only_pdf_failed(self) -> None:
         """XBRL-only when PDF extraction failed - XBRL used as source."""
+        data = Sheet1Data(quarter="IIQ2024", year=2024, quarter_num=2)
+        # No PDF values set
         xbrl_totals = {
             "cost_of_sales": -170862,
             "admin_expense": -17363,
         }
 
-        validations = validate_extraction(None, None, xbrl_totals)
+        validations = _run_pdf_xbrl_validations(data, xbrl_totals, use_fallback=False)
 
         assert len(validations) == 2
         assert all(v.source == "xbrl_only" for v in validations)
         # match=True because XBRL was successfully used as source (not a validation failure)
         assert all(v.match for v in validations)
 
-    def test_mismatch_shows_difference(self, nota_21: SectionBreakdown) -> None:
+    def test_mismatch_shows_difference(self) -> None:
         """Mismatch should include difference value (absolute)."""
-        nota_21.total_ytd_actual = -100000
+        data = Sheet1Data(quarter="IIQ2024", year=2024, quarter_num=2)
+        data.total_costo_venta = -100000
         xbrl_totals = {
             "cost_of_sales": -110000,
             "admin_expense": None,
         }
 
-        validations = validate_extraction(nota_21, None, xbrl_totals)
+        validations = _run_pdf_xbrl_validations(data, xbrl_totals, use_fallback=False)
 
         cost_val = next(v for v in validations if "Costo" in v.field_name)
         assert cost_val.match is False
@@ -1788,76 +1780,6 @@ class TestRunSheetValidations:
             assert v.source == "pdf_only"
 
 
-class TestSectionBreakdownsToSheet1Data:
-    """Tests for _section_breakdowns_to_sheet1data helper."""
-
-    def test_converts_nota_21_total(self) -> None:
-        """Converts Nota 21 total to Sheet1Data."""
-        nota_21 = SectionBreakdown(section_id="nota_21", section_title="Costo de Venta")
-        nota_21.total_ytd_actual = -126202
-
-        data = _section_breakdowns_to_sheet1data(nota_21, None, 2024, 2)
-
-        assert data.total_costo_venta == -126202
-        assert data.total_gasto_admin is None
-        assert data.year == 2024
-        assert data.quarter_num == 2
-
-    def test_converts_nota_22_total(self) -> None:
-        """Converts Nota 22 total to Sheet1Data."""
-        nota_22 = SectionBreakdown(section_id="nota_22", section_title="Gastos Admin")
-        nota_22.total_ytd_actual = -11632
-
-        data = _section_breakdowns_to_sheet1data(None, nota_22, 2024, 2)
-
-        assert data.total_costo_venta is None
-        assert data.total_gasto_admin == -11632
-
-    def test_converts_both_notas(self) -> None:
-        """Converts both Notas to Sheet1Data."""
-        nota_21 = SectionBreakdown(section_id="nota_21", section_title="Costo de Venta")
-        nota_21.total_ytd_actual = -126202
-        nota_22 = SectionBreakdown(section_id="nota_22", section_title="Gastos Admin")
-        nota_22.total_ytd_actual = -11632
-
-        data = _section_breakdowns_to_sheet1data(nota_21, nota_22, 2024, 2)
-
-        assert data.total_costo_venta == -126202
-        assert data.total_gasto_admin == -11632
-
-    def test_handles_none_inputs(self) -> None:
-        """Handles None inputs gracefully."""
-        data = _section_breakdowns_to_sheet1data(None, None, 0, 0)
-
-        assert data.total_costo_venta is None
-        assert data.total_gasto_admin is None
-
-
-class TestValidateExtractionDeprecation:
-    """Tests for validate_extraction deprecation warning."""
-
-    def test_emits_deprecation_warning(self) -> None:
-        """validate_extraction emits DeprecationWarning."""
-        nota_21 = SectionBreakdown(section_id="nota_21", section_title="Costo de Venta")
-        nota_21.total_ytd_actual = -100000
-
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            validate_extraction(nota_21, None, None)
-
-            # Should have at least 1 warning for validate_extraction itself
-            # (may also have warning from _section_breakdowns_to_sheet1data)
-            deprecation_warnings = [warning for warning in w if issubclass(warning.category, DeprecationWarning)]
-            assert len(deprecation_warnings) >= 1
-
-            # Check that validate_extraction's deprecation warning is present
-            validate_extraction_warnings = [
-                warning for warning in deprecation_warnings if "run_sheet1_validations" in str(warning.message)
-            ]
-            assert len(validate_extraction_warnings) == 1
-            assert "deprecated" in str(validate_extraction_warnings[0].message).lower()
-
-
 class TestRunPdfXbrlValidations:
     """Tests for _run_pdf_xbrl_validations helper."""
 
@@ -2188,40 +2110,42 @@ class TestExtractionResultValidationReport:
 
 
 # =============================================================================
-# Tests for config-driven _section_breakdowns_to_sheet1data
+# Tests for config-driven sections_to_sheet1data
 # =============================================================================
 
 
-class TestConfigDrivenSectionBreakdowns:
-    """Tests that _section_breakdowns_to_sheet1data uses config mapping."""
+class TestConfigDrivenSectionsToSheet1Data:
+    """Tests that sections_to_sheet1data uses config mapping."""
 
     def test_uses_config_mapping_for_nota_21(self) -> None:
-        """_section_breakdowns_to_sheet1data uses config for nota_21 → total_costo_venta."""
+        """sections_to_sheet1data uses config for nota_21 → total_costo_venta."""
         mapping = get_sheet1_section_total_mapping()
         assert mapping["nota_21"] == "total_costo_venta"
 
         nota_21 = SectionBreakdown(section_id="nota_21", section_title="Test")
         nota_21.total_ytd_actual = -99999
+        sections = {"nota_21": nota_21}
 
-        data = _section_breakdowns_to_sheet1data(nota_21, None, 2024, 4)
+        data = sections_to_sheet1data(sections, 2024, 4)
 
         assert data.total_costo_venta == -99999
 
     def test_uses_config_mapping_for_nota_22(self) -> None:
-        """_section_breakdowns_to_sheet1data uses config for nota_22 → total_gasto_admin."""
+        """sections_to_sheet1data uses config for nota_22 → total_gasto_admin."""
         mapping = get_sheet1_section_total_mapping()
         assert mapping["nota_22"] == "total_gasto_admin"
 
         nota_22 = SectionBreakdown(section_id="nota_22", section_title="Test")
         nota_22.total_ytd_actual = -88888
+        sections = {"nota_22": nota_22}
 
-        data = _section_breakdowns_to_sheet1data(None, nota_22, 2024, 4)
+        data = sections_to_sheet1data(sections, 2024, 4)
 
         assert data.total_gasto_admin == -88888
 
     def test_period_label_format(self) -> None:
-        """_section_breakdowns_to_sheet1data uses correct period label format."""
-        data = _section_breakdowns_to_sheet1data(None, None, 2024, 3)
+        """sections_to_sheet1data uses correct period label format."""
+        data = sections_to_sheet1data({}, 2024, 3)
 
         # Uses Roman numeral format (e.g., "IIIQ2024"), not "unknown" or "2024Q3"
         assert data.quarter == "IIIQ2024"

@@ -196,6 +196,37 @@ def get_table_identifiers(section_spec: dict[str, Any]) -> tuple[list[str], list
 # =============================================================================
 
 
+def _normalize_text_list(texts: list[str]) -> list[str]:
+    """Normalize a list of texts for case-insensitive matching."""
+    result = []
+    for text in texts:
+        result.append(text.lower())
+        normalized = normalize_for_matching(text)
+        if normalized != text.lower():
+            result.append(normalized)
+    return result
+
+
+def _page_matches_criteria(
+    page_text: str,
+    required_normalized: list[str],
+    optional_normalized: list[str],
+    min_required: int,
+    min_optional: int,
+) -> bool:
+    """Check if page text matches required/optional criteria."""
+    required_count = sum(1 for req in required_normalized if req in page_text)
+    if required_count < min_required:
+        return False
+
+    if optional_normalized and min_optional > 0:
+        optional_count = sum(1 for opt in optional_normalized if opt in page_text)
+        if optional_count < min_optional:
+            return False
+
+    return True
+
+
 def find_text_page(
     pdf_path: Path,
     required_texts: list[str],
@@ -207,36 +238,15 @@ def find_text_page(
     if min_required is None:
         min_required = 1
 
-    required_normalized = []
-    for text in required_texts:
-        required_normalized.append(text.lower())
-        normalized = normalize_for_matching(text)
-        if normalized != text.lower():
-            required_normalized.append(normalized)
-
-    optional_lower = []
-    if optional_texts:
-        for text in optional_texts:
-            optional_lower.append(text.lower())
-            normalized = normalize_for_matching(text)
-            if normalized != text.lower():
-                optional_lower.append(normalized)
+    required_normalized = _normalize_text_list(required_texts)
+    optional_normalized = _normalize_text_list(optional_texts) if optional_texts else []
 
     with pdfplumber.open(pdf_path) as pdf:
         for page_idx, page in enumerate(pdf.pages):
-            text = (page.extract_text() or "").lower()
-
-            required_count = sum(1 for req in required_normalized if req in text)
-            if required_count < min_required:
-                continue
-
-            if optional_lower and min_optional > 0:
-                optional_count = sum(1 for opt in optional_lower if opt in text)
-                if optional_count < min_optional:
-                    continue
-
-            logger.debug(f"Found text match on page {page_idx + 1}")
-            return page_idx
+            page_text = (page.extract_text() or "").lower()
+            if _page_matches_criteria(page_text, required_normalized, optional_normalized, min_required, min_optional):
+                logger.debug(f"Found text match on page {page_idx + 1}")
+                return page_idx
 
     return None
 
@@ -340,48 +350,41 @@ def extract_table_from_page(
 # =============================================================================
 
 
-def extract_pdf_section(
-    pdf_path: Path,
-    section_name: str,
-    sheet_name: str = "sheet1",
-    year: int | None = None,
-    quarter: int | None = None,
-) -> SectionBreakdown | None:
-    """Extract a section from PDF using config-driven rules."""
-    section_spec = get_sheet1_section_spec(section_name)
-    section_title = section_spec.get("title", section_name)
-    expected_items = get_section_expected_labels(section_name, sheet_name)
-
+def _find_section_page_with_fallback(
+    pdf_path: Path, section_name: str, year: int | None, quarter: int | None
+) -> int | None:
+    """Find section page, trying fallback section if primary not found."""
     page_idx = find_section_page(pdf_path, section_name, year, quarter)
+    if page_idx is not None:
+        return page_idx
 
-    if page_idx is None:
-        fallback = get_section_fallback(section_name)
-        if fallback:
-            page_idx = find_section_page(pdf_path, fallback, year, quarter)
+    fallback = get_section_fallback(section_name)
+    if fallback:
+        return find_section_page(pdf_path, fallback, year, quarter)
+    return None
 
-    if page_idx is None:
-        logger.error(f"Could not find section '{section_name}' in PDF")
-        return None
 
+def _extract_table_with_next_page_fallback(
+    pdf_path: Path,
+    page_idx: int,
+    expected_items: list[str],
+    section_name: str,
+    year: int | None,
+    quarter: int | None,
+) -> list[dict[str, Any]]:
+    """Extract table from page, trying next page if empty."""
     rows = extract_table_from_page(
         pdf_path, page_idx, expected_items, section_name=section_name, year=year, quarter=quarter
     )
-
-    if not rows:
-        rows = extract_table_from_page(
-            pdf_path, page_idx + 1, expected_items, section_name=section_name, year=year, quarter=quarter
-        )
-
-    if not rows:
-        logger.error(f"Could not extract table for section '{section_name}'")
-        return None
-
-    breakdown = SectionBreakdown(
-        section_id=section_name,
-        section_title=section_title,
-        page_number=page_idx + 1,
+    if rows:
+        return rows
+    return extract_table_from_page(
+        pdf_path, page_idx + 1, expected_items, section_name=section_name, year=year, quarter=quarter
     )
 
+
+def _populate_breakdown_from_rows(breakdown: SectionBreakdown, rows: list[dict[str, Any]]) -> None:
+    """Populate SectionBreakdown with data from extracted rows."""
     for row in rows:
         concepto = row["concepto"]
         values = row.get("values", [])
@@ -400,6 +403,36 @@ def extract_pdf_section(
                 quarter_anterior=values[3] if len(values) > 3 else None,
             )
             breakdown.items.append(item)
+
+
+def extract_pdf_section(
+    pdf_path: Path,
+    section_name: str,
+    sheet_name: str = "sheet1",
+    year: int | None = None,
+    quarter: int | None = None,
+) -> SectionBreakdown | None:
+    """Extract a section from PDF using config-driven rules."""
+    section_spec = get_sheet1_section_spec(section_name)
+    section_title = section_spec.get("title", section_name)
+    expected_items = get_section_expected_labels(section_name, sheet_name)
+
+    page_idx = _find_section_page_with_fallback(pdf_path, section_name, year, quarter)
+    if page_idx is None:
+        logger.error(f"Could not find section '{section_name}' in PDF")
+        return None
+
+    rows = _extract_table_with_next_page_fallback(pdf_path, page_idx, expected_items, section_name, year, quarter)
+    if not rows:
+        logger.error(f"Could not extract table for section '{section_name}'")
+        return None
+
+    breakdown = SectionBreakdown(
+        section_id=section_name,
+        section_title=section_title,
+        page_number=page_idx + 1,
+    )
+    _populate_breakdown_from_rows(breakdown, rows)
 
     logger.info(f"Extracted {len(breakdown.items)} items from section '{section_name}'")
     return breakdown
@@ -539,15 +572,6 @@ def format_quarter_label(year: int, quarter: int) -> str:
 # Re-export table_parser functions for backward compatibility
 from puco_eeff.extractor.table_parser import (  # noqa: E402, F401
     parse_chilean_number,
-    normalize_for_matching as _normalize_for_matching,
-    match_item as _match_item,
-    score_table_match as _score_table_match,
-    parse_multiline_row as _parse_multiline_row,
-    parse_single_row as _parse_single_row,
-    parse_cost_table as _parse_cost_table,
-    find_label_index as _find_label_index,
-    count_value_offset as _count_value_offset,
-    extract_value_from_row as _extract_value_from_row,
 )
 
 # Private aliases for backward compatibility

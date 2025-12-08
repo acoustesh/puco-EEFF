@@ -29,7 +29,6 @@ from puco_eeff.sheets.sheet1 import (
     get_sheet1_cross_validations,
     get_sheet1_pdf_xbrl_validations,
     get_sheet1_result_key_mapping,
-    get_sheet1_section_total_mapping,
     get_sheet1_sum_tolerance,
     get_sheet1_total_validations,
 )
@@ -49,7 +48,6 @@ __all__ = [
     "log_validation_report",
     # Validation runners
     "run_sheet1_validations",
-    "validate_extraction",
     # Internal helpers (needed by extraction_pipeline)
     "_run_sum_validations",
     "_run_pdf_xbrl_validations",
@@ -647,62 +645,3 @@ def run_sheet1_validations(
         pdf_xbrl_validations=pdf_xbrl_results,
         reference_issues=None,
     )
-
-
-def validate_extraction(
-    pdf_nota_21: SectionBreakdown | None,
-    pdf_nota_22: SectionBreakdown | None,
-    xbrl_totals: dict[str, int | None] | None,
-) -> list[ValidationResult]:
-    """Cross-validate PDF extraction against XBRL totals (deprecated)."""
-    import warnings
-
-    warnings.warn(
-        "validate_extraction() is deprecated. Use run_sheet1_validations() instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-
-    data = _section_breakdowns_to_sheet1data(pdf_nota_21, pdf_nota_22)
-    report = run_sheet1_validations(
-        data,
-        xbrl_totals,
-        run_sum_validations=False,
-        run_pdf_xbrl_validations=True,
-        run_cross_validations=False,
-        use_xbrl_fallback=False,
-    )
-    return report.pdf_xbrl_validations
-
-
-def _section_breakdowns_to_sheet1data(
-    nota_21: SectionBreakdown | None,
-    nota_22: SectionBreakdown | None,
-    year: int = 0,
-    quarter: int = 0,
-) -> Sheet1Data:
-    """Convert SectionBreakdown objects to Sheet1Data (deprecated)."""
-    import warnings
-
-    from puco_eeff.extractor.extraction import format_quarter_label
-
-    warnings.warn(
-        "_section_breakdowns_to_sheet1data() is deprecated. Use sections_to_sheet1data() instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-
-    quarter_label = format_quarter_label(year, quarter)
-    data = Sheet1Data(quarter=quarter_label, year=year, quarter_num=quarter)
-
-    section_total_mapping = get_sheet1_section_total_mapping()
-
-    if nota_21 and "nota_21" in section_total_mapping:
-        field_name = section_total_mapping["nota_21"]
-        data.set_value(field_name, nota_21.total_ytd_actual)
-
-    if nota_22 and "nota_22" in section_total_mapping:
-        field_name = section_total_mapping["nota_22"]
-        data.set_value(field_name, nota_22.total_ytd_actual)
-
-    return data

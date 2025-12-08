@@ -46,7 +46,7 @@ from puco_eeff.config import (  # noqa: E402, I001
     get_period_paths,
     setup_logging,
 )
-from puco_eeff.extractor.cost_extractor import (  # noqa: E402
+from puco_eeff.extractor import (  # noqa: E402
     ValidationReport,
     extract_sheet1,
     format_validation_report,
