@@ -51,7 +51,7 @@ def get_config() -> dict[str, Any]:
         msg = f"Configuration file not found: {config_path}"
         raise FileNotFoundError(msg)
 
-    with open(config_path, encoding="utf-8") as f:
+    with Path(config_path).open(encoding="utf-8") as f:
         return json.load(f)  # type: ignore[no-any-return]
 
 
@@ -183,7 +183,7 @@ def get_extraction_specs() -> dict[str, Any]:
         msg = f"Extraction specs not found: {specs_path}"
         raise FileNotFoundError(msg)
 
-    with open(specs_path, encoding="utf-8") as f:
+    with Path(specs_path).open(encoding="utf-8") as f:
         return json.load(f)  # type: ignore[no-any-return]
 
 
@@ -205,7 +205,7 @@ def get_xbrl_specs() -> dict[str, Any]:
         msg = f"XBRL specs not found: {xbrl_path}"
         raise FileNotFoundError(msg)
 
-    with open(xbrl_path, encoding="utf-8") as f:
+    with Path(xbrl_path).open(encoding="utf-8") as f:
         return json.load(f)  # type: ignore[no-any-return]
 
 
@@ -217,7 +217,7 @@ def get_xbrl_scaling_factor() -> int:
 
     """
     xbrl_specs = get_xbrl_specs()
-    return cast(int, xbrl_specs.get("scaling_factor", 1000))
+    return cast("int", xbrl_specs.get("scaling_factor", 1000))
 
 
 def get_xbrl_namespaces() -> dict[str, str]:
@@ -228,7 +228,7 @@ def get_xbrl_namespaces() -> dict[str, str]:
 
     """
     xbrl_specs = get_xbrl_specs()
-    return cast(dict[str, str], xbrl_specs.get("namespaces", {}))
+    return cast("dict[str, str]", xbrl_specs.get("namespaces", {}))
 
 
 # =============================================================================
@@ -248,7 +248,7 @@ def get_period_type_config(period_type: str = "quarterly") -> dict[str, Any]:
     """
     config = get_config()
     period_types = config.get("period_types", {})
-    return cast(dict[str, Any], period_types.get(period_type, period_types.get("quarterly", {})))
+    return cast("dict[str, Any]", period_types.get(period_type, period_types.get("quarterly", {})))
 
 
 def format_period_key(
@@ -300,7 +300,7 @@ def quarter_to_roman(quarter: int) -> str:
 
     type_config = get_period_type_config("quarterly")
     roman_map = type_config.get("roman_numerals", {"1": "I", "2": "II", "3": "III", "4": "IV"})
-    return cast(str, roman_map[str(quarter)])
+    return cast("str", roman_map[str(quarter)])
 
 
 def format_period_display(
@@ -383,7 +383,7 @@ def get_file_pattern(file_type: str) -> str:
     config = get_config()
     patterns = config.get("file_patterns", {})
     file_config = patterns.get(file_type, {})
-    return cast(str, file_config.get("pattern", f"{file_type}_{{year}}_Q{{quarter}}"))
+    return cast("str", file_config.get("pattern", f"{file_type}_{{year}}_Q{{quarter}}"))
 
 
 def get_file_pattern_alternatives(file_type: str) -> list[str]:
@@ -399,7 +399,7 @@ def get_file_pattern_alternatives(file_type: str) -> list[str]:
     config = get_config()
     patterns = config.get("file_patterns", {})
     file_config = patterns.get(file_type, {})
-    return cast(list[str], file_config.get("alt_patterns", []))
+    return cast("list[str]", file_config.get("alt_patterns", []))
 
 
 def format_filename(
@@ -478,7 +478,7 @@ def get_total_row_markers() -> list[str]:
     specs = get_extraction_specs()
     doc_structure = specs.get("document_structure", {})
     markers = doc_structure.get("section_markers", {})
-    return cast(list[str], markers.get("table_end_markers", ["Totales", "Total"]))
+    return cast("list[str]", markers.get("table_end_markers", ["Totales", "Total"]))
 
 
 def _deep_merge(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
@@ -550,7 +550,7 @@ def extract_pdf_page_to_temp(
     TEMP_DIR.mkdir(parents=True, exist_ok=True)
     temp_path = TEMP_DIR / f"{prefix}{pdf_path.stem}_p{page_number}.pdf"
 
-    with open(temp_path, "wb") as f:
+    with Path(temp_path).open("wb") as f:
         writer.write(f)
 
     return temp_path

@@ -142,7 +142,7 @@ def _parse_number(value: Any) -> float | None:
         return -result if is_negative else result
 
     except (InvalidOperation, ValueError):
-        logger.debug(f"Could not parse number: {value}")
+        logger.debug("Could not parse number: %s", value)
         return None
 
 

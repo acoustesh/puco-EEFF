@@ -87,12 +87,12 @@ def download_all_documents(
     pdf_dir.mkdir(parents=True, exist_ok=True)
     xbrl_dir.mkdir(parents=True, exist_ok=True)
 
-    logger.info(f"Downloading all documents for {year} Q{quarter}")
-    logger.debug(f"Filters: tipo={tipo}, tipo_norma={tipo_norma}")
+    logger.info("Downloading all documents for %s Q%s", year, quarter)
+    logger.debug("Filters: tipo=%s, tipo_norma=%s", tipo, tipo_norma)
 
     cmf_success = False
 
-    with browser_session(headless=headless) as (browser, context, page):
+    with browser_session(headless=headless) as (_browser, _context, page):
         # Navigate and apply filters
         if not _navigate_and_filter(page, cmf_config, year, quarter, tipo, tipo_norma):
             logger.warning("Failed to navigate and apply filters on CMF Chile")
@@ -301,11 +301,11 @@ def download_single_document(
 
     output_dir = xbrl_dir if document_type == "estados_financieros_xbrl" else pdf_dir
 
-    logger.info(f"Downloading {document_type} for {year} Q{quarter}")
+    logger.info("Downloading %s for %s Q%s", document_type, year, quarter)
 
     result = None
 
-    with browser_session(headless=headless) as (browser, context, page):
+    with browser_session(headless=headless) as (_browser, _context, page):
         if not _navigate_and_filter(page, cmf_config, year, quarter, tipo, tipo_norma):
             logger.warning("Failed to navigate and apply CMF Chile filters")
         else:
@@ -395,20 +395,20 @@ def _navigate_and_filter(
     month = quarter_to_month[str(quarter)]
 
     try:
-        logger.debug(f"Navigating to: {base_url}")
+        logger.debug("Navigating to: %s", base_url)
         page.goto(base_url, wait_until="networkidle", timeout=60000)
 
         # Apply filters
-        logger.debug(f"Selecting month: {month}")
+        logger.debug("Selecting month: %s", month)
         page.select_option(selectors["month"], month)
 
-        logger.debug(f"Selecting year: {year}")
+        logger.debug("Selecting year: %s", year)
         page.select_option(selectors["year"], str(year))
 
-        logger.debug(f"Selecting tipo: {tipo}")
+        logger.debug("Selecting tipo: %s", tipo)
         page.select_option(selectors["tipo"], tipo)
 
-        logger.debug(f"Selecting tipo_norma: {tipo_norma}")
+        logger.debug("Selecting tipo_norma: %s", tipo_norma)
         page.select_option(selectors["tipo_norma"], tipo_norma)
 
         # Click submit
@@ -419,14 +419,14 @@ def _navigate_and_filter(
         # Small delay to ensure results are loaded
         time.sleep(2)
 
-        logger.info(f"Successfully filtered for {year} Q{quarter}")
+        logger.info("Successfully filtered for %s Q%s", year, quarter)
         return True
 
     except PlaywrightTimeout as e:
-        logger.exception(f"Timeout during navigation: {e}")
+        logger.exception("Timeout during navigation: %s", e)
         return False
     except Exception as e:
-        logger.exception(f"Error during navigation: {e}")
+        logger.exception("Error during navigation: %s", e)
         return False
 
 
@@ -456,14 +456,14 @@ def _download_single_document(
     filename = doc_config["filename_pattern"].format(year=year, quarter=quarter)
     output_path = output_dir / filename
 
-    logger.debug(f"Looking for link: {link_text}")
+    logger.debug("Looking for link: %s", link_text)
 
     try:
         # Find the download link
         link = page.get_by_text(link_text, exact=True)
 
         if link.count() == 0:
-            logger.warning(f"Link not found: {link_text}")
+            logger.warning("Link not found: %s", link_text)
             return DownloadResult(
                 document_type=doc_type,
                 success=False,
@@ -488,7 +488,7 @@ def _download_single_document(
                 file_path=output_path,
                 file_size=file_size,
             )
-        logger.error(f"File not saved: {output_path}")
+        logger.error("File not saved: %s", output_path)
         return DownloadResult(
             document_type=doc_type,
             success=False,
@@ -498,7 +498,7 @@ def _download_single_document(
         )
 
     except PlaywrightTimeout:
-        logger.exception(f"Timeout downloading: {link_text}")
+        logger.exception("Timeout downloading: %s", link_text)
         return DownloadResult(
             document_type=doc_type,
             success=False,
@@ -507,7 +507,7 @@ def _download_single_document(
             error="Download timeout",
         )
     except Exception as e:
-        logger.exception(f"Error downloading {link_text}: {e}")
+        logger.exception("Error downloading %s: %s", link_text, e)
         return DownloadResult(
             document_type=doc_type,
             success=False,
@@ -540,14 +540,14 @@ def _extract_xbrl_zip(
 
     """
     if zip_path is None or not zip_path.exists():
-        logger.warning(f"ZIP file not found: {zip_path}")
+        logger.warning("ZIP file not found: %s", zip_path)
         return None
 
     try:
         with zipfile.ZipFile(zip_path, "r") as zf:
             # List all files in archive
             all_files = zf.namelist()
-            logger.debug(f"Files in ZIP: {all_files}")
+            logger.debug("Files in ZIP: %s", all_files)
 
             # Prioritize .xbrl files (main instance document with actual data)
             # .xml files are often just label linkbases without financial facts
@@ -558,12 +558,12 @@ def _extract_xbrl_zip(
                 # Use .xbrl file - this is the main instance document
                 main_file = xbrl_files[0]
                 output_filename = f"estados_financieros_{year}_Q{quarter}.xbrl"
-                logger.info(f"Found .xbrl instance document: {main_file}")
+                logger.info("Found .xbrl instance document: %s", main_file)
             elif xml_files:
                 # Fallback to .xml if no .xbrl found
                 main_file = xml_files[0]
                 output_filename = f"estados_financieros_{year}_Q{quarter}.xml"
-                logger.warning(f"No .xbrl found, falling back to .xml: {main_file}")
+                logger.warning("No .xbrl found, falling back to .xml: %s", main_file)
             else:
                 logger.error("No XML/XBRL files found in ZIP archive")
                 return None
@@ -571,7 +571,7 @@ def _extract_xbrl_zip(
             # Save to xbrl directory (separate from PDFs)
             xbrl_dir.mkdir(parents=True, exist_ok=True)
             output_path = xbrl_dir / output_filename
-            logger.debug(f"Extracting: {main_file} -> {output_path}")
+            logger.debug("Extracting: %s -> %s", main_file, output_path)
 
             with zf.open(main_file) as source:
                 xbrl_content = source.read()
@@ -581,10 +581,10 @@ def _extract_xbrl_zip(
         return output_path
 
     except zipfile.BadZipFile:
-        logger.exception(f"Invalid ZIP file: {zip_path}")
+        logger.exception("Invalid ZIP file: %s", zip_path)
         return None
     except Exception as e:
-        logger.exception(f"Error extracting ZIP: {e}")
+        logger.exception("Error extracting ZIP: %s", e)
         return None
 
 
@@ -607,7 +607,7 @@ def list_available_periods(headless: bool = True) -> list[dict]:
 
     periods: list[dict] = []
 
-    with browser_session(headless=headless) as (browser, context, page):
+    with browser_session(headless=headless) as (_browser, _context, page):
         page.goto(base_url, wait_until="networkidle", timeout=60000)
 
         # Get available years
@@ -617,7 +617,7 @@ def list_available_periods(headless: bool = True) -> list[dict]:
             years = [
                 opt.get_attribute("value") for opt in year_options if opt.get_attribute("value")
             ]
-            logger.debug(f"Available years: {years}")
+            logger.debug("Available years: %s", years)
 
             # Get available months
             month_select = page.query_selector("select[name='mm']")
@@ -628,7 +628,7 @@ def list_available_periods(headless: bool = True) -> list[dict]:
                     for opt in month_options
                     if opt.get_attribute("value")
                 ]
-                logger.debug(f"Available months: {months}")
+                logger.debug("Available months: %s", months)
 
                 for year in years:
                     for month in months:

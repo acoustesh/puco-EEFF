@@ -217,9 +217,9 @@ def download_from_pucobre(
     date_str = f"{quarter_to_date[quarter]}-{year}"
     expected_link = f"Estados Financieros {date_str}"
 
-    logger.info(f"Attempting to download from Pucobre.cl: {expected_link}")
+    logger.info("Attempting to download from Pucobre.cl: %s", expected_link)
 
-    with browser_session(headless=headless) as (browser, context, page):
+    with browser_session(headless=headless) as (_browser, context, page):
         # Track PDF URLs from responses
         pdf_url: str | None = None
         pdf_content: bytes | None = None
@@ -237,7 +237,7 @@ def download_from_pucobre(
 
         try:
             # Navigate to Pucobre Estados Financieros page
-            logger.debug(f"Navigating to: {pucobre_url}")
+            logger.debug("Navigating to: %s", pucobre_url)
             page.goto(pucobre_url, wait_until="networkidle", timeout=60000)
 
             # Wait for the table to load
@@ -247,7 +247,7 @@ def download_from_pucobre(
             link = page.get_by_role("link", name=expected_link)
 
             if link.count() == 0:
-                logger.warning(f"Link not found: {expected_link}")
+                logger.warning("Link not found: %s", expected_link)
                 # Try alternative search - look for partial match
                 link = _find_period_link(page, year, quarter, quarter_to_date)
                 if link is None:
@@ -272,7 +272,7 @@ def download_from_pucobre(
                 combined_path.write_bytes(pdf_content)
                 downloaded = True
             elif pdf_url:
-                logger.debug(f"PDF URL captured: {pdf_url}")
+                logger.debug("PDF URL captured: %s", pdf_url)
                 response = page.request.get(pdf_url)
                 if response.ok:
                     combined_path.write_bytes(response.body())
@@ -329,7 +329,7 @@ def download_from_pucobre(
                             analisis_razonado_size=ar_size,
                             combined_pdf_path=combined_path,
                         )
-                    logger.warning(f"Failed to split PDF: {error}")
+                    logger.warning("Failed to split PDF: %s", error)
                         # Fall through to return combined as EEFF
                 else:
                     logger.warning("Could not find Análisis Razonado section in PDF")
@@ -349,7 +349,7 @@ def download_from_pucobre(
             )
 
         except PlaywrightTimeout as e:
-            logger.exception(f"Timeout downloading from Pucobre: {e}")
+            logger.exception("Timeout downloading from Pucobre: %s", e)
             return PucobreDownloadResult(
                 success=False,
                 file_path=None,
@@ -357,7 +357,7 @@ def download_from_pucobre(
                 error=f"Timeout: {e}",
             )
         except Exception as e:
-            logger.exception(f"Error downloading from Pucobre: {e}")
+            logger.exception("Error downloading from Pucobre: %s", e)
             return PucobreDownloadResult(
                 success=False,
                 file_path=None,
@@ -395,7 +395,7 @@ def _find_period_link(page: Page, year: int, quarter: int, quarter_to_date: dict
             link = page.locator(f"a:has-text('{quarter_to_date[quarter]}-{year}')")
 
         if link.count() > 0:
-            logger.debug(f"Found link with pattern: {pattern}")
+            logger.debug("Found link with pattern: %s", pattern)
             return link
 
     return None
@@ -415,7 +415,7 @@ def list_pucobre_periods(headless: bool = True, config: dict | None = None) -> l
     pucobre_url, _ = _get_pucobre_config(config)
     periods: list[dict] = []
 
-    with browser_session(headless=headless) as (browser, context, page):
+    with browser_session(headless=headless) as (_browser, _context, page):
         page.goto(pucobre_url, wait_until="networkidle", timeout=60000)
         time.sleep(2)
 
@@ -471,12 +471,12 @@ def check_pucobre_availability(
     date_str = f"{quarter_to_date[quarter]}-{year}"
     expected_link = f"Estados Financieros {date_str}"
 
-    with browser_session(headless=headless) as (browser, context, page):
+    with browser_session(headless=headless) as (_browser, _context, page):
         page.goto(pucobre_url, wait_until="networkidle", timeout=60000)
         time.sleep(2)
 
         link = page.get_by_role("link", name=expected_link)
         available = link.count() > 0
 
-        logger.debug(f"Pucobre availability for {year} Q{quarter}: {available}")
+        logger.debug("Pucobre availability for %s Q%s: %s", year, quarter, available)
         return available

@@ -10,12 +10,9 @@ This module provides functions to:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import Any, Protocol
 
 from puco_eeff.config import get_config, setup_logging
-
-if TYPE_CHECKING:
-    pass
 
 logger = setup_logging(__name__)
 
@@ -46,14 +43,14 @@ class ValidatorFunc(Protocol):
     """Protocol for validator functions with optional config parameter."""
 
     def __call__(
-        self, data: dict[str, Any], config: dict[str, Any] | None = None
+        self, data: dict[str, Any], config: dict[str, Any] | None = None,
     ) -> ValidationResult:
         """Call validator with data and optional config."""
         ...
 
 
 def get_standard_structure(
-    sheet_name: str = "sheet1", config: dict[str, Any] | None = None
+    sheet_name: str = "sheet1", config: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Get the standard row structure for a sheet.
 
@@ -88,7 +85,7 @@ def get_standard_structure(
 
 
 def get_field_labels(
-    sheet_name: str = "sheet1", config: dict[str, Any] | None = None
+    sheet_name: str = "sheet1", config: dict[str, Any] | None = None,
 ) -> dict[str, str]:
     """Get field to label mapping for a sheet.
 
@@ -285,7 +282,7 @@ def validate_against_reference(
     reference_data = sheet1_config.get("data", {}).get(period, {})
 
     if not reference_data:
-        logger.warning(f"No reference data found for period: {period}")
+        logger.warning("No reference data found for period: %s", period)
         return []
 
     results = []

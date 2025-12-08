@@ -79,7 +79,7 @@ def extract_detailed_costs(year: int, quarter: int, validate: bool = True) -> Ex
         pdf_path = raw_dir / format_filename("estados_financieros_pdf", year, quarter)
 
     if not pdf_path.exists():
-        logger.error(f"PDF not found: {pdf_path}")
+        logger.error("PDF not found: %s", pdf_path)
         return ExtractionResult(year=year, quarter=quarter, xbrl_available=False)
 
     combined_path = find_file_with_alternatives(raw_dir, "pucobre_combined", year, quarter)
@@ -118,7 +118,7 @@ def extract_detailed_costs(year: int, quarter: int, validate: bool = True) -> Ex
             result.validations = report.pdf_xbrl_validations
             result.validation_report = report
     else:
-        logger.info(f"No XBRL available for {year} Q{quarter} - using PDF only")
+        logger.info("No XBRL available for %s Q%s - using PDF only", year, quarter)
         result.xbrl_available = False
 
         if validate:
@@ -185,7 +185,7 @@ def extract_sheet1_from_analisis_razonado(
 
     ef_path = _resolve_pdf_path(raw_dir, year, quarter)
     if not ef_path:
-        logger.warning(f"Estados Financieros PDF not found in {raw_dir}")
+        logger.warning("Estados Financieros PDF not found in %s", raw_dir)
         return (None, None) if return_report else None
 
     combined_path = find_file_with_alternatives(raw_dir, "pucobre_combined", year, quarter)
@@ -205,7 +205,7 @@ def extract_sheet1_from_analisis_razonado(
     nota_22 = extract_pdf_section(ef_path, "nota_22")
 
     if nota_21 is None and nota_22 is None:
-        logger.error(f"Could not extract Nota 21 or 22 from {ef_path}")
+        logger.error("Could not extract Nota 21 or 22 from %s", ef_path)
         return (None, None) if return_report else None
 
     if nota_21:
@@ -251,12 +251,12 @@ def extract_sheet1_from_xbrl(
         xbrl_path = paths["raw_xbrl"] / format_filename("estados_financieros_xbrl", year, quarter)
 
     if not xbrl_path.exists():
-        logger.warning(f"XBRL file not found: {xbrl_path}")
+        logger.warning("XBRL file not found: %s", xbrl_path)
         return (None, None) if return_report else None
 
     xbrl_totals = extract_xbrl_totals(xbrl_path)
     if not xbrl_totals:
-        logger.error(f"Could not extract totals from XBRL: {xbrl_path}")
+        logger.error("Could not extract totals from XBRL: %s", xbrl_path)
         return (None, None) if return_report else None
 
     data = Sheet1Data(
@@ -277,7 +277,7 @@ def extract_sheet1_from_xbrl(
         value = xbrl_totals.get(xbrl_field)
         if value is not None:
             data.set_value(sheet1_field, value)
-            logger.debug(f"XBRL: {sheet1_field} = {value}")
+            logger.debug("XBRL: %s = %s", sheet1_field, value)
 
     report: ValidationReport | None = None
     if return_report:
@@ -365,7 +365,7 @@ def _merge_pdf_into_xbrl_data(xbrl_data: Sheet1Data, pdf_data: Sheet1Data) -> Sh
 
         if pdf_value is not None and xbrl_value is None:
             setattr(xbrl_data, field_name, pdf_value)
-            logger.debug(f"Merged PDF field {field_name} = {pdf_value} into XBRL data")
+            logger.debug("Merged PDF field %s = %s into XBRL data", field_name, pdf_value)
 
     xbrl_data.source = f"xbrl+{pdf_data.source}"
     return xbrl_data
@@ -426,10 +426,10 @@ def _save_legacy_extraction_result(result: ExtractionResult, output_dir: Path | 
         ],
     }
 
-    with open(output_path, "w", encoding="utf-8") as f:
+    with Path(output_path).open("w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
-    logger.info(f"Saved extraction result to: {output_path}")
+    logger.info("Saved extraction result to: %s", output_path)
     return output_path
 
 
@@ -479,10 +479,10 @@ def save_extraction_result(
     if report:
         result_dict["_validation_summary"] = _build_validation_summary(report)
 
-    with open(output_path, "w", encoding="utf-8") as f:
+    with Path(output_path).open("w", encoding="utf-8") as f:
         json.dump(result_dict, f, indent=2, ensure_ascii=False, default=str)
 
-    logger.info(f"Saved extraction result to {output_path}")
+    logger.info("Saved extraction result to %s", output_path)
     return output_path
 
 

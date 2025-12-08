@@ -78,10 +78,10 @@ def parse_xbrl_file(file_path: Path) -> dict[str, Any]:
         Dictionary containing extracted financial data
 
     """
-    logger.info(f"Parsing XBRL file: {file_path}")
+    logger.info("Parsing XBRL file: %s", file_path)
 
     if not file_path.exists():
-        logger.error(f"File not found: {file_path}")
+        logger.error("File not found: %s", file_path)
         msg = f"XBRL file not found: {file_path}"
         raise FileNotFoundError(msg)
 
@@ -90,12 +90,12 @@ def parse_xbrl_file(file_path: Path) -> dict[str, Any]:
 
     # Try parsing - lxml handles encoding declaration automatically
     try:
-        root = etree.fromstring(content)  # noqa: S320
+        root = etree.fromstring(content)
     except etree.XMLSyntaxError as e:
         # Fallback: try with explicit ISO-8859-1 encoding
-        logger.debug(f"Initial parse failed, trying ISO-8859-1: {e}")
+        logger.debug("Initial parse failed, trying ISO-8859-1: %s", e)
         content_str = content.decode("iso-8859-1")
-        root = etree.fromstring(content_str.encode("utf-8"))  # noqa: S320
+        root = etree.fromstring(content_str.encode("utf-8"))
 
     # Detect namespaces from the document
     doc_namespaces = _detect_namespaces(root)
@@ -130,9 +130,7 @@ def _detect_namespaces(root: etree._Element) -> dict[str, str]:
     namespaces = dict(NAMESPACES)  # Start with common namespaces
 
     # Add namespaces from the document
-    for prefix, uri in root.nsmap.items():
-        if prefix is not None:
-            namespaces[prefix] = uri
+    namespaces.update({prefix: uri for prefix, uri in root.nsmap.items() if prefix is not None})
 
     return namespaces
 
@@ -244,15 +242,15 @@ def extract_by_xpath(file_path: Path, xpath_expr: str) -> list[str]:
         List of extracted values as strings
 
     """
-    logger.debug(f"Extracting with XPath: {xpath_expr}")
+    logger.debug("Extracting with XPath: %s", xpath_expr)
 
     # Read file content and parse with encoding detection
     content = file_path.read_bytes()
     try:
-        root = etree.fromstring(content)  # noqa: S320
+        root = etree.fromstring(content)
     except etree.XMLSyntaxError:
         content_str = content.decode("iso-8859-1")
-        root = etree.fromstring(content_str.encode("utf-8"))  # noqa: S320
+        root = etree.fromstring(content_str.encode("utf-8"))
 
     # Use document namespaces
     namespaces = _detect_namespaces(root)
@@ -399,7 +397,7 @@ def extract_xbrl_aggregates(
                 latest_end_date = end_date
                 current_context = ctx_id
 
-    logger.debug(f"Using context: {current_context} (end: {latest_end_date})")
+    logger.debug("Using context: %s (end: %s)", current_context, latest_end_date)
 
     # Extract aggregate values
     aggregates: dict[str, int | None] = {}
@@ -463,5 +461,5 @@ def save_xbrl_aggregates(
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(save_data, f, indent=2, ensure_ascii=False)
 
-    logger.info(f"Saved XBRL aggregates to: {output_path}")
+    logger.info("Saved XBRL aggregates to: %s", output_path)
     return output_path

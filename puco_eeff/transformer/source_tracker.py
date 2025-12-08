@@ -70,7 +70,7 @@ class SourceTracker:
             self.mappings[field_name] = []
 
         self.mappings[field_name].append(source)
-        logger.debug(f"Added source for '{field_name}': {source_type} @ {location}")
+        logger.debug("Added source for '%s': %s @ %s", field_name, source_type, location)
 
     def get_primary_source(self, field_name: str) -> SourceInfo | None:
         """Get the primary (highest confidence) source for a field.
@@ -133,7 +133,7 @@ class SourceTracker:
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(self.to_dict(), f, indent=2, ensure_ascii=False)
 
-        logger.info(f"Saved source mapping to: {filepath}")
+        logger.info("Saved source mapping to: %s", filepath)
         return filepath
 
     @classmethod

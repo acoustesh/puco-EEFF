@@ -137,7 +137,7 @@ def save_sheet_data(
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(output, f, indent=2, ensure_ascii=False, default=str)
 
-    logger.info(f"Saved sheet data: {filepath}")
+    logger.info("Saved sheet data: %s", filepath)
     return filepath
 
 
@@ -176,7 +176,7 @@ def load_sheet_data(
     content = data["content"]
     df = pd.DataFrame(content["data"], columns=content["columns"])
 
-    logger.info(f"Loaded sheet data: {filepath}")
+    logger.info("Loaded sheet data: %s", filepath)
     return df
 
 
@@ -224,7 +224,7 @@ def write_sheet_to_csv(
 
     data.to_csv(filepath, index=False, encoding="utf-8")
 
-    logger.info(f"Saved sheet CSV: {filepath}")
+    logger.info("Saved sheet CSV: %s", filepath)
     return filepath
 
 

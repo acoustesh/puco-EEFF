@@ -81,7 +81,7 @@ def _load_sheet1_config(filename: str) -> dict[str, Any]:
         raise FileNotFoundError(msg)
 
     with open(config_path, encoding="utf-8") as f:
-        return cast(dict[str, Any], json.load(f))
+        return cast("dict[str, Any]", json.load(f))
 
 
 def get_sheet1_fields() -> dict[str, Any]:
@@ -112,7 +112,7 @@ def get_sheet1_value_fields() -> dict[str, dict[str, Any]]:
 
     """
     fields = get_sheet1_fields()
-    return cast(dict[str, dict[str, Any]], fields.get("value_fields", {}))
+    return cast("dict[str, dict[str, Any]]", fields.get("value_fields", {}))
 
 
 def get_sheet1_metadata_fields() -> list[str]:
@@ -123,7 +123,7 @@ def get_sheet1_metadata_fields() -> list[str]:
 
     """
     fields = get_sheet1_fields()
-    return cast(list[str], fields.get("metadata_fields", []))
+    return cast("list[str]", fields.get("metadata_fields", []))
 
 
 def get_sheet1_detail_fields(sections: list[str] | None = None) -> list[str]:
@@ -166,7 +166,7 @@ def get_sheet1_row_mapping() -> dict[str, dict[str, Any]]:
 
     """
     fields = get_sheet1_fields()
-    return cast(dict[str, dict[str, Any]], fields.get("row_mapping", {}))
+    return cast("dict[str, dict[str, Any]]", fields.get("row_mapping", {}))
 
 
 def get_sheet1_section_spec(section_name: str) -> dict[str, Any]:
@@ -188,7 +188,7 @@ def get_sheet1_section_spec(section_name: str) -> dict[str, Any]:
     if section is None:
         msg = f"Section '{section_name}' not found in sheet1/extraction.json"
         raise ValueError(msg)
-    return cast(dict[str, Any], section)
+    return cast("dict[str, Any]", section)
 
 
 def get_section_config(section_name: str, *, sheet: str = "sheet1") -> dict[str, Any]:
@@ -276,7 +276,7 @@ def get_ingresos_pdf_fallback_config() -> dict[str, Any]:
             msg,
         )
 
-    return cast(dict[str, Any], pdf_fallback)
+    return cast("dict[str, Any]", pdf_fallback)
 
 
 def get_sheet1_section_field_mappings(section_name: str) -> dict[str, dict[str, Any]]:
@@ -290,7 +290,7 @@ def get_sheet1_section_field_mappings(section_name: str) -> dict[str, dict[str, 
 
     """
     section = get_sheet1_section_spec(section_name)
-    return cast(dict[str, Any], section.get("field_mappings", {}))
+    return cast("dict[str, Any]", section.get("field_mappings", {}))
 
 
 def get_sheet1_extraction_sections() -> list[str]:
@@ -323,7 +323,7 @@ def get_sheet1_section_search_patterns(section_name: str) -> list[str]:
     if patterns is None:
         msg = f"search_patterns not found for section '{section_name}' in sheet1/extraction.json"
         raise ValueError(msg)
-    return cast(list[str], patterns)
+    return cast("list[str]", patterns)
 
 
 def get_sheet1_section_table_identifiers(section_name: str) -> tuple[list[str], list[str]]:
@@ -375,7 +375,7 @@ def get_sheet1_xbrl_fact_mapping(field_name: str) -> dict[str, Any] | None:
 
     """
     xbrl_mappings = get_sheet1_xbrl_mappings()
-    return cast(dict[str, Any] | None, xbrl_mappings.get("fact_mappings", {}).get(field_name))
+    return cast("dict[str, Any] | None", xbrl_mappings.get("fact_mappings", {}).get(field_name))
 
 
 def get_sheet1_validation_rules() -> dict[str, Any]:
@@ -386,7 +386,7 @@ def get_sheet1_validation_rules() -> dict[str, Any]:
 
     """
     xbrl_mappings = get_sheet1_xbrl_mappings()
-    return cast(dict[str, Any], xbrl_mappings.get("validation_rules", {}))
+    return cast("dict[str, Any]", xbrl_mappings.get("validation_rules", {}))
 
 
 def get_sheet1_sum_tolerance() -> int:
@@ -397,7 +397,7 @@ def get_sheet1_sum_tolerance() -> int:
 
     """
     rules = get_sheet1_validation_rules()
-    return cast(int, rules.get("sum_tolerance", 1))
+    return cast("int", rules.get("sum_tolerance", 1))
 
 
 def get_sheet1_total_validations() -> list[dict[str, Any]]:
@@ -412,7 +412,7 @@ def get_sheet1_total_validations() -> list[dict[str, Any]]:
 
     """
     rules = get_sheet1_validation_rules()
-    return cast(list[dict[str, Any]], rules.get("total_validations", []))
+    return cast("list[dict[str, Any]]", rules.get("total_validations", []))
 
 
 def get_sheet1_cross_validations() -> list[dict[str, Any]]:
@@ -426,7 +426,7 @@ def get_sheet1_cross_validations() -> list[dict[str, Any]]:
 
     """
     rules = get_sheet1_validation_rules()
-    return cast(list[dict[str, Any]], rules.get("cross_validations", []))
+    return cast("list[dict[str, Any]]", rules.get("cross_validations", []))
 
 
 def get_sheet1_result_key_mapping() -> dict[str, str]:
@@ -440,7 +440,7 @@ def get_sheet1_result_key_mapping() -> dict[str, str]:
 
     """
     xbrl_mappings = get_sheet1_xbrl_mappings()
-    return cast(dict[str, str], xbrl_mappings.get("result_key_mapping", {}))
+    return cast("dict[str, str]", xbrl_mappings.get("result_key_mapping", {}))
 
 
 def get_sheet1_pdf_xbrl_validations() -> list[dict[str, str]]:
@@ -454,7 +454,7 @@ def get_sheet1_pdf_xbrl_validations() -> list[dict[str, str]]:
 
     """
     xbrl_mappings = get_sheet1_xbrl_mappings()
-    return cast(list[dict[str, str]], xbrl_mappings.get("pdf_xbrl_validations", []))
+    return cast("list[dict[str, str]]", xbrl_mappings.get("pdf_xbrl_validations", []))
 
 
 def get_sheet1_section_total_mapping() -> dict[str, str]:
@@ -489,7 +489,7 @@ def get_sheet1_reference_values(year: int, quarter: int) -> dict[str, int] | Non
 
     period_data = ref_data.get(period_key, {})
     if period_data.get("verified") and period_data.get("values"):
-        return cast(dict[str, int], period_data["values"])
+        return cast("dict[str, int]", period_data["values"])
 
     return None
 
@@ -585,7 +585,7 @@ class Sheet1Data:
         if hasattr(self, field_name):
             setattr(self, field_name, value)
         else:
-            logger.warning(f"Unknown field name: {field_name}")
+            logger.warning("Unknown field name: %s", field_name)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary matching config row_mapping."""
@@ -690,7 +690,7 @@ def save_sheet1_data(data: Sheet1Data, output_dir: Path | None = None) -> Path:
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(data.to_dict(), f, indent=2, ensure_ascii=False)
 
-    logger.info(f"Saved Sheet1 data to: {output_path}")
+    logger.info("Saved Sheet1 data to: %s", output_path)
     return output_path
 
 
@@ -703,8 +703,6 @@ def print_sheet1_report(data: Sheet1Data) -> None:
     """
     for _row_num, label, value in data.to_row_list():
         if value is not None or label:
-            pass
-        else:
             pass
 
 

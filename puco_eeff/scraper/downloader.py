@@ -31,8 +31,8 @@ async def download_file(url: str, destination: Path, timeout: float = 60.0) -> P
     """
     destination.parent.mkdir(parents=True, exist_ok=True)
 
-    logger.info(f"Downloading: {url}")
-    logger.debug(f"Destination: {destination}")
+    logger.info("Downloading: %s", url)
+    logger.debug("Destination: %s", destination)
 
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
         response = await client.get(url)
@@ -62,8 +62,8 @@ def download_file_sync(url: str, destination: Path, timeout: float = 60.0) -> Pa
     """
     destination.parent.mkdir(parents=True, exist_ok=True)
 
-    logger.info(f"Downloading: {url}")
-    logger.debug(f"Destination: {destination}")
+    logger.info("Downloading: %s", url)
+    logger.debug("Destination: %s", destination)
 
     with httpx.Client(timeout=timeout, follow_redirects=True) as client:
         response = client.get(url)

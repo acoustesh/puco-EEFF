@@ -73,8 +73,8 @@ Format tables as markdown tables when possible."""
         },
     ]
 
-    logger.info(f"Calling Mistral OCR for: {source_desc}")
-    logger.debug(f"Model: {OCR_MODEL}")
+    logger.info("Calling Mistral OCR for: %s", source_desc)
+    logger.debug("Model: %s", OCR_MODEL)
 
     try:
         response = client.chat.complete(
@@ -100,7 +100,7 @@ Format tables as markdown tables when possible."""
         )
 
     except Exception as e:
-        logger.exception(f"Mistral OCR failed: {e}")
+        logger.exception("Mistral OCR failed: %s", e)
         result = {
             "success": False,
             "provider": "mistral",
@@ -137,7 +137,7 @@ def _prepare_pdf_content(pdf_path: Path, page_number: int | None) -> dict[str, A
 
     # Note: page selection may need to be handled differently depending on API support
     if page_number:
-        logger.debug(f"Requesting page {page_number} (API support may vary)")
+        logger.debug("Requesting page %s (API support may vary)", page_number)
 
     return content
 
@@ -214,4 +214,4 @@ def _save_audit_response(result: dict[str, Any], audit_dir: Path, model: str = "
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(result, f, indent=2, ensure_ascii=False)
 
-    logger.debug(f"Audit response saved: {filepath}")
+    logger.debug("Audit response saved: %s", filepath)

@@ -552,7 +552,7 @@ class TestSaveExtractionResult:
 
         import json
 
-        with open(output_path, encoding="utf-8") as f:
+        with Path(output_path).open(encoding="utf-8") as f:
             data = json.load(f)
 
         assert data["period"] == "2024_Q1"
@@ -745,7 +745,7 @@ class TestSaveSheet1Data:
 
         import json
 
-        with open(output_path, encoding="utf-8") as f:
+        with Path(output_path).open(encoding="utf-8") as f:
             saved = json.load(f)
 
         assert saved["quarter"] == "IIQ2024"

@@ -82,14 +82,14 @@ def files_exist_for_period(year: int, quarter: int, require_xbrl: bool = False) 
     # Check required: Estados Financieros PDF
     pdf_path = find_file_with_alternatives(paths["raw_pdf"], "estados_financieros_pdf", year, quarter)
     if pdf_path is None:
-        logger.debug(f"PDF not found for {year} Q{quarter}")
+        logger.debug("PDF not found for %s Q%s", year, quarter)
         return False
 
     # Check optional: XBRL (only if required)
     if require_xbrl:
         xbrl_path = find_file_with_alternatives(paths["raw_xbrl"], "estados_financieros_xbrl", year, quarter)
         if xbrl_path is None:
-            logger.debug(f"XBRL not found for {year} Q{quarter}")
+            logger.debug("XBRL not found for %s Q%s", year, quarter)
             return False
 
     return True
@@ -122,20 +122,20 @@ def ensure_files_downloaded(
     """
     # Check if files already exist
     if not force and files_exist_for_period(year, quarter):
-        logger.info(f"Files already exist for {year} Q{quarter}, skipping download")
+        logger.info("Files already exist for %s Q%s, skipping download", year, quarter)
         return True
 
     # Import here to avoid loading playwright when not needed
     from puco_eeff.scraper.cmf_downloader import download_all_documents
 
-    logger.info(f"Downloading files for {year} Q{quarter}...")
+    logger.info("Downloading files for %s Q%s...", year, quarter)
     results = download_all_documents(year, quarter, headless=headless)
 
     # Check if at least PDF was successful
     pdf_success = any(r.success and r.document_type == "estados_financieros_pdf" for r in results)
 
     if not pdf_success:
-        logger.error(f"Failed to download Estados Financieros PDF for {year} Q{quarter}")
+        logger.error("Failed to download Estados Financieros PDF for %s Q%s", year, quarter)
         for r in results:
             if not r.success and r.error:
                 logger.error(f"  {r.document_type}: {r.error}")
@@ -191,7 +191,7 @@ def process_sheet1(
         Tuple of (Sheet1Data, ValidationReport) if successful, (None, None) otherwise
 
     """
-    logger.info(f"Processing Sheet1 for {year} Q{quarter}")
+    logger.info("Processing Sheet1 for %s Q%s", year, quarter)
 
     # Step 1: Ensure files are available
     if not skip_download:
@@ -199,13 +199,13 @@ def process_sheet1(
             logger.error("Cannot proceed without required files")
             return None, None
     elif not files_exist_for_period(year, quarter):
-        logger.error(f"Files not found for {year} Q{quarter} and download skipped")
+        logger.error("Files not found for %s Q%s and download skipped", year, quarter)
         return None, None
 
     # Step 2: Extract Sheet1 data (includes sum and cross-validations)
     data, report = extract_sheet1(year, quarter, return_report=True)
     if data is None:
-        logger.error(f"Extraction failed for {year} Q{quarter}")
+        logger.error("Extraction failed for %s Q%s", year, quarter)
         return None, report
 
     # Step 3: Check sum validation failures (if strict mode)
@@ -229,7 +229,7 @@ def process_sheet1(
             logger.warning("⚠️  REFERENCE DATA MISMATCH - Values differ from known-good data!")
             logger.warning("=" * 60)
             for issue in ref_issues:
-                logger.warning(f"  • {issue}")
+                logger.warning("  • %s", issue)
             logger.warning("Review extraction or update reference_data.json if values are correct.")
             logger.warning("=" * 60)
 
@@ -240,7 +240,7 @@ def process_sheet1(
     # Step 5: Save to JSON
     if save:
         output_path = save_sheet1_data(data)
-        logger.info(f"Saved to: {output_path}")
+        logger.info("Saved to: %s", output_path)
 
     # Step 6: Print report
     if verbose:

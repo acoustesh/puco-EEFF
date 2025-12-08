@@ -109,7 +109,7 @@ def combine_sheet1_quarters(
     for sheet_info in available:
         period = sheet_info["period"]
         if period in existing_quarters:
-            logger.debug(f"Skipping {period} - already in workbook")
+            logger.debug("Skipping %s - already in workbook", period)
             continue
 
         # Load the JSON file
@@ -125,7 +125,7 @@ def combine_sheet1_quarters(
                 values.append(content.get(field))
 
         combined_df[period] = pd.Series(values, dtype="Int64")
-        logger.info(f"Added quarter: {period}")
+        logger.info("Added quarter: %s", period)
 
     # Ensure columns are in chronological order (Row first, then sorted periods)
     period_cols = [c for c in combined_df.columns if c != "Row"]
@@ -137,7 +137,7 @@ def combine_sheet1_quarters(
         combined_df.to_excel(writer, sheet_name="Ingresos y Costos", index=False)
         logger.debug(f"Wrote Sheet1 with {len(period_cols_sorted)} quarter columns")
 
-    logger.info(f"Workbook saved: {filepath}")
+    logger.info("Workbook saved: %s", filepath)
     return filepath
 
 
@@ -163,7 +163,7 @@ def _load_existing_sheet1(filepath: Path) -> tuple[dict[str, dict[str, Any]], se
     try:
         df = pd.read_excel(filepath, sheet_name="Ingresos y Costos")
     except Exception as e:
-        logger.warning(f"Could not load existing Sheet1: {e}")
+        logger.warning("Could not load existing Sheet1: %s", e)
         return {}, set()
 
     # Get config for field mapping
@@ -224,7 +224,7 @@ def append_quarter_to_workbook(
 
     """
     period = format_period(year, quarter)
-    logger.info(f"Appending {period} to workbook")
+    logger.info("Appending %s to workbook", period)
 
     return combine_sheet1_quarters(
         year=year,
@@ -285,7 +285,7 @@ def create_workbook_from_dataframes(
             df.to_excel(writer, sheet_name=display_name, index=False)
             logger.debug(f"Added sheet: {display_name} ({len(df)} rows)")
 
-    logger.info(f"Workbook created: {output_path}")
+    logger.info("Workbook created: %s", output_path)
     return output_path
 
 
@@ -313,5 +313,5 @@ def list_workbook_quarters(
         _, existing_quarters = _load_existing_sheet1(filepath)
         return sorted(existing_quarters, key=_period_sort_key)
     except Exception as e:
-        logger.warning(f"Could not read workbook quarters: {e}")
+        logger.warning("Could not read workbook quarters: %s", e)
         return []

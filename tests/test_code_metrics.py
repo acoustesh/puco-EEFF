@@ -102,7 +102,7 @@ def _load_embeddings() -> dict[str, list[float]]:
     """Load and decompress embeddings from the compressed cache file."""
     if not EMBEDDINGS_FILE.exists():
         return {}
-    with open(EMBEDDINGS_FILE, encoding="utf-8") as f:
+    with Path(EMBEDDINGS_FILE).open(encoding="utf-8") as f:
         compressed = json.load(f)
     return {h: _decompress_embedding(b64) for h, b64 in compressed.items()}
 
@@ -118,10 +118,10 @@ def _save_embeddings(embeddings: dict[str, list[float]]) -> None:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(compressed, f, indent=2, sort_keys=True)
             f.write("\n")
-        os.replace(temp_path, EMBEDDINGS_FILE)
+        Path(temp_path).replace(EMBEDDINGS_FILE)
     except Exception:
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
+        if Path(temp_path).exists():
+            Path(temp_path).unlink()
         raise
 
 
@@ -140,7 +140,7 @@ def load_baselines() -> dict:
     }
 
     if BASELINES_FILE.exists():
-        with open(BASELINES_FILE, encoding="utf-8") as f:
+        with Path(BASELINES_FILE).open(encoding="utf-8") as f:
             baselines.update(json.load(f))
 
     # Load embeddings from separate compressed file
@@ -165,10 +165,10 @@ def save_baselines(baselines: dict) -> None:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(baselines, f, indent=2, sort_keys=True)
             f.write("\n")
-        os.replace(temp_path, BASELINES_FILE)
+        Path(temp_path).replace(BASELINES_FILE)
     except Exception:
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
+        if Path(temp_path).exists():
+            Path(temp_path).unlink()
         raise
     finally:
         # Restore embeddings to dict (in case caller continues to use it)
@@ -617,7 +617,7 @@ def get_line_count(file_path: Path) -> int:
 
     Uses total lines count (len(file.readlines())).
     """
-    with open(file_path, encoding="utf-8") as f:
+    with Path(file_path).open(encoding="utf-8") as f:
         return len(f.readlines())
 
 

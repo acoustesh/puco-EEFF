@@ -95,7 +95,7 @@ def ocr_with_fallback(
                 all_responses.append(result)
 
             except Exception as e:
-                logger.exception(f"OCR exception: {e}")
+                logger.exception("OCR exception: %s", e)
                 all_responses.append(
                     {
                         "success": False,
@@ -109,10 +109,10 @@ def ocr_with_fallback(
             # Exponential backoff before retry
             if attempt < max_attempts - 1:
                 delay = min(base_delay * (2**attempt), max_delay)
-                logger.debug(f"Waiting {delay}s before retry...")
+                logger.debug("Waiting %ss before retry...", delay)
                 time.sleep(delay)
 
-        logger.warning(f"All {max_attempts} attempts failed for {provider}/{model}")
+        logger.warning("All %s attempts failed for %s/%s", max_attempts, provider, model)
 
     # All providers failed
     logger.error("All OCR providers failed")
@@ -181,7 +181,7 @@ Format tables as markdown tables when possible."""
         },
     ]
 
-    logger.info(f"Calling OpenRouter OCR: {model}")
+    logger.info("Calling OpenRouter OCR: %s", model)
 
     try:
         response = client.chat.completions.create(
@@ -202,10 +202,10 @@ Format tables as markdown tables when possible."""
             },
         }
 
-        logger.info(f"OpenRouter OCR successful with {model}")
+        logger.info("OpenRouter OCR successful with %s", model)
 
     except Exception as e:
-        logger.exception(f"OpenRouter OCR failed: {e}")
+        logger.exception("OpenRouter OCR failed: %s", e)
         result = {
             "success": False,
             "provider": "openrouter",

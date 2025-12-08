@@ -28,7 +28,7 @@ def extract_text_from_pdf(
         Dictionary mapping page numbers to extracted text
 
     """
-    logger.info(f"Extracting text from PDF: {file_path}")
+    logger.info("Extracting text from PDF: %s", file_path)
 
     if not file_path.exists():
         msg = f"PDF file not found: {file_path}"
@@ -38,7 +38,7 @@ def extract_text_from_pdf(
 
     with pdfplumber.open(file_path) as pdf:
         total_pages = len(pdf.pages)
-        logger.debug(f"PDF has {total_pages} pages")
+        logger.debug("PDF has %s pages", total_pages)
 
         # Determine which pages to process
         page_indices = (
@@ -71,7 +71,7 @@ def extract_tables_from_pdf(
         Dictionary mapping page numbers to list of tables (each table is a list of rows)
 
     """
-    logger.info(f"Extracting tables from PDF: {file_path}")
+    logger.info("Extracting tables from PDF: %s", file_path)
 
     if not file_path.exists():
         msg = f"PDF file not found: {file_path}"
@@ -120,7 +120,7 @@ def find_section_in_pdf(
         List of dictionaries with page number and context
 
     """
-    logger.info(f"Searching for section: {section_pattern}")
+    logger.info("Searching for section: %s", section_pattern)
 
     # Parse the section pattern
     pattern_lower = section_pattern.lower()
@@ -146,7 +146,7 @@ def find_section_in_pdf(
                     "context": context,
                 },
             )
-            logger.debug(f"Found match on page {page_num}")
+            logger.debug("Found match on page %s", page_num)
 
     logger.info(f"Found {len(matches)} matches for pattern '{section_pattern}'")
     return matches

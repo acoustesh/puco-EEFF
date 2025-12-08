@@ -427,12 +427,12 @@ def extract_pdf_section(
 
     page_idx = _find_section_page_with_fallback(pdf_path, section_name, year, quarter)
     if page_idx is None:
-        logger.error(f"Could not find section '{section_name}' in PDF")
+        logger.error("Could not find section '%s' in PDF", section_name)
         return None
 
     rows = _extract_table_with_next_page_fallback(pdf_path, page_idx, expected_items, section_name, year, quarter)
     if not rows:
-        logger.error(f"Could not extract table for section '{section_name}'")
+        logger.error("Could not extract table for section '%s'", section_name)
         return None
 
     breakdown = SectionBreakdown(
@@ -495,7 +495,7 @@ def _find_xbrl_facts(data: dict, fact_mapping: dict, field_name: str) -> list[di
         for fallback in fact_mapping.get("fallbacks", []):
             facts = get_facts_by_name(data, fallback)
             if facts:
-                logger.debug(f"Using fallback XBRL fact '{fallback}' for {field_name}")
+                logger.debug("Using fallback XBRL fact '%s' for %s", fallback, field_name)
                 break
     return facts
 
@@ -520,7 +520,7 @@ def extract_xbrl_totals(xbrl_path: Path) -> dict[str, int | None]:
     try:
         data = parse_xbrl_file(xbrl_path)
     except Exception as e:
-        logger.exception(f"Failed to parse XBRL: {e}")
+        logger.exception("Failed to parse XBRL: %s", e)
         return {"cost_of_sales": None, "admin_expense": None, "ingresos": None}
 
     field_to_result = get_sheet1_result_key_mapping()
@@ -530,14 +530,14 @@ def extract_xbrl_totals(xbrl_path: Path) -> dict[str, int | None]:
     for field_name, result_key in field_to_result.items():
         fact_mapping = get_sheet1_xbrl_fact_mapping(field_name)
         if not fact_mapping:
-            logger.debug(f"No XBRL mapping found for field: {field_name}")
+            logger.debug("No XBRL mapping found for field: %s", field_name)
             continue
 
         facts = _find_xbrl_facts(data, fact_mapping, field_name)
         value = _extract_fact_value(facts, fact_mapping, scaling_factor)
         if value is not None:
             result[result_key] = value
-            logger.debug(f"Extracted {field_name}: {value}")
+            logger.debug("Extracted %s: %s", field_name, value)
 
     return result
 

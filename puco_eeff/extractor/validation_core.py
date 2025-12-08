@@ -314,7 +314,7 @@ def log_validation_report(report: ValidationReport) -> None:
         logger.warning("⚠️  REFERENCE DATA MISMATCH")
         logger.warning("=" * 60)
         for issue in report.reference_issues:
-            logger.warning(f"  • {issue}")
+            logger.warning("  • %s", issue)
         logger.warning("=" * 60)
 
 
@@ -486,7 +486,7 @@ def _run_cross_validations(
         if match:
             logger.info(f"✓ {description}: {expected:,}")
         else:
-            logger.warning(f"✗ {description}: expected={expected}, calculated={calculated} (diff: {diff})")
+            logger.warning("✗ %s: expected=%s, calculated=%s (diff: %s)", description, expected, calculated, diff)
 
     return results
 
@@ -534,12 +534,12 @@ def _evaluate_cross_validation(
 ) -> tuple[int | None, int | None, bool, int | None]:
     """Safely evaluate a cross-validation formula."""
     if "==" not in formula:
-        logger.warning(f"Unsupported formula format (no '=='): {formula}")
+        logger.warning("Unsupported formula format (no '=='): %s", formula)
         return None, None, True, None
 
     parts = formula.split("==")
     if len(parts) != 2:
-        logger.warning(f"Unsupported formula format (multiple '=='): {formula}")
+        logger.warning("Unsupported formula format (multiple '=='): %s", formula)
         return None, None, True, None
 
     lhs_expr = parts[0].strip()
@@ -556,7 +556,7 @@ def _evaluate_cross_validation(
         match = diff <= tolerance
         return expected, calculated, match, diff
     except Exception as e:
-        logger.warning(f"Error evaluating formula '{formula}': {e}")
+        logger.warning("Error evaluating formula '%s': %s", formula, e)
         return None, None, True, None
 
 
@@ -637,7 +637,7 @@ def _safe_eval_expression(expr: str, values: dict[str, int]) -> int | None:
     try:
         tree = ast.parse(expr, mode="eval")
     except SyntaxError as e:
-        logger.debug(f"Syntax error parsing expression '{expr}': {e}")
+        logger.debug("Syntax error parsing expression '%s': %s", expr, e)
         return None
 
     try:
