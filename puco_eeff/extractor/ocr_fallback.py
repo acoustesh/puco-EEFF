@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from puco_eeff.config import AUDIT_DIR, get_config, get_openrouter_client, setup_logging
-from puco_eeff.extractor.ocr_mistral import ocr_with_mistral
+from puco_eeff.extractor.ocr_mistral import _save_audit_response, ocr_with_mistral
 
 logger = setup_logging(__name__)
 
@@ -240,27 +240,3 @@ def _encode_image(image_path: Path) -> str:
         image_base64 = base64.standard_b64encode(f.read()).decode("utf-8")
 
     return f"data:{mime_type};base64,{image_base64}"
-
-
-def _save_audit_response(result: dict[str, Any], audit_dir: Path, model: str) -> None:
-    """Save OCR response to audit directory.
-
-    Args:
-        result: OCR result dictionary
-        audit_dir: Directory to save audit files
-        model: Model name for filename
-    """
-    from datetime import datetime
-
-    audit_dir.mkdir(parents=True, exist_ok=True)
-
-    # Create a safe filename from model name
-    model_safe = model.replace("/", "_").replace(".", "_")
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"ocr_{model_safe}_{timestamp}.json"
-    filepath = audit_dir / filename
-
-    with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(result, f, indent=2, ensure_ascii=False)
-
-    logger.debug(f"Audit response saved: {filepath}")

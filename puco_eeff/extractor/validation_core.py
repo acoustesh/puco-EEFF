@@ -522,6 +522,7 @@ def _safe_eval_expression(expr: str, values: dict[str, int]) -> int | None:
         return None
 
     def _eval_node(node: ast.AST) -> int | None:
+        """Recursively evaluate an AST node to an integer value."""
         if isinstance(node, ast.Constant) and isinstance(node.value, int):
             return node.value
 

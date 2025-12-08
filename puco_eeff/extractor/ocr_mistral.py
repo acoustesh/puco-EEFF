@@ -185,19 +185,22 @@ def _prepare_base64_content(image_base64: str) -> dict[str, Any]:
     }
 
 
-def _save_audit_response(result: dict[str, Any], audit_dir: Path) -> None:
+def _save_audit_response(result: dict[str, Any], audit_dir: Path, model: str = "mistral") -> None:
     """Save OCR response to audit directory.
 
     Args:
         result: OCR result dictionary
         audit_dir: Directory to save audit files
+        model: Model name for filename (default: "mistral")
     """
     from datetime import datetime
 
     audit_dir.mkdir(parents=True, exist_ok=True)
 
+    # Create a safe filename from model name
+    model_safe = model.replace("/", "_").replace(".", "_")
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"ocr_mistral_{timestamp}.json"
+    filename = f"ocr_{model_safe}_{timestamp}.json"
     filepath = audit_dir / filename
 
     with open(filepath, "w", encoding="utf-8") as f:
