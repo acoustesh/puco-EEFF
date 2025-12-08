@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from lxml import etree
 
 from puco_eeff.config import get_config, setup_logging
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = setup_logging(__name__)
 
@@ -21,6 +23,7 @@ def _get_xbrl_config(config: dict | None = None) -> tuple[dict[str, str], list[s
 
     Returns:
         Tuple of (namespaces dict, aggregate_facts list)
+
     """
     if config is None:
         config = get_config()
@@ -73,12 +76,14 @@ def parse_xbrl_file(file_path: Path) -> dict[str, Any]:
 
     Returns:
         Dictionary containing extracted financial data
+
     """
     logger.info(f"Parsing XBRL file: {file_path}")
 
     if not file_path.exists():
         logger.error(f"File not found: {file_path}")
-        raise FileNotFoundError(f"XBRL file not found: {file_path}")
+        msg = f"XBRL file not found: {file_path}"
+        raise FileNotFoundError(msg)
 
     # Read file content and parse with encoding detection
     content = file_path.read_bytes()
@@ -120,6 +125,7 @@ def _detect_namespaces(root: etree._Element) -> dict[str, str]:
 
     Returns:
         Dictionary of namespace prefixes to URIs
+
     """
     namespaces = dict(NAMESPACES)  # Start with common namespaces
 
@@ -140,6 +146,7 @@ def _extract_facts(root: etree._Element, namespaces: dict[str, str]) -> list[dic
 
     Returns:
         List of fact dictionaries
+
     """
     facts = []
 
@@ -161,7 +168,7 @@ def _extract_facts(root: etree._Element, namespaces: dict[str, str]) -> list[dic
 
 
 def _extract_contexts(
-    root: etree._Element, namespaces: dict[str, str]
+    root: etree._Element, namespaces: dict[str, str],
 ) -> dict[str, dict[str, Any]]:
     """Extract XBRL contexts (periods and entity information).
 
@@ -171,6 +178,7 @@ def _extract_contexts(
 
     Returns:
         Dictionary mapping context IDs to context information
+
     """
     contexts: dict[str, dict[str, Any]] = {}
 
@@ -218,6 +226,7 @@ def _get_local_name(element: etree._Element) -> str:
 
     Returns:
         Local name string
+
     """
     if "}" in element.tag:
         return element.tag.split("}")[1]
@@ -233,6 +242,7 @@ def extract_by_xpath(file_path: Path, xpath_expr: str) -> list[str]:
 
     Returns:
         List of extracted values as strings
+
     """
     logger.debug(f"Extracting with XPath: {xpath_expr}")
 
@@ -275,6 +285,7 @@ def get_facts_by_name(
 
     Returns:
         List of matching facts with context information
+
     """
     matching_facts = []
     contexts = data.get("contexts", {})
@@ -303,6 +314,7 @@ def get_units(data: dict[str, Any]) -> dict[str, str]:
 
     Returns:
         Dictionary mapping unit IDs to their descriptions
+
     """
     # Units are stored in the facts with unitRef attribute
     units: dict[str, str] = {}
@@ -327,6 +339,7 @@ def summarize_facts(data: dict[str, Any]) -> dict[str, int]:
 
     Returns:
         Dictionary mapping category/prefix to count
+
     """
     categories: dict[str, int] = {}
 
@@ -367,6 +380,7 @@ def extract_xbrl_aggregates(
             },
             "all_facts": list  # Full fact list for debugging
         }
+
     """
     _, aggregate_fact_names = _get_xbrl_config(config)
 
@@ -435,6 +449,7 @@ def save_xbrl_aggregates(
 
     Returns:
         Path to saved file
+
     """
     output_path.parent.mkdir(parents=True, exist_ok=True)
 

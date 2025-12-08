@@ -23,16 +23,16 @@ logger = setup_logging(__name__)
 
 # Public API exports
 __all__ = [
-    "parse_chilean_number",
-    "normalize_for_matching",
+    "count_value_offset",
+    "extract_value_from_row",
+    "find_label_index",
     "match_item",
-    "score_table_match",
+    "normalize_for_matching",
+    "parse_chilean_number",
     "parse_cost_table",
     "parse_multiline_row",
     "parse_single_row",
-    "find_label_index",
-    "count_value_offset",
-    "extract_value_from_row",
+    "score_table_match",
 ]
 
 
@@ -55,7 +55,7 @@ def parse_chilean_number(value: str | None) -> int | None:
     is_negative = "(" in value and ")" in value
     value = re.sub(r"[^\d.\-]", "", value)
 
-    if not value or value in (".", "-"):
+    if not value or value in {".", "-"}:
         return None
 
     try:
@@ -77,14 +77,13 @@ def normalize_for_matching(text: str) -> str:
     text = "".join(c for c in text if not unicodedata.combining(c))
     text = text.lower()
     text = re.sub(r"[.,;:()\[\]]", " ", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def match_item(concept: str, expected_items: list[str]) -> str | None:
     """Match a concept text against expected items."""
     norm_concept = normalize_for_matching(concept)
-    sorted_items = sorted(expected_items, key=lambda x: len(x), reverse=True)
+    sorted_items = sorted(expected_items, key=len, reverse=True)
 
     for expected in sorted_items:
         norm_expected = normalize_for_matching(expected)
@@ -123,6 +122,7 @@ def score_table_match(
 
     Returns:
         Match score (higher is better)
+
     """
     table_text = str(table).lower()
     score = sum(1 for item in expected_items if item.lower() in table_text)
@@ -163,6 +163,7 @@ def parse_multiline_row(
 
     Returns:
         List of parsed row dictionaries with concepto and values
+
     """
     parsed_rows = []
     for idx, concept in enumerate(concepts):
@@ -200,6 +201,7 @@ def parse_single_row(
 
     Returns:
         Parsed row dictionary with concepto and values, or None if not matched
+
     """
     matched_item = match_item(row_text, expected_items)
     if not matched_item and "total" in row_text.lower():

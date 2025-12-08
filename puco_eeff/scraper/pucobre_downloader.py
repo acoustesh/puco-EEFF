@@ -15,13 +15,16 @@ import contextlib
 import re
 import time
 from dataclasses import dataclass
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from playwright.sync_api import Page
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
 from puco_eeff.config import get_config, get_period_paths, setup_logging
 from puco_eeff.scraper.browser import browser_session
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = setup_logging(__name__)
 
@@ -34,6 +37,7 @@ def _get_pucobre_config(config: dict | None = None) -> tuple[str, dict[int, str]
 
     Returns:
         Tuple of (base_url, quarter_to_date_mapping)
+
     """
     if config is None:
         config = get_config()
@@ -88,6 +92,7 @@ def _find_analisis_razonado_page(pdf_path: Path) -> int | None:
 
     Returns:
         0-based page index where Análisis Razonado starts, or None if not found
+
     """
     try:
         import fitz  # PyMuPDF
@@ -99,15 +104,17 @@ def _find_analisis_razonado_page(pdf_path: Path) -> int | None:
 
     for page_num in range(len(doc)):
         page = doc[page_num]
-        text = page.get_text().upper()
+        text_raw = page.get_text()
+        text = str(text_raw or "")
+        text_upper = text.upper()
 
         # Look for the Análisis Razonado title page
         # It typically contains "ANALISIS RAZONADO" as a prominent heading
-        if "ANALISIS RAZONADO" in text:
+        if "ANALISIS RAZONADO" in text_upper:
             # Verify this looks like a title page (short text, near start)
-            text_lines = [line.strip() for line in page.get_text().split("\n") if line.strip()]
+            text_lines = [line.strip() for line in text.split("\n") if line.strip()]
             # Title pages typically have few lines and contain the company name
-            if len(text_lines) < 20 or "SOCIEDAD PUNTA DEL COBRE" in text.upper():
+            if len(text_lines) < 20 or "SOCIEDAD PUNTA DEL COBRE" in text_upper:
                 doc.close()
                 logger.info(f"Found Análisis Razonado at page {page_num + 1}")
                 return page_num
@@ -132,6 +139,7 @@ def _split_combined_pdf(
 
     Returns:
         Tuple of (success, error_message)
+
     """
     try:
         import fitz  # PyMuPDF
@@ -157,7 +165,7 @@ def _split_combined_pdf(
         doc.close()
 
         logger.info(
-            f"Split PDF: Estados Financieros ({split_page} pages), Análisis Razonado ({total_pages - split_page} pages)"
+            f"Split PDF: Estados Financieros ({split_page} pages), Análisis Razonado ({total_pages - split_page} pages)",
         )
         return True, None
 
@@ -187,6 +195,7 @@ def download_from_pucobre(
 
     Returns:
         PucobreDownloadResult with status and file paths
+
     """
     pucobre_url, quarter_to_date = _get_pucobre_config(config)
 
@@ -215,7 +224,7 @@ def download_from_pucobre(
         pdf_url: str | None = None
         pdf_content: bytes | None = None
 
-        def capture_pdf_response(response):
+        def capture_pdf_response(response) -> None:
             """Capture PDF response content from browser network traffic."""
             nonlocal pdf_url, pdf_content
             content_type = response.headers.get("content-type", "")
@@ -289,7 +298,7 @@ def download_from_pucobre(
 
             combined_size = combined_path.stat().st_size
             logger.info(
-                f"Downloaded combined PDF from Pucobre: {combined_filename} ({combined_size:,} bytes)"
+                f"Downloaded combined PDF from Pucobre: {combined_filename} ({combined_size:,} bytes)",
             )
 
             # Split the PDF if requested
@@ -298,7 +307,10 @@ def download_from_pucobre(
 
                 if split_page is not None:
                     success, error = _split_combined_pdf(
-                        combined_path, eeff_path, ar_path, split_page
+                        combined_path,
+                        eeff_path,
+                        ar_path,
+                        split_page,
                     )
 
                     if success:
@@ -306,7 +318,7 @@ def download_from_pucobre(
                         ar_size = ar_path.stat().st_size
 
                         logger.info(
-                            f"Split into: {eeff_filename} ({eeff_size:,} bytes), {ar_filename} ({ar_size:,} bytes)"
+                            f"Split into: {eeff_filename} ({eeff_size:,} bytes), {ar_filename} ({ar_size:,} bytes)",
                         )
 
                         return PucobreDownloadResult(
@@ -317,8 +329,7 @@ def download_from_pucobre(
                             analisis_razonado_size=ar_size,
                             combined_pdf_path=combined_path,
                         )
-                    else:
-                        logger.warning(f"Failed to split PDF: {error}")
+                    logger.warning(f"Failed to split PDF: {error}")
                         # Fall through to return combined as EEFF
                 else:
                     logger.warning("Could not find Análisis Razonado section in PDF")
@@ -338,7 +349,7 @@ def download_from_pucobre(
             )
 
         except PlaywrightTimeout as e:
-            logger.error(f"Timeout downloading from Pucobre: {e}")
+            logger.exception(f"Timeout downloading from Pucobre: {e}")
             return PucobreDownloadResult(
                 success=False,
                 file_path=None,
@@ -346,7 +357,7 @@ def download_from_pucobre(
                 error=f"Timeout: {e}",
             )
         except Exception as e:
-            logger.error(f"Error downloading from Pucobre: {e}")
+            logger.exception(f"Error downloading from Pucobre: {e}")
             return PucobreDownloadResult(
                 success=False,
                 file_path=None,
@@ -366,6 +377,7 @@ def _find_period_link(page: Page, year: int, quarter: int, quarter_to_date: dict
 
     Returns:
         Locator for the link, or None if not found
+
     """
     date_str = f"{quarter_to_date[quarter]}-{year}"
 
@@ -398,6 +410,7 @@ def list_pucobre_periods(headless: bool = True, config: dict | None = None) -> l
 
     Returns:
         List of available periods with year, quarter, and link text
+
     """
     pucobre_url, _ = _get_pucobre_config(config)
     periods: list[dict] = []
@@ -416,7 +429,7 @@ def list_pucobre_periods(headless: bool = True, config: dict | None = None) -> l
             # Parse date from link text: "Estados Financieros DD-MM-YYYY"
             match = re.search(r"(\d{2})-(\d{2})-(\d{4})", link_text)
             if match:
-                day, month, year = match.groups()
+                _day, month, year = match.groups()
 
                 # Map end-month to quarter
                 month_to_quarter = {"03": 1, "06": 2, "09": 3, "12": 4}
@@ -429,7 +442,7 @@ def list_pucobre_periods(headless: bool = True, config: dict | None = None) -> l
                             "quarter": quarter,
                             "link_text": link_text,
                             "source": "pucobre.cl",
-                        }
+                        },
                     )
 
     logger.info(f"Found {len(periods)} periods on Pucobre.cl")
@@ -437,7 +450,10 @@ def list_pucobre_periods(headless: bool = True, config: dict | None = None) -> l
 
 
 def check_pucobre_availability(
-    year: int, quarter: int, headless: bool = True, config: dict | None = None
+    year: int,
+    quarter: int,
+    headless: bool = True,
+    config: dict | None = None,
 ) -> bool:
     """Check if a specific period is available on Pucobre.cl.
 
@@ -449,6 +465,7 @@ def check_pucobre_availability(
 
     Returns:
         True if the period is available
+
     """
     pucobre_url, quarter_to_date = _get_pucobre_config(config)
     date_str = f"{quarter_to_date[quarter]}-{year}"

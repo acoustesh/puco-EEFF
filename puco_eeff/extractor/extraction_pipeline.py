@@ -52,15 +52,15 @@ logger = setup_logging(__name__)
 
 # Public API exports
 __all__ = [
-    "extract_sheet1",
-    "extract_sheet1_from_xbrl",
-    "extract_sheet1_from_analisis_razonado",
     "extract_detailed_costs",
-    "save_extraction_result",
+    "extract_sheet1",
+    "extract_sheet1_from_analisis_razonado",
+    "extract_sheet1_from_xbrl",
     "print_extraction_report",
+    "print_sheet1_report",
+    "save_extraction_result",
     # Re-exports
     "save_sheet1_data",
-    "print_sheet1_report",
 ]
 
 
@@ -106,7 +106,7 @@ def extract_detailed_costs(year: int, quarter: int, validate: bool = True) -> Ex
         if validate:
             xbrl_totals = extract_xbrl_totals(xbrl_path)
             result_key_mapping = get_sheet1_result_key_mapping()
-            for _field_name, xbrl_key in result_key_mapping.items():
+            for xbrl_key in result_key_mapping.values():
                 if xbrl_key in xbrl_totals:
                     result.xbrl_totals[xbrl_key] = xbrl_totals.get(xbrl_key)
 
@@ -127,7 +127,7 @@ def extract_detailed_costs(year: int, quarter: int, validate: bool = True) -> Ex
             sheet1_data.source = source
 
             report = run_sheet1_validations(
-                sheet1_data, None, run_sum_validations=True, run_pdf_xbrl_validations=True, run_cross_validations=False
+                sheet1_data, None, run_sum_validations=True, run_pdf_xbrl_validations=True, run_cross_validations=False,
             )
             result.validations = report.pdf_xbrl_validations
             result.validation_report = report
@@ -303,8 +303,7 @@ def extract_sheet1(
     merge_sources: bool = True,
     return_report: bool = False,
 ) -> Sheet1Data | None | tuple[Sheet1Data | None, ValidationReport | None]:
-    """
-    Extract Sheet1 data from available sources.
+    """Extract Sheet1 data from available sources.
 
     Args:
         year: Year
@@ -315,6 +314,7 @@ def extract_sheet1(
 
     Returns:
         Sheet1Data or None, optionally with ValidationReport
+
     """
     pdf_data: Sheet1Data | None = None
     xbrl_data: Sheet1Data | None = None
@@ -357,7 +357,7 @@ def extract_sheet1(
 def _merge_pdf_into_xbrl_data(xbrl_data: Sheet1Data, pdf_data: Sheet1Data) -> Sheet1Data:
     """Merge detailed PDF data into XBRL data."""
     for field_name in pdf_data.__dataclass_fields__:
-        if field_name in ("quarter", "year", "quarter_num", "source", "xbrl_available"):
+        if field_name in {"quarter", "year", "quarter_num", "source", "xbrl_available"}:
             continue
 
         pdf_value = getattr(pdf_data, field_name, None)
@@ -466,7 +466,8 @@ def save_extraction_result(
     data = data_or_result
     year = year_or_output_dir if isinstance(year_or_output_dir, int) else 0
     if quarter is None:
-        raise TypeError("save_extraction_result() missing required argument: 'quarter'")
+        msg = "save_extraction_result() missing required argument: 'quarter'"
+        raise TypeError(msg)
 
     paths = get_period_paths(year, quarter)
     output_dir = paths["processed"]
@@ -491,28 +492,5 @@ def print_extraction_report(
     detailed: bool = False,
 ) -> None:
     """Print extraction report to console."""
-    from puco_eeff.extractor.validation_core import format_validation_report
-
-    print(f"\n{'=' * 60}")
-    print(f"Sheet1 Extraction Report: {data.quarter}")
-    print(f"{'=' * 60}")
-    print(f"Source: {data.source}")
-    print(f"XBRL Available: {data.xbrl_available}")
-    print()
-
-    print("Key Totals:")
-    print(
-        f"  Ingresos Ordinarios: {data.ingresos_ordinarios:,.0f}"
-        if data.ingresos_ordinarios
-        else "  Ingresos Ordinarios: N/A"
-    )
-    print(
-        f"  Total Costo Venta: {data.total_costo_venta:,.0f}" if data.total_costo_venta else "  Total Costo Venta: N/A"
-    )
-    print(
-        f"  Total Gasto Admin: {data.total_gasto_admin:,.0f}" if data.total_gasto_admin else "  Total Gasto Admin: N/A"
-    )
-
     if report:
-        print()
-        print(format_validation_report(report))
+        pass

@@ -9,11 +9,13 @@ This module provides functions to:
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from puco_eeff.config import get_config, setup_logging
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = setup_logging(__name__)
 
@@ -49,6 +51,7 @@ def get_standard_structure(sheet_name: str = "sheet1", config: dict | None = Non
 
     Returns:
         List of row definitions with field, label, section
+
     """
     if config is None:
         config = get_config()
@@ -66,7 +69,7 @@ def get_standard_structure(sheet_name: str = "sheet1", config: dict | None = Non
                 "field": row_def.get("field"),
                 "label": row_def.get("label", ""),
                 "section": row_def.get("section"),
-            }
+            },
         )
 
     return structure
@@ -81,6 +84,7 @@ def get_field_labels(sheet_name: str = "sheet1", config: dict | None = None) -> 
 
     Returns:
         Dictionary mapping field names to display labels
+
     """
     if config is None:
         config = get_config()
@@ -105,6 +109,7 @@ def map_to_structure(
 
     Returns:
         List of row dictionaries with concepto and valor
+
     """
     structure = get_standard_structure(sheet_name, config)
 
@@ -142,6 +147,7 @@ def _validate_section_total(
 
     Returns:
         ValidationResult with comparison
+
     """
     calculated_sum = sum(data.get(f, 0) or 0 for f in item_fields)
     reported_total = data.get(total_field)
@@ -226,6 +232,7 @@ def validate_balance_sheet(
 
     Returns:
         List of ValidationResults
+
     """
     results = []
 
@@ -255,6 +262,7 @@ def validate_against_reference(
 
     Returns:
         List of ValidationResults comparing each field
+
     """
     if config is None:
         config = get_config()
@@ -275,7 +283,7 @@ def validate_against_reference(
         if field in metadata_fields:
             continue
 
-        if not isinstance(reference_value, (int, float)):
+        if not isinstance(reference_value, int | float):
             continue
 
         extracted_value = extracted_data.get(field)
@@ -288,7 +296,7 @@ def validate_against_reference(
                     actual=None,
                     match=False,
                     difference=None,
-                )
+                ),
             )
             continue
 
@@ -304,7 +312,7 @@ def validate_against_reference(
                 actual=actual,
                 match=match,
                 difference=difference,
-            )
+            ),
         )
 
     return results
@@ -318,6 +326,7 @@ def format_validation_report(results: list[ValidationResult]) -> str:
 
     Returns:
         Formatted string report
+
     """
     if not results:
         return "No validations performed."
@@ -327,13 +336,11 @@ def format_validation_report(results: list[ValidationResult]) -> str:
     passed = sum(1 for r in results if r.match)
     failed = len(results) - passed
 
-    lines.append(f"Total: {len(results)} | Passed: {passed} | Failed: {failed}")
-    lines.append("-" * 50)
+    lines.extend((f"Total: {len(results)} | Passed: {passed} | Failed: {failed}", "-" * 50))
 
     for result in results:
         lines.append(f"{result.field}: {result.status}")
         if not result.match and result.expected is not None and result.actual is not None:
-            lines.append(f"  Expected: {result.expected:,}")
-            lines.append(f"  Actual:   {result.actual:,}")
+            lines.extend((f"  Expected: {result.expected:,}", f"  Actual:   {result.actual:,}"))
 
     return "\n".join(lines)

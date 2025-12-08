@@ -123,7 +123,7 @@ class TestSheet1ExtractionConfig:
             assert field in nota_22, f"nota_22 missing required field: {field}"
 
     def test_ingresos_has_required_fields(self, extraction_config: dict) -> None:
-        """ingresos section should have all required fields including pdf_fallback."""
+        """Ingresos section should have all required fields including pdf_fallback."""
         ingresos = extraction_config["sections"]["ingresos"]
 
         required_fields = ["title", "fallback_section", "pdf_fallback", "field_mappings"]
@@ -316,8 +316,7 @@ class TestCrossFileConsistency:
         extraction_fields = set()
         for section_name in ["nota_21", "nota_22", "ingresos"]:
             section = extraction["sections"].get(section_name, {})
-            for field_name in section.get("field_mappings", {}):
-                extraction_fields.add(field_name)
+            extraction_fields.update(section.get("field_mappings", {}))
 
         # Get value fields from fields.json
         value_fields = set(fields.get("value_fields", {}).keys())
@@ -334,8 +333,7 @@ class TestCrossFileConsistency:
         extraction_fields = set()
         for section_name in ["nota_21", "nota_22", "ingresos"]:
             section = extraction["sections"].get(section_name, {})
-            for field_name in section.get("field_mappings", {}):
-                extraction_fields.add(field_name)
+            extraction_fields.update(section.get("field_mappings", {}))
 
         # Get Sheet1Data attributes
         sheet1_sample = Sheet1Data(quarter="test", year=2024, quarter_num=2)

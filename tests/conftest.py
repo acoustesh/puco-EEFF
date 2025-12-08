@@ -1,5 +1,4 @@
-"""
-Pytest configuration for puco_eeff tests.
+"""Pytest configuration for puco_eeff tests.
 
 This module provides:
 - CLI options for baseline management (--update-baselines, --cached-only)

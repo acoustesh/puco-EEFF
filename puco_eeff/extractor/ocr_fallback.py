@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import base64
 import time
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from puco_eeff.config import AUDIT_DIR, get_config, get_openrouter_client, setup_logging
 from puco_eeff.extractor.ocr_mistral import _save_audit_response, ocr_with_mistral
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = setup_logging(__name__)
 
@@ -38,6 +40,7 @@ def ocr_with_fallback(
 
     Returns:
         Dictionary with extracted content and metadata
+
     """
     config = get_config()
     ocr_config = config["ocr"]
@@ -92,7 +95,7 @@ def ocr_with_fallback(
                 all_responses.append(result)
 
             except Exception as e:
-                logger.error(f"OCR exception: {e}")
+                logger.exception(f"OCR exception: {e}")
                 all_responses.append(
                     {
                         "success": False,
@@ -100,7 +103,7 @@ def ocr_with_fallback(
                         "model": model,
                         "error": str(e),
                         "attempt": attempt + 1,
-                    }
+                    },
                 )
 
             # Exponential backoff before retry
@@ -138,6 +141,7 @@ def _ocr_with_openrouter(
 
     Returns:
         Dictionary with extracted content and metadata
+
     """
     client = get_openrouter_client()
 
@@ -153,7 +157,8 @@ def _ocr_with_openrouter(
         )
         source_desc = "Base64 image"
     else:
-        raise ValueError("Must provide image_path or image_base64")
+        msg = "Must provide image_path or image_base64"
+        raise ValueError(msg)
 
     default_prompt = """Extract all text and tables from this image.
 For tables, preserve the structure with rows and columns clearly separated.
@@ -173,7 +178,7 @@ Format tables as markdown tables when possible."""
                     "text": prompt or default_prompt,
                 },
             ],
-        }
+        },
     ]
 
     logger.info(f"Calling OpenRouter OCR: {model}")
@@ -200,7 +205,7 @@ Format tables as markdown tables when possible."""
         logger.info(f"OpenRouter OCR successful with {model}")
 
     except Exception as e:
-        logger.error(f"OpenRouter OCR failed: {e}")
+        logger.exception(f"OpenRouter OCR failed: {e}")
         result = {
             "success": False,
             "provider": "openrouter",
@@ -224,6 +229,7 @@ def _encode_image(image_path: Path) -> str:
 
     Returns:
         Base64 data URL string
+
     """
     suffix = image_path.suffix.lower()
     mime_types = {

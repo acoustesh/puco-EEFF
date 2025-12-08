@@ -12,8 +12,7 @@ Output format for Sheet1:
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
@@ -24,6 +23,9 @@ from puco_eeff.writer.sheet_writer import (
     load_sheet_json,
     parse_period,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = setup_logging(__name__)
 
@@ -50,6 +52,7 @@ def combine_sheet1_quarters(
 
     Returns:
         Path to the created/updated Excel workbook
+
     """
     save_dir = output_dir if output_dir is not None else DATA_DIR / "output"
     save_dir.mkdir(parents=True, exist_ok=True)
@@ -63,7 +66,8 @@ def combine_sheet1_quarters(
     # Find available quarters for this year
     available = list_available_sheets(sheet_name="sheet1", year=year, input_dir=load_dir)
     if not available:
-        raise ValueError(f"No sheet1 data found for year {year}")
+        msg = f"No sheet1 data found for year {year}"
+        raise ValueError(msg)
 
     logger.info(f"Found {len(available)} quarters for {year}: {[a['period'] for a in available]}")
 
@@ -96,7 +100,10 @@ def combine_sheet1_quarters(
     # Add existing quarter columns first (preserve order)
     for period in sorted(existing_quarters):
         if period in existing_data:
-            combined_df[period] = [existing_data[period].get(field) for field in row_fields]
+            combined_df[period] = pd.Series(
+                [existing_data[period].get(field) for field in row_fields],
+                dtype="Int64",
+            )
 
     # Add new quarter columns from JSON files
     for sheet_info in available:
@@ -117,13 +124,13 @@ def combine_sheet1_quarters(
             else:
                 values.append(content.get(field))
 
-        combined_df[period] = values
+        combined_df[period] = pd.Series(values, dtype="Int64")
         logger.info(f"Added quarter: {period}")
 
     # Ensure columns are in chronological order (Row first, then sorted periods)
     period_cols = [c for c in combined_df.columns if c != "Row"]
     period_cols_sorted = sorted(period_cols, key=_period_sort_key)
-    combined_df = combined_df[["Row"] + period_cols_sorted]
+    combined_df = combined_df[["Row", *period_cols_sorted]]
 
     # Write to Excel
     with pd.ExcelWriter(filepath, engine="openpyxl") as writer:
@@ -151,6 +158,7 @@ def _load_existing_sheet1(filepath: Path) -> tuple[dict[str, dict[str, Any]], se
 
     Returns:
         Tuple of (data dict mapping period -> field values, set of existing periods)
+
     """
     try:
         df = pd.read_excel(filepath, sheet_name="Ingresos y Costos")
@@ -213,6 +221,7 @@ def append_quarter_to_workbook(
 
     Returns:
         Path to the updated workbook
+
     """
     period = format_period(year, quarter)
     logger.info(f"Appending {period} to workbook")
@@ -233,6 +242,7 @@ def _format_sheet_name(name: str) -> str:
 
     Returns:
         Formatted name (e.g., "Balance General")
+
     """
     # Replace underscores with spaces and title case
     formatted = name.replace("_", " ").title()
@@ -261,6 +271,7 @@ def create_workbook_from_dataframes(
 
     Returns:
         Path to the created workbook
+
     """
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -290,6 +301,7 @@ def list_workbook_quarters(
 
     Returns:
         List of period strings (e.g., ["2024_QI", "2024_QII"])
+
     """
     search_dir = output_dir if output_dir is not None else DATA_DIR / "output"
     filepath = search_dir / f"EEFF_{year}.xlsx"

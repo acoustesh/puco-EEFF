@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import base64
 import json
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from puco_eeff.config import AUDIT_DIR, get_mistral_client, setup_logging
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = setup_logging(__name__)
 
@@ -36,9 +38,11 @@ def ocr_with_mistral(
 
     Returns:
         Dictionary with extracted content and metadata
+
     """
     if not any([image_path, image_base64, pdf_path]):
-        raise ValueError("Must provide image_path, image_base64, or pdf_path")
+        msg = "Must provide image_path, image_base64, or pdf_path"
+        raise ValueError(msg)
 
     client = get_mistral_client()
 
@@ -66,7 +70,7 @@ Format tables as markdown tables when possible."""
                 content,
                 {"type": "text", "text": prompt or default_prompt},
             ],
-        }
+        },
     ]
 
     logger.info(f"Calling Mistral OCR for: {source_desc}")
@@ -92,11 +96,11 @@ Format tables as markdown tables when possible."""
 
         logger.info("Mistral OCR extraction successful")
         logger.debug(
-            f"Tokens used: {response.usage.prompt_tokens} + {response.usage.completion_tokens}"
+            f"Tokens used: {response.usage.prompt_tokens} + {response.usage.completion_tokens}",
         )
 
     except Exception as e:
-        logger.error(f"Mistral OCR failed: {e}")
+        logger.exception(f"Mistral OCR failed: {e}")
         result = {
             "success": False,
             "provider": "mistral",
@@ -121,6 +125,7 @@ def _prepare_pdf_content(pdf_path: Path, page_number: int | None) -> dict[str, A
 
     Returns:
         Content dictionary for API
+
     """
     with open(pdf_path, "rb") as f:
         pdf_base64 = base64.standard_b64encode(f.read()).decode("utf-8")
@@ -145,6 +150,7 @@ def _prepare_image_content(image_path: Path) -> dict[str, Any]:
 
     Returns:
         Content dictionary for API
+
     """
     # Determine MIME type
     suffix = image_path.suffix.lower()
@@ -174,6 +180,7 @@ def _prepare_base64_content(image_base64: str) -> dict[str, Any]:
 
     Returns:
         Content dictionary for API
+
     """
     # Assume PNG if no prefix provided
     if not image_base64.startswith("data:"):
@@ -192,6 +199,7 @@ def _save_audit_response(result: dict[str, Any], audit_dir: Path, model: str = "
         result: OCR result dictionary
         audit_dir: Directory to save audit files
         model: Model name for filename (default: "mistral")
+
     """
     from datetime import datetime
 

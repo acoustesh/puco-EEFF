@@ -48,7 +48,8 @@ def get_config() -> dict[str, Any]:
     """Load configuration from config.json."""
     config_path = CONFIG_DIR / "config.json"
     if not config_path.exists():
-        raise FileNotFoundError(f"Configuration file not found: {config_path}")
+        msg = f"Configuration file not found: {config_path}"
+        raise FileNotFoundError(msg)
 
     with open(config_path, encoding="utf-8") as f:
         return json.load(f)  # type: ignore[no-any-return]
@@ -63,6 +64,7 @@ def get_period_paths(year: int, quarter: int) -> dict[str, Path]:
 
     Returns:
         Dictionary with paths for raw, processed, output, and audit directories.
+
     """
     period_str = f"{year}_Q{quarter}"
 
@@ -83,6 +85,7 @@ def setup_logging(name: str = "puco_eeff") -> logging.Logger:
 
     Returns:
         Configured logger instance.
+
     """
     logger = logging.getLogger(name)
 
@@ -112,6 +115,7 @@ def validate_api_keys() -> dict[str, bool]:
 
     Returns:
         Dictionary mapping API name to whether it's configured.
+
     """
     return {
         "mistral": bool(MISTRAL_API_KEY),
@@ -129,9 +133,11 @@ def get_mistral_client() -> Any:
 
     Raises:
         ValueError: If MISTRAL_API_KEY is not set.
+
     """
     if not MISTRAL_API_KEY:
-        raise ValueError("MISTRAL_API_KEY is not set")
+        msg = "MISTRAL_API_KEY is not set"
+        raise ValueError(msg)
 
     from mistralai import Mistral
 
@@ -146,9 +152,11 @@ def get_openrouter_client() -> Any:
 
     Raises:
         ValueError: If OPENROUTER_API_KEY is not set.
+
     """
     if not OPENROUTER_API_KEY:
-        raise ValueError("OPENROUTER_API_KEY is not set")
+        msg = "OPENROUTER_API_KEY is not set"
+        raise ValueError(msg)
 
     from openai import OpenAI
 
@@ -168,10 +176,12 @@ def get_extraction_specs() -> dict[str, Any]:
 
     Returns:
         Dictionary with general extraction settings (number_format, search_strategy, document_structure).
+
     """
     specs_path = CONFIG_DIR / "extraction_specs.json"
     if not specs_path.exists():
-        raise FileNotFoundError(f"Extraction specs not found: {specs_path}")
+        msg = f"Extraction specs not found: {specs_path}"
+        raise FileNotFoundError(msg)
 
     with open(specs_path, encoding="utf-8") as f:
         return json.load(f)  # type: ignore[no-any-return]
@@ -188,10 +198,12 @@ def get_xbrl_specs() -> dict[str, Any]:
     Returns:
         Dictionary with general XBRL config (scaling_factor, namespaces, period_filter).
         Sheet-specific fact mappings are in config/<sheet_name>/xbrl_mappings.json.
+
     """
     xbrl_path = CONFIG_DIR / "xbrl_specs.json"
     if not xbrl_path.exists():
-        raise FileNotFoundError(f"XBRL specs not found: {xbrl_path}")
+        msg = f"XBRL specs not found: {xbrl_path}"
+        raise FileNotFoundError(msg)
 
     with open(xbrl_path, encoding="utf-8") as f:
         return json.load(f)  # type: ignore[no-any-return]
@@ -202,6 +214,7 @@ def get_xbrl_scaling_factor() -> int:
 
     Returns:
         Scaling factor (default 1000 for MUS$ conversion).
+
     """
     xbrl_specs = get_xbrl_specs()
     return xbrl_specs.get("scaling_factor", 1000)
@@ -212,6 +225,7 @@ def get_xbrl_namespaces() -> dict[str, str]:
 
     Returns:
         Dictionary mapping namespace prefixes to URIs.
+
     """
     xbrl_specs = get_xbrl_specs()
     return xbrl_specs.get("namespaces", {})
@@ -230,6 +244,7 @@ def get_period_type_config(period_type: str = "quarterly") -> dict[str, Any]:
 
     Returns:
         Period type configuration dictionary.
+
     """
     config = get_config()
     period_types = config.get("period_types", {})
@@ -250,16 +265,16 @@ def format_period_key(
 
     Returns:
         Formatted period key string.
+
     """
     if period_type == "quarterly":
         return f"{year}_Q{period}"
-    elif period_type == "monthly":
+    if period_type == "monthly":
         return f"{year}_M{period:02d}"
-    elif period_type == "yearly":
+    if period_type == "yearly":
         return f"{year}_FY"
-    else:
-        # Default to quarterly format
-        return f"{year}_Q{period}"
+    # Default to quarterly format
+    return f"{year}_Q{period}"
 
 
 def quarter_to_roman(quarter: int) -> str:
@@ -277,9 +292,11 @@ def quarter_to_roman(quarter: int) -> str:
 
     Raises:
         ValueError: If quarter is not 1-4
+
     """
-    if quarter not in (1, 2, 3, 4):
-        raise ValueError(f"Invalid quarter: {quarter}. Must be 1-4.")
+    if quarter not in {1, 2, 3, 4}:
+        msg = f"Invalid quarter: {quarter}. Must be 1-4."
+        raise ValueError(msg)
 
     type_config = get_period_type_config("quarterly")
     roman_map = type_config.get("roman_numerals", {"1": "I", "2": "II", "3": "III", "4": "IV"})
@@ -300,6 +317,7 @@ def format_period_display(
 
     Returns:
         Formatted display string.
+
     """
     type_config = get_period_type_config(period_type)
 
@@ -307,12 +325,11 @@ def format_period_display(
         roman_map = type_config.get("roman_numerals", {"1": "I", "2": "II", "3": "III", "4": "IV"})
         roman = roman_map.get(str(period), str(period))
         return f"{roman}Q{year}"
-    elif period_type == "monthly":
+    if period_type == "monthly":
         return f"{period:02d}-{year}"
-    elif period_type == "yearly":
+    if period_type == "yearly":
         return f"FY{year}"
-    else:
-        return f"{period}_{year}"
+    return f"{period}_{year}"
 
 
 def parse_period_key(period_key: str) -> tuple[int, int, str]:
@@ -326,6 +343,7 @@ def parse_period_key(period_key: str) -> tuple[int, int, str]:
 
     Raises:
         ValueError: If period key format is not recognized.
+
     """
     # Quarterly: 2024_Q2
     quarterly_match = re.match(r"(\d{4})_Q(\d)", period_key)
@@ -342,7 +360,8 @@ def parse_period_key(period_key: str) -> tuple[int, int, str]:
     if yearly_match:
         return int(yearly_match.group(1)), 1, "yearly"
 
-    raise ValueError(f"Unrecognized period key format: {period_key}")
+    msg = f"Unrecognized period key format: {period_key}"
+    raise ValueError(msg)
 
 
 # =============================================================================
@@ -359,6 +378,7 @@ def get_file_pattern(file_type: str) -> str:
 
     Returns:
         File pattern string with placeholders.
+
     """
     config = get_config()
     patterns = config.get("file_patterns", {})
@@ -374,6 +394,7 @@ def get_file_pattern_alternatives(file_type: str) -> list[str]:
 
     Returns:
         List of alternative patterns (may be empty).
+
     """
     config = get_config()
     patterns = config.get("file_patterns", {})
@@ -399,6 +420,7 @@ def format_filename(
 
     Returns:
         Formatted filename.
+
     """
     pattern = get_file_pattern(file_type)
 
@@ -428,6 +450,7 @@ def find_file_with_alternatives(
 
     Returns:
         Path to found file, or None if not found.
+
     """
     # Try primary pattern
     primary_name = format_filename(file_type, year, quarter)
@@ -450,6 +473,7 @@ def get_total_row_markers() -> list[str]:
 
     Returns:
         List of marker strings (e.g., ["Totales", "Total"]).
+
     """
     specs = get_extraction_specs()
     doc_structure = specs.get("document_structure", {})
@@ -466,6 +490,7 @@ def _deep_merge(base: dict, overlay: dict) -> dict:
 
     Returns:
         Merged dictionary
+
     """
     result = base.copy()
     for key, value in overlay.items():
@@ -502,17 +527,20 @@ def extract_pdf_page_to_temp(
     Raises:
         ImportError: If pypdf is not installed
         ValueError: If page number is out of range
+
     """
     try:
         from pypdf import PdfReader, PdfWriter
     except ImportError:
-        raise ImportError("pypdf is required for page extraction. Install with: pip install pypdf")
+        msg = "pypdf is required for page extraction. Install with: pip install pypdf"
+        raise ImportError(msg)
 
     reader = PdfReader(pdf_path)
     total_pages = len(reader.pages)
 
     if page_number < 1 or page_number > total_pages:
-        raise ValueError(f"Page {page_number} out of range (1-{total_pages})")
+        msg = f"Page {page_number} out of range (1-{total_pages})"
+        raise ValueError(msg)
 
     # Create writer with just the requested page (0-indexed internally)
     writer = PdfWriter()
@@ -536,6 +564,7 @@ def cleanup_temp_files(prefix: str = "page_review_") -> int:
 
     Returns:
         Number of files deleted
+
     """
     count = 0
     if TEMP_DIR.exists():

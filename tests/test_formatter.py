@@ -34,7 +34,7 @@ def mock_config():
                         "cv_gastos_personal": "Gastos en personal",
                         "cv_materiales": "Materiales y repuestos",
                         "total_costo_venta": "Total Costo de Venta",
-                    }
+                    },
                 },
                 "data": {
                     "IIQ2024": {
@@ -60,17 +60,17 @@ def mock_config():
                         "total_gasto_admin": -11632,
                         "source": "cmf",
                         "xbrl_available": True,
-                    }
+                    },
                 },
-            }
-        }
+            },
+        },
     }
 
 
 class TestGetStandardStructure:
     """Tests for get_standard_structure."""
 
-    def test_returns_ordered_list(self, mock_config):
+    def test_returns_ordered_list(self, mock_config) -> None:
         """Structure should be ordered by row number."""
         structure = get_standard_structure("sheet1", mock_config)
 
@@ -79,7 +79,7 @@ class TestGetStandardStructure:
         assert structure[1]["row"] == 2
         assert structure[4]["row"] == 5
 
-    def test_includes_field_and_label(self, mock_config):
+    def test_includes_field_and_label(self, mock_config) -> None:
         """Each row should have field, label, section."""
         structure = get_standard_structure("sheet1", mock_config)
 
@@ -91,7 +91,7 @@ class TestGetStandardStructure:
 class TestGetFieldLabels:
     """Tests for get_field_labels."""
 
-    def test_returns_labels_dict(self, mock_config):
+    def test_returns_labels_dict(self, mock_config) -> None:
         """Should return field to label mapping."""
         labels = get_field_labels("sheet1", mock_config)
 
@@ -102,7 +102,7 @@ class TestGetFieldLabels:
 class TestMapToStructure:
     """Tests for map_to_structure."""
 
-    def test_maps_data_to_rows(self, mock_config):
+    def test_maps_data_to_rows(self, mock_config) -> None:
         """Should map data values to row structure."""
         data = {
             "ingresos_ordinarios": 100000,
@@ -116,7 +116,7 @@ class TestMapToStructure:
         assert rows[0]["concepto"] == "Ingresos"
         assert rows[2]["valor"] == -5000
 
-    def test_missing_values_are_none(self, mock_config):
+    def test_missing_values_are_none(self, mock_config) -> None:
         """Missing data should result in None values."""
         data = {"ingresos_ordinarios": 100000}
 
@@ -128,7 +128,7 @@ class TestMapToStructure:
 class TestValidateCostoVentaTotal:
     """Tests for validate_costo_venta_total."""
 
-    def test_valid_total(self):
+    def test_valid_total(self) -> None:
         """Sum should match total."""
         data = {
             "cv_gastos_personal": -1000,
@@ -151,7 +151,7 @@ class TestValidateCostoVentaTotal:
         assert result.actual == -4000
         assert result.expected == -4000
 
-    def test_invalid_total(self):
+    def test_invalid_total(self) -> None:
         """Mismatch should be detected."""
         data = {
             "cv_gastos_personal": -1000,
@@ -170,7 +170,7 @@ class TestValidateCostoVentaTotal:
 class TestValidateGastoAdminTotal:
     """Tests for validate_gasto_admin_total."""
 
-    def test_valid_total(self):
+    def test_valid_total(self) -> None:
         """Sum should match total."""
         data = {
             "ga_gastos_personal": -1000,
@@ -190,7 +190,7 @@ class TestValidateGastoAdminTotal:
 class TestValidateBalanceSheet:
     """Tests for validate_balance_sheet."""
 
-    def test_returns_multiple_results(self):
+    def test_returns_multiple_results(self) -> None:
         """Should validate both totals."""
         data = {
             "cv_gastos_personal": -1000,
@@ -208,7 +208,7 @@ class TestValidateBalanceSheet:
 class TestValidateAgainstReference:
     """Tests for validate_against_reference."""
 
-    def test_all_match(self, mock_config):
+    def test_all_match(self, mock_config) -> None:
         """Exact match should pass all validations."""
         extracted = {
             "ingresos_ordinarios": 179165,
@@ -222,7 +222,7 @@ class TestValidateAgainstReference:
         matching = [r for r in results if r.match]
         assert len(matching) == 4
 
-    def test_mismatch_detected(self, mock_config):
+    def test_mismatch_detected(self, mock_config) -> None:
         """Mismatched values should be flagged."""
         extracted = {
             "ingresos_ordinarios": 179165,
@@ -237,13 +237,13 @@ class TestValidateAgainstReference:
         assert cv_result.actual == -20000
         assert cv_result.difference == -279
 
-    def test_missing_reference_period(self, mock_config):
+    def test_missing_reference_period(self, mock_config) -> None:
         """Unknown period should return empty list."""
         results = validate_against_reference({}, "IQ2030", mock_config)
 
         assert results == []
 
-    def test_ignores_metadata_fields(self, mock_config):
+    def test_ignores_metadata_fields(self, mock_config) -> None:
         """Should not validate 'source' and 'xbrl_available'."""
         extracted = {"source": "cmf", "xbrl_available": True}
 
@@ -253,7 +253,7 @@ class TestValidateAgainstReference:
         assert "source" not in field_names
         assert "xbrl_available" not in field_names
 
-    def test_missing_extracted_value(self, mock_config):
+    def test_missing_extracted_value(self, mock_config) -> None:
         """Missing extracted values should be flagged."""
         extracted = {}  # No values extracted
 
@@ -267,13 +267,13 @@ class TestValidateAgainstReference:
 class TestFormatValidationReport:
     """Tests for format_validation_report."""
 
-    def test_empty_results(self):
+    def test_empty_results(self) -> None:
         """Empty results should return simple message."""
         report = format_validation_report([])
 
         assert "No validations performed" in report
 
-    def test_includes_summary(self):
+    def test_includes_summary(self) -> None:
         """Report should include pass/fail counts."""
         results = [
             ValidationResult("field1", 100, 100, True),
@@ -286,7 +286,7 @@ class TestFormatValidationReport:
         assert "Failed: 1" in report
         assert "Total: 2" in report
 
-    def test_includes_mismatch_details(self):
+    def test_includes_mismatch_details(self) -> None:
         """Failed validations should show expected vs actual."""
         results = [
             ValidationResult("test_field", 1000, 1500, False, 500),
@@ -301,23 +301,23 @@ class TestFormatValidationReport:
 class TestValidationResultStatus:
     """Tests for ValidationResult.status property."""
 
-    def test_match_status(self):
+    def test_match_status(self) -> None:
         """Matching result should show checkmark."""
         result = ValidationResult("field", 100, 100, True)
         assert "✓" in result.status
 
-    def test_mismatch_status(self):
+    def test_mismatch_status(self) -> None:
         """Mismatched result should show X and difference."""
         result = ValidationResult("field", 100, 150, False, 50)
         assert "✗" in result.status
         assert "50" in result.status
 
-    def test_no_reference_status(self):
+    def test_no_reference_status(self) -> None:
         """Missing reference should show warning."""
         result = ValidationResult("field", None, 100, False)
         assert "⚠" in result.status
 
-    def test_no_actual_status(self):
+    def test_no_actual_status(self) -> None:
         """Missing actual should show warning."""
         result = ValidationResult("field", 100, None, False)
         assert "⚠" in result.status

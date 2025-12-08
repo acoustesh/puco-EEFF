@@ -27,6 +27,7 @@ def normalize_financial_data(
 
     Returns:
         Normalized DataFrame
+
     """
     logger.info("Normalizing financial data")
 
@@ -62,6 +63,7 @@ def _normalize_column_name(name: str) -> str:
 
     Returns:
         Normalized column name
+
     """
     # Convert to string and strip
     name = str(name).strip()
@@ -79,9 +81,7 @@ def _normalize_column_name(name: str) -> str:
     name = re.sub(r"_+", "_", name)
 
     # Remove leading/trailing underscores
-    name = name.strip("_")
-
-    return name
+    return name.strip("_")
 
 
 def _parse_number(value: Any) -> float | None:
@@ -98,6 +98,7 @@ def _parse_number(value: Any) -> float | None:
 
     Returns:
         Parsed float or None if unparseable
+
     """
     if value is None or pd.isna(value):
         return None
@@ -153,14 +154,13 @@ def clean_text(text: str) -> str:
 
     Returns:
         Cleaned text
+
     """
     # Normalize whitespace
     text = re.sub(r"\s+", " ", text)
 
     # Strip leading/trailing whitespace
-    text = text.strip()
-
-    return text
+    return text.strip()
 
 
 def extract_tables_from_ocr_markdown(ocr_content: str) -> list[pd.DataFrame]:
@@ -171,6 +171,7 @@ def extract_tables_from_ocr_markdown(ocr_content: str) -> list[pd.DataFrame]:
 
     Returns:
         List of DataFrames extracted from markdown tables
+
     """
     tables: list[pd.DataFrame] = []
 

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pdfplumber
 
 from puco_eeff.config import setup_logging
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = setup_logging(__name__)
 
@@ -24,11 +26,13 @@ def extract_text_from_pdf(
 
     Returns:
         Dictionary mapping page numbers to extracted text
+
     """
     logger.info(f"Extracting text from PDF: {file_path}")
 
     if not file_path.exists():
-        raise FileNotFoundError(f"PDF file not found: {file_path}")
+        msg = f"PDF file not found: {file_path}"
+        raise FileNotFoundError(msg)
 
     result: dict[int, str] = {}
 
@@ -65,11 +69,13 @@ def extract_tables_from_pdf(
 
     Returns:
         Dictionary mapping page numbers to list of tables (each table is a list of rows)
+
     """
     logger.info(f"Extracting tables from PDF: {file_path}")
 
     if not file_path.exists():
-        raise FileNotFoundError(f"PDF file not found: {file_path}")
+        msg = f"PDF file not found: {file_path}"
+        raise FileNotFoundError(msg)
 
     result: dict[int, list[list[list[str | None]]]] = {}
 
@@ -112,6 +118,7 @@ def find_section_in_pdf(
 
     Returns:
         List of dictionaries with page number and context
+
     """
     logger.info(f"Searching for section: {section_pattern}")
 
@@ -137,7 +144,7 @@ def find_section_in_pdf(
                     "page": page_num,
                     "pattern": section_pattern,
                     "context": context,
-                }
+                },
             )
             logger.debug(f"Found match on page {page_num}")
 
@@ -153,9 +160,11 @@ def get_pdf_info(file_path: Path) -> dict[str, Any]:
 
     Returns:
         Dictionary with PDF metadata
+
     """
     if not file_path.exists():
-        raise FileNotFoundError(f"PDF file not found: {file_path}")
+        msg = f"PDF file not found: {file_path}"
+        raise FileNotFoundError(msg)
 
     with pdfplumber.open(file_path) as pdf:
         return {

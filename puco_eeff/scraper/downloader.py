@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import httpx
 
 from puco_eeff.config import setup_logging
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = setup_logging(__name__)
 
@@ -24,6 +27,7 @@ async def download_file(url: str, destination: Path, timeout: float = 60.0) -> P
 
     Raises:
         httpx.HTTPError: If download fails
+
     """
     destination.parent.mkdir(parents=True, exist_ok=True)
 
@@ -54,6 +58,7 @@ def download_file_sync(url: str, destination: Path, timeout: float = 60.0) -> Pa
 
     Raises:
         httpx.HTTPError: If download fails
+
     """
     destination.parent.mkdir(parents=True, exist_ok=True)
 

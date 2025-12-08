@@ -14,12 +14,12 @@ from __future__ import annotations
 
 import ast
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from functools import singledispatch
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from puco_eeff.config import setup_logging
-from puco_eeff.extractor.extraction import SectionBreakdown
 from puco_eeff.sheets.sheet1 import (
     Sheet1Data,
     get_sheet1_cross_validations,
@@ -29,25 +29,30 @@ from puco_eeff.sheets.sheet1 import (
     get_sheet1_total_validations,
 )
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from puco_eeff.extractor.extraction import SectionBreakdown
+
 logger = setup_logging(__name__)
 
 __all__ = [
-    # Dataclasses
-    "ValidationResult",
+    "CrossValidationResult",
     "ExtractionResult",
     "SumValidationResult",
-    "CrossValidationResult",
     "ValidationReport",
+    # Dataclasses
+    "ValidationResult",
+    "_compare_with_tolerance",
+    "_run_cross_validations",
+    "_run_pdf_xbrl_validations",
+    # Internal helpers (needed by extraction_pipeline)
+    "_run_sum_validations",
     # Formatting
     "format_validation_report",
     "log_validation_report",
     # Validation runners
     "run_sheet1_validations",
-    # Internal helpers (needed by extraction_pipeline)
-    "_run_sum_validations",
-    "_run_pdf_xbrl_validations",
-    "_run_cross_validations",
-    "_compare_with_tolerance",
 ]
 
 
@@ -186,7 +191,8 @@ def _format_validation_result_status(result: ValidationResult) -> str:
         return "⚠ PDF only (no XBRL)"
     if result.source == "xbrl_only":
         return "⚠ XBRL only (PDF extraction failed)"
-    return _format_match_status(result.match, "✓ Match", f"✗ Mismatch (diff: {result.difference:,})")
+    diff_display = f"{result.difference:,}" if result.difference is not None else "n/a"
+    return _format_match_status(result.match, "✓ Match", f"✗ Mismatch (diff: {diff_display})")
 
 
 @format_status.register
@@ -237,9 +243,10 @@ def _format_pdf_xbrl_validation_item(v: ValidationResult) -> str:
     """Format a single PDF-XBRL validation item."""
     if v.source == "both":
         symbol = "✓" if v.match else "✗"
+        diff_display = f"{v.difference:,}" if v.difference is not None else "n/a"
         if v.match:
             return f"  {symbol} {v.field_name}: {v.pdf_value:,} (PDF) = {v.xbrl_value:,} (XBRL)"
-        return f"  {symbol} {v.field_name}: {v.pdf_value:,} (PDF) ≠ {v.xbrl_value:,} (XBRL) [diff: {v.difference}]"
+        return f"  {symbol} {v.field_name}: {v.pdf_value:,} (PDF) ≠ {v.xbrl_value:,} (XBRL) [diff: {diff_display}]"
     if v.source == "xbrl_only":
         return f"  ⚠ {v.field_name}: {v.xbrl_value:,} (XBRL only, used as source)"
     return f"  ⚠ {v.field_name}: {v.pdf_value:,} (PDF only, no XBRL)"
@@ -254,8 +261,7 @@ def _format_reference_validations(report: ValidationReport) -> list[str]:
         lines.append("Reference Validation: ✓ All values match reference data")
     else:
         lines.append("Reference Validation: ✗ MISMATCHES FOUND")
-        for issue in report.reference_issues:
-            lines.append(f"  • {issue}")
+        lines.extend(f"  • {issue}" for issue in report.reference_issues)
     return lines
 
 
@@ -372,7 +378,7 @@ def _run_sum_validations(data: Sheet1Data) -> list[SumValidationResult]:
 
 def _run_pdf_xbrl_validations(
     data: Sheet1Data,
-    xbrl_totals: dict[str, int | None] | None,
+    xbrl_totals: Mapping[str, int | None] | None,
     use_fallback: bool = True,
 ) -> list[ValidationResult]:
     """Config-driven PDF ↔ XBRL comparison."""
@@ -398,13 +404,13 @@ def _run_pdf_xbrl_validations(
                         match=match,
                         source="both",
                         difference=diff if not match else None,
-                    )
+                    ),
                 )
                 if match:
                     logger.info(f"✓ {display_name} matches XBRL: {pdf_value:,}")
                 else:
                     logger.warning(
-                        f"✗ {display_name} mismatch - PDF: {pdf_value:,}, XBRL: {xbrl_value:,} (diff: {diff})"
+                        f"✗ {display_name} mismatch - PDF: {pdf_value:,}, XBRL: {xbrl_value:,} (diff: {diff})",
                     )
             else:
                 if use_fallback:
@@ -417,7 +423,7 @@ def _run_pdf_xbrl_validations(
                         xbrl_value=xbrl_value,
                         match=True,
                         source="xbrl_only",
-                    )
+                    ),
                 )
         elif pdf_value is not None:
             results.append(
@@ -427,7 +433,7 @@ def _run_pdf_xbrl_validations(
                     xbrl_value=None,
                     match=True,
                     source="pdf_only",
-                )
+                ),
             )
 
     return results
@@ -435,7 +441,7 @@ def _run_pdf_xbrl_validations(
 
 def _run_cross_validations(
     data: Sheet1Data,
-    xbrl_totals: dict[str, int | None] | None,
+    xbrl_totals: Mapping[str, int | None] | None,
 ) -> list[CrossValidationResult]:
     """Run config-driven cross-validations."""
     results = []
@@ -487,7 +493,7 @@ def _run_cross_validations(
 
 def _resolve_cross_validation_values(
     data: Sheet1Data,
-    xbrl_totals: dict[str, int | None] | None,
+    xbrl_totals: Mapping[str, int | None] | None,
     formula: str,
 ) -> tuple[dict[str, int], list[str]]:
     """Resolve values needed for a cross-validation formula."""
@@ -497,7 +503,7 @@ def _resolve_cross_validation_values(
     var_pattern = re.compile(r"\b([a-z_]+)\b")
     var_names = set(var_pattern.findall(formula))
     keywords = {"abs", "and", "or", "not", "if", "else", "true", "false"}
-    var_names = var_names - keywords
+    var_names -= keywords
 
     values = {}
     missing = []
@@ -507,7 +513,7 @@ def _resolve_cross_validation_values(
 
         if value is None and xbrl_totals:
             for xbrl_key, mapped_name in xbrl_key_map.items():
-                if var == mapped_name or var == xbrl_key:
+                if var in {mapped_name, xbrl_key}:
                     value = xbrl_totals.get(xbrl_key)
                     break
             if value is None:
@@ -647,7 +653,7 @@ def _safe_eval_expression(expr: str, values: dict[str, int]) -> int | None:
 
 def run_sheet1_validations(
     data: Sheet1Data,
-    xbrl_totals: dict[str, int | None] | None = None,
+    xbrl_totals: Mapping[str, int | None] | None = None,
     *,
     run_sum_validations: bool = True,
     run_pdf_xbrl_validations: bool = True,

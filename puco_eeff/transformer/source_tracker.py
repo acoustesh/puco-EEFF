@@ -5,10 +5,12 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from datetime import datetime
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from puco_eeff.config import AUDIT_DIR, setup_logging
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = setup_logging(__name__)
 
@@ -53,6 +55,7 @@ class SourceTracker:
             extraction_method: Method used for extraction
             confidence: Confidence score
             raw_value: Raw extracted value before normalization
+
         """
         source = SourceInfo(
             source_type=source_type,
@@ -77,6 +80,7 @@ class SourceTracker:
 
         Returns:
             Primary SourceInfo or None if not found
+
         """
         sources = self.mappings.get(field_name, [])
         if not sources:
@@ -90,6 +94,7 @@ class SourceTracker:
 
         Returns:
             Dictionary representation
+
         """
         return {
             "period": self.period,
@@ -119,6 +124,7 @@ class SourceTracker:
 
         Returns:
             Path to saved file
+
         """
         save_dir = output_dir if output_dir is not None else AUDIT_DIR / self.period
         save_dir.mkdir(parents=True, exist_ok=True)
@@ -139,6 +145,7 @@ class SourceTracker:
 
         Returns:
             SourceTracker instance
+
         """
         with open(filepath, encoding="utf-8") as f:
             data = json.load(f)
@@ -186,6 +193,7 @@ def create_source_mapping(
 
     Returns:
         Source mapping dictionary
+
     """
     return {
         "period": period,

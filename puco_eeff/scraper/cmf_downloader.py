@@ -16,13 +16,16 @@ from __future__ import annotations
 import time
 import zipfile
 from dataclasses import dataclass
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from playwright.sync_api import Download, Page
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
 from puco_eeff.config import get_config, get_period_paths, setup_logging
 from puco_eeff.scraper.browser import browser_session
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = setup_logging(__name__)
 
@@ -70,6 +73,7 @@ def download_all_documents(
 
     Returns:
         List of DownloadResult for each document type
+
     """
     config = get_config()
     paths = get_period_paths(year, quarter)
@@ -109,7 +113,7 @@ def download_all_documents(
 
             # Check if we got the main PDF
             pdf_result = next(
-                (r for r in results if r.document_type == "estados_financieros_pdf"), None
+                (r for r in results if r.document_type == "estados_financieros_pdf"), None,
             )
             cmf_success = pdf_result is not None and pdf_result.success
 
@@ -128,7 +132,7 @@ def download_all_documents(
                     file_path=None,
                     file_size=None,
                     error="Failed to download from both CMF Chile and Pucobre.cl",
-                )
+                ),
             )
 
     # Post-process: Extract XBRL if downloaded
@@ -157,6 +161,7 @@ def _download_with_pucobre_fallback(
 
     Returns:
         Updated results list
+
     """
     from puco_eeff.scraper.pucobre_downloader import download_from_pucobre
 
@@ -168,7 +173,7 @@ def _download_with_pucobre_fallback(
         None,
     )
     ar_idx = next(
-        (i for i, r in enumerate(existing_results) if r.document_type == "analisis_razonado"), None
+        (i for i, r in enumerate(existing_results) if r.document_type == "analisis_razonado"), None,
     )
 
     if pucobre_result.success:
@@ -187,7 +192,7 @@ def _download_with_pucobre_fallback(
             existing_results.append(eeff_result)
 
         logger.info(
-            f"Successfully downloaded Estados Financieros from Pucobre.cl: {pucobre_result.file_path}"
+            f"Successfully downloaded Estados Financieros from Pucobre.cl: {pucobre_result.file_path}",
         )
 
         # Análisis Razonado (if split was successful)
@@ -206,25 +211,24 @@ def _download_with_pucobre_fallback(
                 existing_results.append(ar_result)
 
             logger.info(
-                f"Successfully extracted Análisis Razonado from Pucobre.cl: {pucobre_result.analisis_razonado_path}"
+                f"Successfully extracted Análisis Razonado from Pucobre.cl: {pucobre_result.analisis_razonado_path}",
             )
-        else:
-            # Análisis Razonado not extracted (split failed or not available)
-            if not any(
-                r.document_type == "analisis_razonado" and r.success for r in existing_results
-            ):
-                ar_result = DownloadResult(
-                    document_type="analisis_razonado",
-                    success=False,
-                    file_path=None,
-                    file_size=None,
-                    error="Could not extract Análisis Razonado from combined PDF",
-                    source="pucobre.cl",
-                )
-                if ar_idx is not None:
-                    existing_results[ar_idx] = ar_result
-                else:
-                    existing_results.append(ar_result)
+        # Análisis Razonado not extracted (split failed or not available)
+        elif not any(
+            r.document_type == "analisis_razonado" and r.success for r in existing_results
+        ):
+            ar_result = DownloadResult(
+                document_type="analisis_razonado",
+                success=False,
+                file_path=None,
+                file_size=None,
+                error="Could not extract Análisis Razonado from combined PDF",
+                source="pucobre.cl",
+            )
+            if ar_idx is not None:
+                existing_results[ar_idx] = ar_result
+            else:
+                existing_results.append(ar_result)
 
         # XBRL is never available from Pucobre.cl
         if not any(r.document_type == "estados_financieros_xbrl" for r in existing_results):
@@ -236,7 +240,7 @@ def _download_with_pucobre_fallback(
                     file_size=None,
                     error="XBRL not available on Pucobre.cl",
                     source="pucobre.cl",
-                )
+                ),
             )
     else:
         logger.error(f"Pucobre.cl fallback also failed: {pucobre_result.error}")
@@ -274,6 +278,7 @@ def download_single_document(
 
     Returns:
         DownloadResult with status and file path
+
     """
     config = get_config()
     paths = get_period_paths(year, quarter)
@@ -333,23 +338,21 @@ def download_single_document(
                     file_size=pucobre_result.file_size,
                     error=None,
                 )
-            else:
-                return DownloadResult(
-                    document_type=document_type,
-                    success=False,
-                    file_path=None,
-                    file_size=None,
-                    error=f"CMF and Pucobre both failed: {pucobre_result.error}",
-                )
-        else:
-            # XBRL and Análisis Razonado not available on Pucobre
             return DownloadResult(
                 document_type=document_type,
                 success=False,
                 file_path=None,
                 file_size=None,
-                error="Not available on CMF Chile; document type not available on Pucobre.cl fallback",
+                error=f"CMF and Pucobre both failed: {pucobre_result.error}",
             )
+        # XBRL and Análisis Razonado not available on Pucobre
+        return DownloadResult(
+            document_type=document_type,
+            success=False,
+            file_path=None,
+            file_size=None,
+            error="Not available on CMF Chile; document type not available on Pucobre.cl fallback",
+        )
 
     if result is None:
         return DownloadResult(
@@ -383,6 +386,7 @@ def _navigate_and_filter(
 
     Returns:
         True if navigation and filtering succeeded
+
     """
     base_url = cmf_config["base_url"]
     selectors = cmf_config["filters"]["selectors"]
@@ -419,10 +423,10 @@ def _navigate_and_filter(
         return True
 
     except PlaywrightTimeout as e:
-        logger.error(f"Timeout during navigation: {e}")
+        logger.exception(f"Timeout during navigation: {e}")
         return False
     except Exception as e:
-        logger.error(f"Error during navigation: {e}")
+        logger.exception(f"Error during navigation: {e}")
         return False
 
 
@@ -446,6 +450,7 @@ def _download_single_document(
 
     Returns:
         DownloadResult with status
+
     """
     link_text = doc_config["link_text"]
     filename = doc_config["filename_pattern"].format(year=year, quarter=quarter)
@@ -483,18 +488,17 @@ def _download_single_document(
                 file_path=output_path,
                 file_size=file_size,
             )
-        else:
-            logger.error(f"File not saved: {output_path}")
-            return DownloadResult(
-                document_type=doc_type,
-                success=False,
-                file_path=None,
-                file_size=None,
-                error="File download completed but not saved",
-            )
+        logger.error(f"File not saved: {output_path}")
+        return DownloadResult(
+            document_type=doc_type,
+            success=False,
+            file_path=None,
+            file_size=None,
+            error="File download completed but not saved",
+        )
 
     except PlaywrightTimeout:
-        logger.error(f"Timeout downloading: {link_text}")
+        logger.exception(f"Timeout downloading: {link_text}")
         return DownloadResult(
             document_type=doc_type,
             success=False,
@@ -503,7 +507,7 @@ def _download_single_document(
             error="Download timeout",
         )
     except Exception as e:
-        logger.error(f"Error downloading {link_text}: {e}")
+        logger.exception(f"Error downloading {link_text}: {e}")
         return DownloadResult(
             document_type=doc_type,
             success=False,
@@ -514,7 +518,7 @@ def _download_single_document(
 
 
 def _extract_xbrl_zip(
-    zip_path: Path | None, xbrl_dir: Path, year: int, quarter: int
+    zip_path: Path | None, xbrl_dir: Path, year: int, quarter: int,
 ) -> Path | None:
     """Extract XBRL instance document from downloaded ZIP file.
 
@@ -533,6 +537,7 @@ def _extract_xbrl_zip(
 
     Returns:
         Path to the extracted XBRL file, or None if extraction failed
+
     """
     if zip_path is None or not zip_path.exists():
         logger.warning(f"ZIP file not found: {zip_path}")
@@ -576,10 +581,10 @@ def _extract_xbrl_zip(
         return output_path
 
     except zipfile.BadZipFile:
-        logger.error(f"Invalid ZIP file: {zip_path}")
+        logger.exception(f"Invalid ZIP file: {zip_path}")
         return None
     except Exception as e:
-        logger.error(f"Error extracting ZIP: {e}")
+        logger.exception(f"Error extracting ZIP: {e}")
         return None
 
 
@@ -593,6 +598,7 @@ def list_available_periods(headless: bool = True) -> list[dict]:
 
     Returns:
         List of available periods with year, month, and quarter
+
     """
     config = get_config()
     cmf_config = config["sources"]["cmf_chile"]
@@ -634,7 +640,7 @@ def list_available_periods(headless: bool = True) -> list[dict]:
                                         "year": int(year),
                                         "month": month,
                                         "quarter": quarter,
-                                    }
+                                    },
                                 )
 
     return periods

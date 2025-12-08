@@ -40,14 +40,16 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from puco_eeff.config import (
     CONFIG_DIR,
     format_period_display,
     get_period_paths,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -70,10 +72,12 @@ def _load_sheet1_config(filename: str) -> dict[str, Any]:
 
     Raises:
         FileNotFoundError: If config file not found.
+
     """
     config_path = SHEET1_CONFIG_DIR / filename
     if not config_path.exists():
-        raise FileNotFoundError(f"Sheet1 config not found: {config_path}")
+        msg = f"Sheet1 config not found: {config_path}"
+        raise FileNotFoundError(msg)
 
     with open(config_path, encoding="utf-8") as f:
         return json.load(f)
@@ -104,6 +108,7 @@ def get_sheet1_value_fields() -> dict[str, dict[str, Any]]:
 
     Returns:
         Dictionary mapping field names to their definitions.
+
     """
     fields = get_sheet1_fields()
     return fields.get("value_fields", {})
@@ -114,6 +119,7 @@ def get_sheet1_metadata_fields() -> list[str]:
 
     Returns:
         List of metadata field names.
+
     """
     fields = get_sheet1_fields()
     return fields.get("metadata_fields", [])
@@ -132,6 +138,7 @@ def get_sheet1_detail_fields(sections: list[str] | None = None) -> list[str]:
 
     Returns:
         List of detail field names (e.g., ["cv_gastos_personal", "cv_materiales", ...]).
+
     """
     value_fields = get_sheet1_value_fields()
 
@@ -155,6 +162,7 @@ def get_sheet1_row_mapping() -> dict[str, dict[str, Any]]:
 
     Returns:
         Dictionary mapping row numbers (as strings) to row definitions.
+
     """
     fields = get_sheet1_fields()
     return fields.get("row_mapping", {})
@@ -171,12 +179,14 @@ def get_sheet1_section_spec(section_name: str) -> dict[str, Any]:
 
     Raises:
         ValueError: If section not found.
+
     """
     extraction_config = get_sheet1_extraction_config()
     sections = extraction_config.get("sections", {})
     section = sections.get(section_name)
     if section is None:
-        raise ValueError(f"Section '{section_name}' not found in sheet1/extraction.json")
+        msg = f"Section '{section_name}' not found in sheet1/extraction.json"
+        raise ValueError(msg)
     return section
 
 
@@ -196,9 +206,11 @@ def get_section_config(section_name: str, *, sheet: str = "sheet1") -> dict[str,
     Raises:
         ValueError: If section not found or sheet not supported.
         KeyError: If required config keys are missing.
+
     """
     if sheet != "sheet1":
-        raise ValueError(f"Sheet '{sheet}' not supported. Only 'sheet1' is implemented.")
+        msg = f"Sheet '{sheet}' not supported. Only 'sheet1' is implemented."
+        raise ValueError(msg)
 
     section = get_sheet1_section_spec(section_name)
 
@@ -206,7 +218,8 @@ def get_section_config(section_name: str, *, sheet: str = "sheet1") -> dict[str,
     required_keys = ["title", "field_mappings"]
     missing = [k for k in required_keys if k not in section]
     if missing:
-        raise KeyError(f"Section '{section_name}' missing required keys: {missing}")
+        msg = f"Section '{section_name}' missing required keys: {missing}"
+        raise KeyError(msg)
 
     return section
 
@@ -225,12 +238,16 @@ def get_section_fallback(section_name: str) -> str | None:
 
     Raises:
         KeyError: If fallback_section key is missing from config.
+
     """
     section = get_section_config(section_name)
     if "fallback_section" not in section:
-        raise KeyError(
+        msg = (
             f"Section '{section_name}' missing 'fallback_section' key. "
             f"Add it to config/sheet1/extraction.json (use null for no fallback)."
+        )
+        raise KeyError(
+            msg,
         )
     return section.get("fallback_section")
 
@@ -246,14 +263,16 @@ def get_ingresos_pdf_fallback_config() -> dict[str, Any]:
 
     Raises:
         KeyError: If required keys missing from config.
+
     """
     section = get_section_config("ingresos")
     pdf_fallback = section.get("pdf_fallback", {})
 
     # Validate required keys
     if "min_value_threshold" not in pdf_fallback:
+        msg = "ingresos.pdf_fallback missing 'min_value_threshold' key. Add it to config/sheet1/extraction.json."
         raise KeyError(
-            "ingresos.pdf_fallback missing 'min_value_threshold' key. Add it to config/sheet1/extraction.json."
+            msg,
         )
 
     return pdf_fallback
@@ -267,6 +286,7 @@ def get_sheet1_section_field_mappings(section_name: str) -> dict[str, dict[str, 
 
     Returns:
         Dictionary of field mappings with match_keywords, exclude_keywords, etc.
+
     """
     section = get_sheet1_section_spec(section_name)
     return section.get("field_mappings", {})
@@ -277,6 +297,7 @@ def get_sheet1_extraction_sections() -> list[str]:
 
     Returns:
         List of section keys (e.g., ["nota_21", "nota_22", "ingresos"])
+
     """
     extraction_config = get_sheet1_extraction_config()
     sections = extraction_config.get("sections", {})
@@ -294,11 +315,13 @@ def get_sheet1_section_search_patterns(section_name: str) -> list[str]:
 
     Raises:
         ValueError: If search_patterns not found for section.
+
     """
     section = get_sheet1_section_spec(section_name)
     patterns = section.get("search_patterns")
     if patterns is None:
-        raise ValueError(f"search_patterns not found for section '{section_name}' in sheet1/extraction.json")
+        msg = f"search_patterns not found for section '{section_name}' in sheet1/extraction.json"
+        raise ValueError(msg)
     return patterns
 
 
@@ -310,6 +333,7 @@ def get_sheet1_section_table_identifiers(section_name: str) -> tuple[list[str], 
 
     Returns:
         Tuple of (unique_items, exclude_items) lists.
+
     """
     section = get_sheet1_section_spec(section_name)
     identifiers = section.get("table_identifiers", {})
@@ -329,6 +353,7 @@ def get_sheet1_section_expected_items(section_name: str) -> list[str]:
 
     Returns:
         List of expected item label strings.
+
     """
     field_mappings = get_sheet1_section_field_mappings(section_name)
     items = []
@@ -346,6 +371,7 @@ def get_sheet1_xbrl_fact_mapping(field_name: str) -> dict[str, Any] | None:
 
     Returns:
         Dictionary with primary, fallbacks, and other XBRL info, or None.
+
     """
     xbrl_mappings = get_sheet1_xbrl_mappings()
     return xbrl_mappings.get("fact_mappings", {}).get(field_name)
@@ -356,6 +382,7 @@ def get_sheet1_validation_rules() -> dict[str, Any]:
 
     Returns:
         Dictionary with sum_tolerance, total_validations, cross_validations.
+
     """
     xbrl_mappings = get_sheet1_xbrl_mappings()
     return xbrl_mappings.get("validation_rules", {})
@@ -366,6 +393,7 @@ def get_sheet1_sum_tolerance() -> int:
 
     Returns:
         Tolerance value (default 1).
+
     """
     rules = get_sheet1_validation_rules()
     return rules.get("sum_tolerance", 1)
@@ -380,6 +408,7 @@ def get_sheet1_total_validations() -> list[dict[str, Any]]:
         - sum_fields: List of field names to sum
         - xbrl_fact: XBRL fact name for cross-validation
         - description: Human-readable description
+
     """
     rules = get_sheet1_validation_rules()
     return rules.get("total_validations", [])
@@ -393,6 +422,7 @@ def get_sheet1_cross_validations() -> list[dict[str, Any]]:
         - description: Human-readable description
         - formula: Formula string (e.g., "gross_profit == ingresos - cost")
         - tolerance: Optional per-rule tolerance (defaults to sum_tolerance)
+
     """
     rules = get_sheet1_validation_rules()
     return rules.get("cross_validations", [])
@@ -406,6 +436,7 @@ def get_sheet1_result_key_mapping() -> dict[str, str]:
     Returns:
         Dictionary mapping field names to result keys.
         Example: {"total_costo_venta": "cost_of_sales", ...}
+
     """
     xbrl_mappings = get_sheet1_xbrl_mappings()
     return xbrl_mappings.get("result_key_mapping", {})
@@ -419,6 +450,7 @@ def get_sheet1_pdf_xbrl_validations() -> list[dict[str, str]]:
         - field_name: Sheet1 field name
         - xbrl_key: Key in XBRL result dict
         - display_name: Human-readable name for logging/reporting
+
     """
     xbrl_mappings = get_sheet1_xbrl_mappings()
     return xbrl_mappings.get("pdf_xbrl_validations", [])
@@ -432,6 +464,7 @@ def get_sheet1_section_total_mapping() -> dict[str, str]:
     Returns:
         Dictionary mapping section_id to total field name.
         Example: {"nota_21": "total_costo_venta", "nota_22": "total_gasto_admin"}
+
     """
     xbrl_mappings = get_sheet1_xbrl_mappings()
     mapping = xbrl_mappings.get("section_total_mapping", {})
@@ -448,6 +481,7 @@ def get_sheet1_reference_values(year: int, quarter: int) -> dict[str, int] | Non
 
     Returns:
         Dictionary of reference values, or None if not available.
+
     """
     ref_data = get_sheet1_reference_data()
     period_key = f"{year}_Q{quarter}"
@@ -471,6 +505,7 @@ def match_concepto_to_field(concepto: str, section_name: str) -> str | None:
 
     Returns:
         Field name if matched, None otherwise.
+
     """
     concepto_lower = concepto.lower()
     field_mappings = get_sheet1_section_field_mappings(section_name)
@@ -589,6 +624,7 @@ class Sheet1Data:
 
         Returns:
             List of (row_number, label, value) tuples for all 27 rows.
+
         """
         row_mapping = get_sheet1_row_mapping()
 
@@ -599,7 +635,7 @@ class Sheet1Data:
             field_name = row_def.get("field")
             label = row_def.get("label", "")
 
-            if field_name and field_name not in ("costo_venta_header", "gasto_admin_header"):
+            if field_name and field_name not in {"costo_venta_header", "gasto_admin_header"}:
                 value = self.get_value(field_name)
                 result.append((row_num, label, value))
             else:
@@ -622,6 +658,7 @@ def format_quarter_label(year: int, quarter: int) -> str:
 
     Returns:
         Formatted string like "IIQ2024"
+
     """
     return format_period_display(year, quarter, "quarterly")
 
@@ -640,6 +677,7 @@ def save_sheet1_data(data: Sheet1Data, output_dir: Path | None = None) -> Path:
 
     Returns:
         Path to saved file
+
     """
     if output_dir is None:
         paths = get_period_paths(data.year, data.quarter_num)
@@ -660,26 +698,13 @@ def print_sheet1_report(data: Sheet1Data) -> None:
 
     Args:
         data: Sheet1Data to report
+
     """
-    print(f"\n{'=' * 60}")
-    print(f"Sheet1 Report: {data.quarter}")
-    print(f"{'=' * 60}")
-    print(f"Source: {data.source}")
-    print(f"XBRL Available: {'Yes' if data.xbrl_available else 'No'}")
-
-    print(f"\n{'Row':<4} {'Label':<45} {'Value':>12}")
-    print("-" * 65)
-
-    for row_num, label, value in data.to_row_list():
-        if value is not None:
-            val_str = f"{value:,}"
-        elif label:
-            val_str = ""
+    for _row_num, label, value in data.to_row_list():
+        if value is not None or label:
+            pass
         else:
-            val_str = ""
-        print(f"{row_num:<4} {label:<45} {val_str:>12}")
-
-    print(f"\n{'=' * 60}\n")
+            pass
 
 
 # =============================================================================
@@ -696,6 +721,7 @@ def validate_sheet1_against_reference(data: Sheet1Data) -> list[str] | None:
     Returns:
         List of validation issue strings (empty if all match).
         Returns None if no verified reference data exists for the period.
+
     """
     ref_values = get_sheet1_reference_values(data.year, data.quarter_num)
     if ref_values is None:
@@ -746,6 +772,7 @@ def sections_to_sheet1data(
 
     Returns:
         Sheet1Data with fields populated from sections
+
     """
     quarter_label = format_quarter_label(year, quarter)
     data = Sheet1Data(quarter=quarter_label, year=year, quarter_num=quarter)
@@ -806,6 +833,7 @@ def get_validation_types():
 
     Example:
         ValidationReport, ValidationResult, SumValidationResult, CrossValidationResult = get_validation_types()
+
     """
     from puco_eeff.extractor.cost_extractor import (
         CrossValidationResult,
@@ -818,42 +846,42 @@ def get_validation_types():
 
 
 __all__ = [
-    # Config accessors
-    "get_sheet1_fields",
-    "get_sheet1_extraction_config",
-    "get_sheet1_xbrl_mappings",
-    "get_sheet1_reference_data",
-    "get_sheet1_value_fields",
-    "get_sheet1_metadata_fields",
-    "get_sheet1_detail_fields",
-    "get_sheet1_row_mapping",
-    "get_sheet1_section_spec",
-    "get_section_config",
-    "get_section_fallback",
-    "get_ingresos_pdf_fallback_config",
-    "get_sheet1_section_field_mappings",
-    "get_sheet1_extraction_sections",
-    "get_sheet1_section_search_patterns",
-    "get_sheet1_section_table_identifiers",
-    "get_sheet1_section_expected_items",
-    "get_sheet1_xbrl_fact_mapping",
-    "get_sheet1_validation_rules",
-    "get_sheet1_sum_tolerance",
-    "get_sheet1_total_validations",
-    "get_sheet1_cross_validations",
-    "get_sheet1_result_key_mapping",
-    "get_sheet1_pdf_xbrl_validations",
-    "get_sheet1_section_total_mapping",
-    "get_sheet1_reference_values",
     # Data classes and types
     "Sheet1Data",
+    "get_ingresos_pdf_fallback_config",
+    "get_section_config",
+    "get_section_fallback",
+    "get_sheet1_cross_validations",
+    "get_sheet1_detail_fields",
+    "get_sheet1_extraction_config",
+    "get_sheet1_extraction_sections",
+    # Config accessors
+    "get_sheet1_fields",
+    "get_sheet1_metadata_fields",
+    "get_sheet1_pdf_xbrl_validations",
+    "get_sheet1_reference_data",
+    "get_sheet1_reference_values",
+    "get_sheet1_result_key_mapping",
+    "get_sheet1_row_mapping",
+    "get_sheet1_section_expected_items",
+    "get_sheet1_section_field_mappings",
+    "get_sheet1_section_search_patterns",
+    "get_sheet1_section_spec",
+    "get_sheet1_section_table_identifiers",
+    "get_sheet1_section_total_mapping",
+    "get_sheet1_sum_tolerance",
+    "get_sheet1_total_validations",
+    "get_sheet1_validation_rules",
+    "get_sheet1_value_fields",
+    "get_sheet1_xbrl_fact_mapping",
+    "get_sheet1_xbrl_mappings",
+    "get_validation_types",
     # Matching/conversion
     "match_concepto_to_field",
-    "sections_to_sheet1data",
     # Utilities
     "print_sheet1_report",
-    "save_sheet1_data",
     # Validation (re-exported with lazy import)
     "run_sheet1_validations",
-    "get_validation_types",
+    "save_sheet1_data",
+    "sections_to_sheet1data",
 ]

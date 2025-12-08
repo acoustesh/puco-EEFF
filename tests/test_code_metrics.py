@@ -1,5 +1,4 @@
-"""
-Code Quality Metrics Tests for puco_eeff/
+"""Code Quality Metrics Tests for puco_eeff/.
 
 This module enforces code quality standards via CI:
 - Docstring coverage (warnings for missing docstrings)
@@ -23,12 +22,12 @@ import ast
 import base64
 import hashlib
 import json
+import operator
 import os
 import tempfile
 import time
 import warnings
 import zlib
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -38,7 +37,7 @@ import pytest
 from radon.complexity import cc_visit
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
 # =============================================================================
 # Constants
@@ -188,11 +187,11 @@ def save_baselines(baselines: dict) -> None:
 def extract_functions_from_file(
     file_path: Path,
 ) -> Iterator[tuple[ast.FunctionDef | ast.AsyncFunctionDef, str]]:
-    """
-    Extract all function definitions from a Python file.
+    """Extract all function definitions from a Python file.
 
     Yields:
         Tuples of (function_node, source_code)
+
     """
     source = file_path.read_text(encoding="utf-8")
     try:
@@ -206,8 +205,7 @@ def extract_functions_from_file(
 
 
 def extract_items_with_docstrings(file_path: Path) -> list[tuple[str, int, bool, str]]:
-    """
-    Extract functions, methods, and classes with their docstring status.
+    """Extract functions, methods, and classes with their docstring status.
 
     Args:
         file_path: Path to the Python file
@@ -215,6 +213,7 @@ def extract_items_with_docstrings(file_path: Path) -> list[tuple[str, int, bool,
     Returns:
         List of (name, line_number, has_docstring, kind) tuples
         where kind is "function", "method", or "class"
+
     """
     results = []
     source = file_path.read_text(encoding="utf-8")
@@ -232,11 +231,11 @@ def extract_items_with_docstrings(file_path: Path) -> list[tuple[str, int, bool,
 
 
 def extract_functions_with_docstrings(file_path: Path) -> list[tuple[str, int, bool]]:
-    """
-    Extract functions with their docstring status (legacy compatibility).
+    """Extract functions with their docstring status (legacy compatibility).
 
     Returns:
         List of (function_name, line_number, has_docstring) tuples
+
     """
     results = []
     for node, _ in extract_functions_from_file(file_path):
@@ -246,8 +245,7 @@ def extract_functions_with_docstrings(file_path: Path) -> list[tuple[str, int, b
 
 
 def get_function_text(node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef, source: str) -> str:
-    """
-    Extract the full text of a function or class from source code.
+    """Extract the full text of a function or class from source code.
 
     Args:
         node: AST function or class node
@@ -255,16 +253,16 @@ def get_function_text(node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDe
 
     Returns:
         Function/class text including signature, docstring, and body
+
     """
     lines = source.splitlines()
     start = node.lineno - 1  # AST uses 1-based line numbers
-    end = node.end_lineno if node.end_lineno else start + 1
+    end = node.end_lineno or start + 1
     return "\n".join(lines[start:end])
 
 
 def normalize_ast_tokens(node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef) -> str:
-    """
-    Produce deterministic token sequence from function or class AST.
+    """Produce deterministic token sequence from function or class AST.
 
     Strips comments, normalizes whitespace, produces canonical representation
     for hashing purposes.
@@ -283,8 +281,7 @@ def extract_function_infos(
     min_loc: int = 15,
     directory: Path | None = None,
 ) -> list[FunctionInfo]:
-    """
-    Extract all functions and classes from a directory meeting LOC threshold.
+    """Extract all functions and classes from a directory meeting LOC threshold.
 
     Args:
         min_loc: Minimum lines of code for inclusion
@@ -292,6 +289,7 @@ def extract_function_infos(
 
     Returns:
         List of FunctionInfo objects
+
     """
     if directory is None:
         directory = EXTRACTOR_DIR
@@ -325,21 +323,21 @@ def extract_function_infos(
                             loc=loc,
                             hash=content_hash,
                             text=text,
-                        )
+                        ),
                     )
 
     return functions
 
 
 def extract_all_function_infos(min_loc: int = 15) -> list[FunctionInfo]:
-    """
-    Extract all functions and classes from ALL puco_eeff directories meeting LOC threshold.
+    """Extract all functions and classes from ALL puco_eeff directories meeting LOC threshold.
 
     Args:
         min_loc: Minimum lines of code for inclusion
 
     Returns:
         List of FunctionInfo objects from all directories
+
     """
     all_functions = []
 
@@ -380,7 +378,7 @@ def extract_all_function_infos(min_loc: int = 15) -> list[FunctionInfo]:
                             loc=loc,
                             hash=content_hash,
                             text=text,
-                        )
+                        ),
                     )
 
     return all_functions
@@ -390,8 +388,7 @@ def extract_function_infos_from_file(
     file_path: Path,
     min_loc: int = 1,
 ) -> list[FunctionInfo]:
-    """
-    Extract all functions from a single file meeting LOC threshold.
+    """Extract all functions from a single file meeting LOC threshold.
 
     Args:
         file_path: Path to the Python file
@@ -399,6 +396,7 @@ def extract_function_infos_from_file(
 
     Returns:
         List of FunctionInfo objects
+
     """
     functions = []
 
@@ -428,7 +426,7 @@ def extract_function_infos_from_file(
                         loc=loc,
                         hash=content_hash,
                         text=text,
-                    )
+                    ),
                 )
 
     return functions
@@ -438,8 +436,7 @@ def fit_pca_on_all_embeddings(
     baselines: dict,
     variance_threshold: float = 0.95,
 ):
-    """
-    Fit PCA on all cached embeddings from puco_eeff directories.
+    """Fit PCA on all cached embeddings from puco_eeff directories.
 
     Uses ALL cached embeddings (from extractor, scraper, sheets, etc.)
     to fit a single PCA model for dimensionality reduction.
@@ -451,6 +448,7 @@ def fit_pca_on_all_embeddings(
     Returns:
         Tuple of (fitted PCA model, number of components to use)
         Returns (None, 0) if not enough embeddings
+
     """
     from sklearn.decomposition import PCA
 
@@ -484,8 +482,7 @@ def cluster_functions_kmeans_with_pca(
     n_components: int,
     n_clusters: int = 2,
 ) -> tuple[list[list[FunctionInfo]], list[str]]:
-    """
-    Cluster functions using k-means on PCA-reduced embeddings.
+    """Cluster functions using k-means on PCA-reduced embeddings.
 
     Args:
         functions: List of FunctionInfo objects with embeddings
@@ -495,6 +492,7 @@ def cluster_functions_kmeans_with_pca(
 
     Returns:
         Tuple of (list of function lists per cluster, list of cluster names)
+
     """
     from sklearn.cluster import KMeans
 
@@ -540,8 +538,7 @@ def generate_file_split_proposal(
     file_path: Path,
     baselines: dict,
 ) -> str | None:
-    """
-    Generate a proposal to split a file into two based on k-means clustering.
+    """Generate a proposal to split a file into two based on k-means clustering.
 
     Uses PCA fitted on ALL extractor embeddings to reduce dimensionality,
     keeping components that explain 95% of variance, then runs k-means.
@@ -552,6 +549,7 @@ def generate_file_split_proposal(
 
     Returns:
         Formatted proposal string, or None if not enough functions
+
     """
     # Extract all functions/classes from the file
     functions = extract_function_infos_from_file(file_path, min_loc=1)
@@ -598,18 +596,13 @@ def generate_file_split_proposal(
         f"  File 1: {base_name}_part1.py ({len(clusters[0])} functions/classes)",
     ]
 
-    for func in clusters[0]:
-        lines.append(f"    - {func.name} (lines {func.start_line}-{func.end_line})")
+    lines.extend(f"    - {func.name} (lines {func.start_line}-{func.end_line})" for func in clusters[0])
 
-    lines.append("")
-    lines.append(f"  File 2: {base_name}_part2.py ({len(clusters[1])} functions/classes)")
+    lines.extend(("", f"  File 2: {base_name}_part2.py ({len(clusters[1])} functions/classes)"))
 
-    for func in clusters[1]:
-        lines.append(f"    - {func.name} (lines {func.start_line}-{func.end_line})")
+    lines.extend(f"    - {func.name} (lines {func.start_line}-{func.end_line})" for func in clusters[1])
 
-    lines.append("")
-    lines.append("  Note: Functions are grouped by semantic similarity using PCA + k-means.")
-    lines.append(f"  {'─' * 60}")
+    lines.extend(("", "  Note: Functions are grouped by semantic similarity using PCA + k-means.", f"  {'─' * 60}"))
 
     return "\n".join(lines)
 
@@ -620,8 +613,7 @@ def generate_file_split_proposal(
 
 
 def get_line_count(file_path: Path) -> int:
-    """
-    Get line count consistent with `wc -l`.
+    """Get line count consistent with `wc -l`.
 
     Uses total lines count (len(file.readlines())).
     """
@@ -635,11 +627,11 @@ def get_line_count(file_path: Path) -> int:
 
 
 def get_all_function_complexities(file_path: Path) -> list[tuple[str, int, int]]:
-    """
-    Get cyclomatic complexity for all functions in a file.
+    """Get cyclomatic complexity for all functions in a file.
 
     Returns:
         List of (function_name, line_number, complexity) tuples
+
     """
     source = file_path.read_text(encoding="utf-8")
     try:
@@ -651,11 +643,11 @@ def get_all_function_complexities(file_path: Path) -> list[tuple[str, int, int]]
 
 
 def get_all_cognitive_complexities(file_path: Path) -> list[tuple[str, int, int]]:
-    """
-    Get cognitive complexity for all functions in a file using complexipy.
+    """Get cognitive complexity for all functions in a file using complexipy.
 
     Returns:
         List of (function_name, line_number, complexity) tuples
+
     """
     from complexipy import file_complexity
 
@@ -668,11 +660,11 @@ def get_all_cognitive_complexities(file_path: Path) -> list[tuple[str, int, int]
 
 
 def get_maintainability_index(file_path: Path) -> float:
-    """
-    Get the Maintainability Index for a file using radon.
+    """Get the Maintainability Index for a file using radon.
 
     Returns:
         MI score (0-100, higher is better)
+
     """
     from radon.metrics import mi_visit
 
@@ -699,8 +691,7 @@ def get_embeddings_batch(
     max_retries: int = 3,
     timeout: float = 30.0,
 ) -> list[list[float]]:
-    """
-    Get embeddings for a batch of texts using OpenAI API.
+    """Get embeddings for a batch of texts using OpenAI API.
 
     Args:
         texts: List of text strings to embed
@@ -710,6 +701,7 @@ def get_embeddings_batch(
 
     Returns:
         List of embedding vectors
+
     """
     import openai
 
@@ -756,14 +748,14 @@ def compute_cosine_similarity(a: list[float], b: list[float]) -> float:
 
 
 def compute_similarity_matrix(functions: list[FunctionInfo]) -> np.ndarray:
-    """
-    Compute pairwise cosine similarity matrix for all functions.
+    """Compute pairwise cosine similarity matrix for all functions.
 
     Args:
         functions: List of FunctionInfo objects with embeddings
 
     Returns:
         n x n numpy array of cosine similarities
+
     """
     # Build embedding matrix (n x dim)
     embeddings = []
@@ -791,21 +783,20 @@ def compute_similarity_matrix(functions: list[FunctionInfo]) -> np.ndarray:
 
 
 def compute_max_similarities(similarity_matrix: np.ndarray) -> np.ndarray:
-    """
-    Compute max similarity for each function (excluding self).
+    """Compute max similarity for each function (excluding self).
 
     Args:
         similarity_matrix: n x n similarity matrix
 
     Returns:
         Array of max similarities for each function
+
     """
     return np.max(similarity_matrix, axis=1)
 
 
 def compute_similarity_indices(max_similarities: np.ndarray) -> np.ndarray:
-    """
-    Compute similarity index from max similarities.
+    """Compute similarity index from max similarities.
 
     Formula: similarity_index = 25.403 * max_similarity^5
 
@@ -814,6 +805,7 @@ def compute_similarity_indices(max_similarities: np.ndarray) -> np.ndarray:
 
     Returns:
         Array of similarity indices
+
     """
     return 25.403 * np.power(max_similarities, 5)
 
@@ -823,8 +815,7 @@ def compute_refactor_indices(
     cog_values: np.ndarray,
     similarity_indices: np.ndarray,
 ) -> np.ndarray:
-    """
-    Compute refactor index for each function.
+    """Compute refactor index for each function.
 
     Formula: refactor_index = 0.25*CC + 0.15*COG + 0.6*similarity_index
 
@@ -835,6 +826,7 @@ def compute_refactor_indices(
 
     Returns:
         Array of refactor indices
+
     """
     return 0.25 * cc_values + 0.15 * cog_values + 0.6 * similarity_indices
 
@@ -846,8 +838,7 @@ def get_refactor_priority_message(
     threshold: float = DEFAULT_REFACTOR_INDEX_THRESHOLD,
     top_n: int = DEFAULT_REFACTOR_INDEX_TOP_N,
 ) -> str | None:
-    """
-    Generate refactoring priority message for functions above threshold.
+    """Generate refactoring priority message for functions above threshold.
 
     Args:
         functions: List of FunctionInfo objects with embeddings
@@ -858,6 +849,7 @@ def get_refactor_priority_message(
 
     Returns:
         Formatted message string, or None if no functions meet threshold
+
     """
     if len(functions) < 2:
         return None
@@ -894,7 +886,7 @@ def get_refactor_priority_message(
         return None
 
     # Sort by refactor index descending
-    above_threshold.sort(key=lambda x: x[0], reverse=True)
+    above_threshold.sort(key=operator.itemgetter(0), reverse=True)
 
     # Take top N
     top_funcs = above_threshold[:top_n]
@@ -910,26 +902,22 @@ def get_refactor_priority_message(
     ]
 
     for ri, func, max_sim, cc, cog, sim_idx in top_funcs:
-        lines.append(f"  {func.file}:{func.start_line} - {func.name}()")
-        lines.append(f"    Refactor Index: {ri:.2f}")
-        lines.append(f"      CC={cc:.0f}, COG={cog:.0f}, MaxSim={max_sim:.2%}, SimIdx={sim_idx:.2f}")
-        lines.append("")
+        lines.extend((f"  {func.file}:{func.start_line} - {func.name}()", f"    Refactor Index: {ri:.2f}", f"      CC={cc:.0f}, COG={cog:.0f}, MaxSim={max_sim:.2%}, SimIdx={sim_idx:.2f}", ""))
 
-    lines.append("Formula: RefactorIndex = 0.25*CC + 0.15*COG + 0.6*(25.403 * MaxSimilarity^5)")
-    lines.append(f"{'=' * 70}")
+    lines.extend(("Formula: RefactorIndex = 0.25*CC + 0.15*COG + 0.6*(25.403 * MaxSimilarity^5)", f"{'=' * 70}"))
 
     return "\n".join(lines)
 
 
 def _load_complexity_maps(directory: Path | None = None) -> tuple[dict[str, int], dict[str, int]]:
-    """
-    Load cyclomatic and cognitive complexity maps for functions in a directory.
+    """Load cyclomatic and cognitive complexity maps for functions in a directory.
 
     Args:
         directory: Directory to scan (default: EXTRACTOR_DIR)
 
     Returns:
         Tuple of (cc_map, cog_map) where each maps "file:func" to complexity value
+
     """
     if directory is None:
         directory = EXTRACTOR_DIR
@@ -952,11 +940,11 @@ def _load_complexity_maps(directory: Path | None = None) -> tuple[dict[str, int]
 
 
 def _load_all_complexity_maps() -> tuple[dict[str, int], dict[str, int]]:
-    """
-    Load cyclomatic and cognitive complexity maps for ALL puco_eeff functions.
+    """Load cyclomatic and cognitive complexity maps for ALL puco_eeff functions.
 
     Returns:
         Tuple of (cc_map, cog_map) where each maps "subdir/file:func" to complexity value
+
     """
     cc_map: dict[str, int] = {}
     cog_map: dict[str, int] = {}
@@ -1020,15 +1008,15 @@ def _run_similarity_checks(
             f"--cached-only mode: {len(uncached_functions)} functions lack "
             f"cached embeddings:\n  "
             + "\n  ".join(uncached_names[:10])
-            + (f"\n  ... and {len(uncached_names) - 10} more" if len(uncached_names) > 10 else "")
+            + (f"\n  ... and {len(uncached_names) - 10} more" if len(uncached_names) > 10 else ""),
         )
 
     if uncached_functions:
         api_key = os.environ.get("OPENAI_API_KEY")
-        if not api_key or api_key.startswith("your_") or api_key.startswith("sk-xxx") or len(api_key) < 20:
+        if not api_key or api_key.startswith(("your_", "sk-xxx")) or len(api_key) < 20:
             pytest.skip(
                 "OPENAI_API_KEY not set (or invalid) and some functions lack cached embeddings. "
-                "Set a valid API key or run with --cached-only to skip."
+                "Set a valid API key or run with --cached-only to skip.",
             )
 
         texts = [f.text for f in uncached_functions]
@@ -1039,7 +1027,7 @@ def _run_similarity_checks(
             if "401" in error_msg or "authentication" in error_msg or "api key" in error_msg:
                 pytest.skip(
                     f"Invalid OPENAI_API_KEY and some functions lack cached embeddings. "
-                    f"Set a valid API key or run with --cached-only to skip. Error: {e}"
+                    f"Set a valid API key or run with --cached-only to skip. Error: {e}",
                 )
             pytest.fail(f"Failed to get embeddings from OpenAI: {e}")
 
@@ -1074,7 +1062,7 @@ def _run_similarity_checks(
                 pair_violations.append(
                     f"{func_a.file}:{func_a.start_line} {func_a.name}() vs "
                     f"{func_b.file}:{func_b.start_line} {func_b.name}() - "
-                    f"similarity: {similarity:.1%}"
+                    f"similarity: {similarity:.1%}",
                 )
 
             if similarity >= threshold_neighbor:
@@ -1084,7 +1072,7 @@ def _run_similarity_checks(
             neighbor_info = ", ".join(f"{f}:{n}() ({s:.1%})" for f, n, _, s in similar_neighbors[:3])
             neighbor_violations.append(
                 f"{func_a.file}:{func_a.start_line} {func_a.name}() has "
-                f"{len(similar_neighbors)} similar functions: {neighbor_info}"
+                f"{len(similar_neighbors)} similar functions: {neighbor_info}",
             )
 
     all_violations: list[str] = []
@@ -1093,7 +1081,7 @@ def _run_similarity_checks(
     if neighbor_violations:
         all_violations.append(
             f"Functions with multiple similar neighbors (>={threshold_neighbor:.0%}):\n  "
-            + "\n  ".join(neighbor_violations)
+            + "\n  ".join(neighbor_violations),
         )
 
     if all_violations:
@@ -1111,8 +1099,7 @@ def _run_similarity_checks(
 
 
 def _get_refactor_priority_suffix() -> str:
-    """
-    Get the refactoring priority message to append to assertion errors.
+    """Get the refactoring priority message to append to assertion errors.
 
     Loads embeddings and complexity data to compute refactor indices.
     Uses ALL puco_eeff directories for comprehensive analysis.
@@ -1147,7 +1134,7 @@ def _get_refactor_priority_suffix() -> str:
 
         # Get refactor priority message
         msg = get_refactor_priority_message(functions, cc_map, cog_map, threshold=threshold, top_n=top_n)
-        return msg if msg else ""
+        return msg or ""
     except Exception:
         # Don't fail the test due to refactor index computation errors
         return ""
@@ -1157,8 +1144,7 @@ class TestDocstringCoverage:
     """Tests for docstring presence in all puco_eeff modules."""
 
     def test_docstring_coverage_all_directories(self) -> None:
-        """
-        Check that all functions, methods, and classes have docstrings.
+        """Check that all functions, methods, and classes have docstrings.
 
         Tests all puco_eeff directories. Emits warnings for missing docstrings.
         Fails if any directory exceeds its baseline (initially 0 for all).
@@ -1190,7 +1176,7 @@ class TestDocstringCoverage:
                 baseline = docstring_baselines.get(subdir, max_missing_default)
                 if len(missing_in_dir) > baseline:
                     violations.append(
-                        f"{subdir}/: {len(missing_in_dir)} missing docstrings, baseline allows {baseline}"
+                        f"{subdir}/: {len(missing_in_dir)} missing docstrings, baseline allows {baseline}",
                     )
 
         # Also check root-level files in puco_eeff/
@@ -1230,8 +1216,7 @@ class TestLineCount:
     """Tests for file line count limits."""
 
     def test_file_line_counts(self, update_baselines: bool) -> None:
-        """
-        Check that files don't exceed their line count baselines.
+        """Check that files don't exceed their line count baselines.
 
         Prevents code bloat by failing if any file grows beyond baseline.
         """
@@ -1260,8 +1245,7 @@ class TestLineCount:
             pytest.fail(error_msg)
 
     def test_total_line_count(self, update_baselines: bool) -> None:
-        """
-        Check that total lines across all extractor files don't exceed baseline.
+        """Check that total lines across all extractor files don't exceed baseline.
 
         Prevents overall code bloat in the extractor module.
         """
@@ -1289,8 +1273,7 @@ class TestCyclomaticComplexity:
     """Tests for cyclomatic complexity limits."""
 
     def test_cyclomatic_complexity(self, update_baselines: bool) -> None:
-        """
-        Check that no function exceeds the complexity threshold.
+        """Check that no function exceeds the complexity threshold.
 
         Uses radon for CC analysis. Threshold is configurable in baselines.
         Existing complex functions can be grandfathered in cc_baselines.
@@ -1314,7 +1297,7 @@ class TestCyclomaticComplexity:
                 if cc > func_baseline:
                     violations.append(
                         f"{py_file.name}:{line_no} - {func_name}() has CC={cc}, "
-                        f"exceeds {'baseline' if key in cc_baselines else 'threshold'} of {func_baseline}"
+                        f"exceeds {'baseline' if key in cc_baselines else 'threshold'} of {func_baseline}",
                     )
 
         if update_baselines:
@@ -1335,8 +1318,7 @@ class TestCognitiveComplexity:
     """Tests for cognitive complexity limits using complexipy."""
 
     def test_cognitive_complexity(self, update_baselines: bool) -> None:
-        """
-        Check that no function exceeds the cognitive complexity threshold.
+        """Check that no function exceeds the cognitive complexity threshold.
 
         Uses complexipy for cognitive complexity analysis. Threshold defaults to 14.
         Existing complex functions can be grandfathered in cog_baselines.
@@ -1360,7 +1342,7 @@ class TestCognitiveComplexity:
                 if cog > func_baseline:
                     violations.append(
                         f"{py_file.name}:{line_no} - {func_name}() has cognitive complexity={cog}, "
-                        f"exceeds {'baseline' if key in cog_baselines else 'threshold'} of {func_baseline}"
+                        f"exceeds {'baseline' if key in cog_baselines else 'threshold'} of {func_baseline}",
                     )
 
         if update_baselines:
@@ -1381,8 +1363,7 @@ class TestMaintainabilityIndex:
     """Tests for maintainability index limits using radon."""
 
     def test_maintainability_index_all_directories(self, update_baselines: bool) -> None:
-        """
-        Check that no file in any puco_eeff directory has MI below threshold.
+        """Check that no file in any puco_eeff directory has MI below threshold.
 
         Uses radon for MI analysis. Threshold defaults to 13 (very low).
         MI scale: 0-100, higher is better. 20+ is generally acceptable.
@@ -1418,7 +1399,7 @@ class TestMaintainabilityIndex:
                 if mi < file_baseline:
                     violations.append(
                         f"{subdir}/{py_file.name} has MI={mi:.2f}, "
-                        f"below {'baseline' if py_file.name in dir_mi_baselines else 'threshold'} of {file_baseline}"
+                        f"below {'baseline' if py_file.name in dir_mi_baselines else 'threshold'} of {file_baseline}",
                     )
                     failing_files.append(py_file)
 
@@ -1437,7 +1418,7 @@ class TestMaintainabilityIndex:
             if mi < file_baseline:
                 violations.append(
                     f"{py_file.name} has MI={mi:.2f}, "
-                    f"below {'baseline' if py_file.name in root_mi_baselines else 'threshold'} of {file_baseline}"
+                    f"below {'baseline' if py_file.name in root_mi_baselines else 'threshold'} of {file_baseline}",
                 )
                 failing_files.append(py_file)
 
@@ -1466,8 +1447,7 @@ class TestMaintainabilityIndex:
             pytest.fail(error_msg)
 
     def test_maintainability_index_extractor(self, update_baselines: bool) -> None:
-        """
-        Check that no file in extractor/ has MI below threshold.
+        """Check that no file in extractor/ has MI below threshold.
 
         Legacy test for backward compatibility. Uses mi_baselines from baselines.
         """
@@ -1489,7 +1469,7 @@ class TestMaintainabilityIndex:
             if mi < file_baseline:
                 violations.append(
                     f"{py_file.name} has MI={mi:.2f}, "
-                    f"below {'baseline' if py_file.name in mi_baselines else 'threshold'} of {file_baseline}"
+                    f"below {'baseline' if py_file.name in mi_baselines else 'threshold'} of {file_baseline}",
                 )
                 failing_files.append(py_file)
 
@@ -1523,8 +1503,7 @@ class TestFunctionSimilarity:
         update_baselines: bool,
         cached_only: bool,
     ) -> None:
-        """
-        Detect near-duplicate functions across ALL puco_eeff directories.
+        """Detect near-duplicate functions across ALL puco_eeff directories.
 
         Uses OpenAI embeddings with hash-based caching.
         PCA dimensionality reduction is fitted on ALL cached embeddings.
@@ -1555,8 +1534,7 @@ class TestFunctionSimilarity:
         update_baselines: bool,
         cached_only: bool,
     ) -> None:
-        """
-        Detect near-duplicate functions in extractor/ only (legacy test).
+        """Detect near-duplicate functions in extractor/ only (legacy test).
 
         Uses OpenAI embeddings with hash-based caching.
         Fails if:

@@ -15,7 +15,7 @@ def test_core_imports() -> None:
     import httpx  # noqa: F401
     import lxml  # noqa: F401
     import openpyxl  # noqa: F401
-    import pandas  # noqa: F401
+    import pandas as pd  # noqa: F401
     import pdfplumber  # noqa: F401
 
 

@@ -18,7 +18,6 @@ Tests cover:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -50,10 +49,6 @@ from puco_eeff.sheets.sheet1 import (
     get_sheet1_section_total_mapping,
     sections_to_sheet1data,
 )
-
-if TYPE_CHECKING:
-    pass
-
 
 # =============================================================================
 # Tests for parse_chilean_number
@@ -454,7 +449,7 @@ class TestExtractDetailedCostsMocked:
                 breakdown = SectionBreakdown(section_id="nota_21", section_title="Costo de Venta")
                 breakdown.total_ytd_actual = -54000
                 return breakdown
-            elif section_name == "nota_22":
+            if section_name == "nota_22":
                 breakdown = SectionBreakdown(section_id="nota_22", section_title="Gastos Admin")
                 breakdown.total_ytd_actual = -12000
                 return breakdown
@@ -504,7 +499,7 @@ class TestExtractDetailedCostsMocked:
                 breakdown = SectionBreakdown(section_id="nota_21", section_title="Costo de Venta")
                 breakdown.total_ytd_actual = -170862
                 return breakdown
-            elif section_name == "nota_22":
+            if section_name == "nota_22":
                 breakdown = SectionBreakdown(section_id="nota_22", section_title="Gastos Admin")
                 breakdown.total_ytd_actual = -17363
                 return breakdown
@@ -557,7 +552,7 @@ class TestSaveExtractionResult:
 
         import json
 
-        with open(output_path) as f:
+        with open(output_path, encoding="utf-8") as f:
             data = json.load(f)
 
         assert data["period"] == "2024_Q1"
@@ -750,7 +745,7 @@ class TestSaveSheet1Data:
 
         import json
 
-        with open(output_path) as f:
+        with open(output_path, encoding="utf-8") as f:
             saved = json.load(f)
 
         assert saved["quarter"] == "IIQ2024"
@@ -969,9 +964,9 @@ class TestIngresosPDFFallback:
                 def find_side_effect(dir_path, doc_type, year, quarter):
                     if doc_type == "estados_financieros_pdf":
                         return mock_pdf_path
-                    elif doc_type == "estados_financieros_xbrl":
+                    if doc_type == "estados_financieros_xbrl":
                         return None  # No XBRL available
-                    elif doc_type == "pucobre_combined":
+                    if doc_type == "pucobre_combined":
                         return mock_combined_path  # pucobre source
                     return None
 
@@ -986,7 +981,7 @@ class TestIngresosPDFFallback:
                                 section_title="Costo de Venta",
                                 total_ytd_actual=-62982,
                             )
-                        elif section_name == "nota_22":
+                        if section_name == "nota_22":
                             return SectionBreakdown(
                                 section_id="nota_22",
                                 section_title="Gastos Admin",
@@ -1261,21 +1256,21 @@ class TestEvaluateCrossValidation:
     def test_mismatch_within_tolerance(self) -> None:
         """Mismatch within tolerance should pass."""
         values = {"a": 100, "b": 101}
-        expected, calculated, match, diff = _evaluate_cross_validation("a == b", values, tolerance=5)
+        _expected, _calculated, match, diff = _evaluate_cross_validation("a == b", values, tolerance=5)
         assert match is True
         assert diff == 1
 
     def test_mismatch_outside_tolerance(self) -> None:
         """Mismatch outside tolerance should fail."""
         values = {"a": 100, "b": 110}
-        expected, calculated, match, diff = _evaluate_cross_validation("a == b", values, tolerance=5)
+        _expected, _calculated, match, diff = _evaluate_cross_validation("a == b", values, tolerance=5)
         assert match is False
         assert diff == 10
 
     def test_invalid_formula_no_equals(self) -> None:
         """Formula without == returns None values."""
         values = {"a": 100}
-        expected, calculated, match, diff = _evaluate_cross_validation("a + b", values, tolerance=1)
+        expected, calculated, match, _diff = _evaluate_cross_validation("a + b", values, tolerance=1)
         assert expected is None
         assert calculated is None
         assert match is True  # Can't fail without valid formula
@@ -1625,7 +1620,7 @@ class TestPerRuleTolerance:
                     "description": "Test cross-validation",
                     "formula": "gross_profit == ingresos_ordinarios - abs(total_costo_venta)",
                     "tolerance": 5,  # Per-rule override
-                }
+                },
             ]
 
             results = _run_cross_validations(data, xbrl_totals)
@@ -1682,7 +1677,7 @@ class TestRunSheetValidations:
         }
 
     def test_all_validations_enabled(
-        self, sample_sheet1_data: Sheet1Data, sample_xbrl_totals: dict[str, int | None]
+        self, sample_sheet1_data: Sheet1Data, sample_xbrl_totals: dict[str, int | None],
     ) -> None:
         """Run all validations with both sources matching."""
         report = run_sheet1_validations(sample_sheet1_data, sample_xbrl_totals)
@@ -1707,7 +1702,7 @@ class TestRunSheetValidations:
         assert len(report.cross_validations) == 0
 
     def test_pdf_xbrl_validations_only(
-        self, sample_sheet1_data: Sheet1Data, sample_xbrl_totals: dict[str, int | None]
+        self, sample_sheet1_data: Sheet1Data, sample_xbrl_totals: dict[str, int | None],
     ) -> None:
         """Run only PDF↔XBRL validations."""
         report = run_sheet1_validations(
@@ -1734,7 +1729,7 @@ class TestRunSheetValidations:
             "admin_expense": -20000,
         }
 
-        report = run_sheet1_validations(
+        run_sheet1_validations(
             data,
             xbrl_totals,
             run_sum_validations=False,
@@ -1757,7 +1752,7 @@ class TestRunSheetValidations:
             "cost_of_sales": -100000,
         }
 
-        report = run_sheet1_validations(
+        run_sheet1_validations(
             data,
             xbrl_totals,
             run_sum_validations=False,
@@ -2013,7 +2008,7 @@ class TestExtractionResultValidationReport:
                 breakdown = SectionBreakdown(section_id="nota_21", section_title="Costo")
                 breakdown.total_ytd_actual = -100000
                 return breakdown
-            elif section_name == "nota_22":
+            if section_name == "nota_22":
                 breakdown = SectionBreakdown(section_id="nota_22", section_title="Admin")
                 breakdown.total_ytd_actual = -20000
                 return breakdown
@@ -2091,7 +2086,7 @@ class TestExtractionResultValidationReport:
                     xbrl_value=-100,
                     match=True,
                     source="both",
-                )
+                ),
             ],
             sum_validations=[],
             cross_validations=[],

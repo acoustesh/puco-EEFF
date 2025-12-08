@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Generator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
 from playwright.sync_api import Browser, BrowserContext, Page, sync_playwright
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+
     from playwright.sync_api import Playwright
 
 
@@ -21,6 +22,7 @@ def create_browser(playwright: Playwright, headless: bool = True) -> Browser:
 
     Returns:
         Browser instance
+
     """
     return playwright.chromium.launch(
         headless=headless,
@@ -40,6 +42,7 @@ def create_browser_context(browser: Browser) -> BrowserContext:
 
     Returns:
         BrowserContext configured for scraping
+
     """
     return browser.new_context(
         viewport={"width": 1920, "height": 1080},
@@ -63,6 +66,7 @@ def browser_session(
 
     Yields:
         Tuple of (Browser, BrowserContext, Page) for interaction
+
     """
     with sync_playwright() as playwright:
         browser = create_browser(playwright, headless=headless)
@@ -86,6 +90,7 @@ def wait_for_download(page: Page, trigger_action: Any, download_path: str) -> st
 
     Returns:
         Path to the downloaded file
+
     """
     with page.expect_download() as download_info:
         trigger_action()

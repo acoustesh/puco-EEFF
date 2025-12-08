@@ -19,8 +19,7 @@ Key Functions:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pdfplumber
 
@@ -48,25 +47,28 @@ from puco_eeff.sheets.sheet1 import (
     get_sheet1_xbrl_fact_mapping,
 )
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 logger = setup_logging(__name__)
 
 # Public API exports
 __all__ = [
     "LineItem",
     "SectionBreakdown",
-    "get_section_expected_labels",
-    "get_all_field_labels",
-    "get_extraction_labels",
-    "get_table_identifiers",
+    "extract_ingresos_from_pdf",
     "extract_pdf_section",
-    "find_text_page",
-    "find_section_page",
     "extract_table_from_page",
     "extract_xbrl_totals",
-    "extract_ingresos_from_pdf",
-    "quarter_to_roman",
+    "find_section_page",
+    "find_text_page",
     "format_period_label",
     "format_quarter_label",
+    "get_all_field_labels",
+    "get_extraction_labels",
+    "get_section_expected_labels",
+    "get_table_identifiers",
+    "quarter_to_roman",
 ]
 
 
@@ -118,14 +120,16 @@ class SectionBreakdown:
 def get_section_expected_labels(section_name: str, sheet_name: str = "sheet1") -> list[str]:
     """Get expected PDF labels for a section from config."""
     if sheet_name != "sheet1":
-        raise ValueError(f"Sheet '{sheet_name}' not yet implemented.")
+        msg = f"Sheet '{sheet_name}' not yet implemented."
+        raise ValueError(msg)
     return get_sheet1_section_expected_items(section_name)
 
 
 def get_all_field_labels(sheet_name: str = "sheet1") -> dict[str, str]:
     """Get all field labels from all sections in config."""
     if sheet_name != "sheet1":
-        raise ValueError(f"Sheet '{sheet_name}' not yet implemented.")
+        msg = f"Sheet '{sheet_name}' not yet implemented."
+        raise ValueError(msg)
 
     field_labels = {}
     for section_name in get_sheet1_extraction_sections():
@@ -154,11 +158,13 @@ def get_extraction_labels(
 
     Raises:
         ValueError: If config loading fails
+
     """
     # Get all extraction sections from config
     sections = get_sheet1_extraction_sections()
     if len(sections) < 2:
-        raise ValueError(f"Expected at least 2 extraction sections in config, got {len(sections)}")
+        msg = f"Expected at least 2 extraction sections in config, got {len(sections)}"
+        raise ValueError(msg)
 
     # Build items lists for the first two cost sections
     section1_items: list[str] = []
@@ -262,14 +268,16 @@ def find_section_page(
     unique_items, _ = get_table_identifiers(section_spec)
 
     if not unique_items:
-        raise ValueError(f"No unique_items defined for section '{section_name}'.")
+        msg = f"No unique_items defined for section '{section_name}'."
+        raise ValueError(msg)
 
     search_patterns = section_spec.get("search_patterns", [])
     if not search_patterns:
         pdf_fallback = section_spec.get("pdf_fallback", {})
         search_patterns = pdf_fallback.get("search_patterns", [])
     if not search_patterns:
-        raise ValueError(f"No search_patterns defined for section '{section_name}'.")
+        msg = f"No search_patterns defined for section '{section_name}'."
+        raise ValueError(msg)
 
     validation = section_spec.get("validation", {})
     min_detail_items = validation.get("min_detail_items", 3)
@@ -351,7 +359,7 @@ def extract_table_from_page(
 
 
 def _find_section_page_with_fallback(
-    pdf_path: Path, section_name: str, year: int | None, quarter: int | None
+    pdf_path: Path, section_name: str, year: int | None, quarter: int | None,
 ) -> int | None:
     """Find section page, trying fallback section if primary not found."""
     page_idx = find_section_page(pdf_path, section_name, year, quarter)
@@ -374,12 +382,12 @@ def _extract_table_with_next_page_fallback(
 ) -> list[dict[str, Any]]:
     """Extract table from page, trying next page if empty."""
     rows = extract_table_from_page(
-        pdf_path, page_idx, expected_items, section_name=section_name, year=year, quarter=quarter
+        pdf_path, page_idx, expected_items, section_name=section_name, year=year, quarter=quarter,
     )
     if rows:
         return rows
     return extract_table_from_page(
-        pdf_path, page_idx + 1, expected_items, section_name=section_name, year=year, quarter=quarter
+        pdf_path, page_idx + 1, expected_items, section_name=section_name, year=year, quarter=quarter,
     )
 
 
@@ -389,7 +397,7 @@ def _populate_breakdown_from_rows(breakdown: SectionBreakdown, rows: list[dict[s
         concepto = row["concepto"]
         values = row.get("values", [])
 
-        if concepto.lower() in ("totales", "total"):
+        if concepto.lower() in {"totales", "total"}:
             breakdown.total_ytd_actual = values[0] if len(values) > 0 else None
             breakdown.total_ytd_anterior = values[1] if len(values) > 1 else None
             breakdown.total_quarter_actual = values[2] if len(values) > 2 else None
@@ -445,7 +453,8 @@ def extract_ingresos_from_pdf(pdf_path: Path) -> int | None:
     ingresos_mapping = field_mappings.get("ingresos_ordinarios", {})
     match_keywords = ingresos_mapping.get("match_keywords")
     if not match_keywords:
-        raise KeyError("ingresos.field_mappings.ingresos_ordinarios.match_keywords missing from config.")
+        msg = "ingresos.field_mappings.ingresos_ordinarios.match_keywords missing from config."
+        raise KeyError(msg)
 
     pdf_config = get_ingresos_pdf_fallback_config()
     min_threshold = pdf_config["min_value_threshold"]
@@ -498,7 +507,7 @@ def _extract_fact_value(facts: list[dict], fact_mapping: dict, scaling_factor: i
             continue
         try:
             raw_value = int(float(fact["value"]))
-            if fact_mapping.get("apply_scaling", False):
+            if fact_mapping.get("apply_scaling"):
                 return raw_value // scaling_factor
             return raw_value
         except (ValueError, TypeError):
@@ -511,11 +520,11 @@ def extract_xbrl_totals(xbrl_path: Path) -> dict[str, int | None]:
     try:
         data = parse_xbrl_file(xbrl_path)
     except Exception as e:
-        logger.error(f"Failed to parse XBRL: {e}")
+        logger.exception(f"Failed to parse XBRL: {e}")
         return {"cost_of_sales": None, "admin_expense": None, "ingresos": None}
 
     field_to_result = get_sheet1_result_key_mapping()
-    result: dict[str, int | None] = {key: None for key in set(field_to_result.values())}
+    result: dict[str, int | None] = dict.fromkeys(set(field_to_result.values()))
     scaling_factor = get_xbrl_scaling_factor()
 
     for field_name, result_key in field_to_result.items():

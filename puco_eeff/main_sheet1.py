@@ -41,7 +41,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from puco_eeff.config import (  # noqa: E402, I001
+from puco_eeff.config import (  # noqa: E402
     find_file_with_alternatives,
     get_period_paths,
     setup_logging,
@@ -49,7 +49,6 @@ from puco_eeff.config import (  # noqa: E402, I001
 from puco_eeff.extractor import (  # noqa: E402
     ValidationReport,
     extract_sheet1,
-    format_validation_report,
 )
 from puco_eeff.sheets.sheet1 import (  # noqa: E402
     Sheet1Data,
@@ -76,6 +75,7 @@ def files_exist_for_period(year: int, quarter: int, require_xbrl: bool = False) 
 
     Returns:
         True if all required files exist
+
     """
     paths = get_period_paths(year, quarter)
 
@@ -118,6 +118,7 @@ def ensure_files_downloaded(
 
     Returns:
         True if files are available (existed or downloaded successfully)
+
     """
     # Check if files already exist
     if not force and files_exist_for_period(year, quarter):
@@ -188,6 +189,7 @@ def process_sheet1(
 
     Returns:
         Tuple of (Sheet1Data, ValidationReport) if successful, (None, None) otherwise
+
     """
     logger.info(f"Processing Sheet1 for {year} Q{quarter}")
 
@@ -196,10 +198,9 @@ def process_sheet1(
         if not ensure_files_downloaded(year, quarter, headless=headless):
             logger.error("Cannot proceed without required files")
             return None, None
-    else:
-        if not files_exist_for_period(year, quarter):
-            logger.error(f"Files not found for {year} Q{quarter} and download skipped")
-            return None, None
+    elif not files_exist_for_period(year, quarter):
+        logger.error(f"Files not found for {year} Q{quarter} and download skipped")
+        return None, None
 
     # Step 2: Extract Sheet1 data (includes sum and cross-validations)
     data, report = extract_sheet1(year, quarter, return_report=True)
@@ -245,7 +246,7 @@ def process_sheet1(
     if verbose:
         print_sheet1_report(data)
         if report:
-            print(format_validation_report(report))
+            pass
 
     return data, report
 
@@ -310,7 +311,7 @@ Examples:
     # Process each quarter
     success_count = 0
     for quarter in args.quarter:
-        data, report = process_sheet1(
+        data, _report = process_sheet1(
             year=args.year,
             quarter=quarter,
             skip_download=args.skip_download,

@@ -12,13 +12,16 @@ This preserves alphabetical ordering while using Roman numerals for consistency.
 from __future__ import annotations
 
 import json
+import operator
 import re
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
 from puco_eeff.config import DATA_DIR, quarter_to_roman, setup_logging
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = setup_logging(__name__)
 
@@ -33,10 +36,12 @@ def roman_to_quarter(roman: str) -> int:
 
     Returns:
         Quarter number (1-4)
+
     """
     roman = roman.upper()
     if roman not in ROMAN_TO_QUARTER:
-        raise ValueError(f"Invalid Roman numeral: {roman}. Must be I, II, III, or IV.")
+        msg = f"Invalid Roman numeral: {roman}. Must be I, II, III, or IV."
+        raise ValueError(msg)
     return ROMAN_TO_QUARTER[roman]
 
 
@@ -49,6 +54,7 @@ def format_period(year: int, quarter: int) -> str:
 
     Returns:
         Period string (e.g., "2024_QII")
+
     """
     return f"{year}_Q{quarter_to_roman(quarter)}"
 
@@ -61,10 +67,12 @@ def parse_period(period: str) -> tuple[int, int]:
 
     Returns:
         Tuple of (year, quarter)
+
     """
     match = re.match(r"(\d{4})_Q(I{1,3}|IV|\d)", period)
     if not match:
-        raise ValueError(f"Invalid period format: {period}")
+        msg = f"Invalid period format: {period}"
+        raise ValueError(msg)
 
     year = int(match.group(1))
     quarter_str = match.group(2)
@@ -96,6 +104,7 @@ def save_sheet_data(
 
     Returns:
         Path to saved JSON file
+
     """
     save_dir = output_dir if output_dir is not None else DATA_DIR / "processed"
     save_dir.mkdir(parents=True, exist_ok=True)
@@ -148,6 +157,7 @@ def load_sheet_data(
 
     Returns:
         DataFrame with sheet data
+
     """
     load_dir = input_dir if input_dir is not None else DATA_DIR / "processed"
 
@@ -157,7 +167,8 @@ def load_sheet_data(
     filepath = load_dir / filename
 
     if not filepath.exists():
-        raise FileNotFoundError(f"Sheet data not found: {filepath}")
+        msg = f"Sheet data not found: {filepath}"
+        raise FileNotFoundError(msg)
 
     with open(filepath, encoding="utf-8") as f:
         data = json.load(f)
@@ -177,6 +188,7 @@ def load_sheet_json(filepath: Path) -> dict[str, Any]:
 
     Returns:
         Dictionary with sheet data including metadata
+
     """
     with open(filepath, encoding="utf-8") as f:
         return json.load(f)  # type: ignore[no-any-return]
@@ -200,6 +212,7 @@ def write_sheet_to_csv(
 
     Returns:
         Path to saved CSV file
+
     """
     save_dir = output_dir if output_dir is not None else DATA_DIR / "processed"
     save_dir.mkdir(parents=True, exist_ok=True)
@@ -229,6 +242,7 @@ def list_available_sheets(
 
     Returns:
         List of dicts with sheet_name, year, quarter, period, and filepath
+
     """
     search_dir = input_dir if input_dir is not None else DATA_DIR / "processed"
 
@@ -262,9 +276,9 @@ def list_available_sheets(
                 "quarter": file_quarter,
                 "period": file_period,
                 "filepath": filepath,
-            }
+            },
         )
 
     # Sort by sheet name, then year, then quarter
-    results.sort(key=lambda x: (x["sheet_name"], x["year"], x["quarter"]))
+    results.sort(key=operator.itemgetter("sheet_name", "year", "quarter"))
     return results
