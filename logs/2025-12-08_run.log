@@ -944,3 +944,237 @@
 2025-12-08 03:45:30,693 - puco_eeff.extractor.extraction_pipeline - INFO - No XBRL available for 2024 Q1 - using PDF only
 2025-12-08 03:45:30,693 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 21 - Costo de Venta: sum=0 != total=-50,000 (diff: 50000)
 2025-12-08 03:45:30,693 - puco_eeff.extractor.validation_core - INFO - ⚠ Nota 22 - Gastos de Administración y Ventas: no total value to compare (sum=0)
+2025-12-08 04:05:48,437 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -170,862
+2025-12-08 04:05:48,438 - puco_eeff.extractor.validation_core - INFO - ✓ Total Gasto Admin matches XBRL: -17,363
+2025-12-08 04:05:48,439 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -170,862
+2025-12-08 04:05:48,439 - puco_eeff.extractor.validation_core - INFO - ✓ Total Gasto Admin matches XBRL: -17,363
+2025-12-08 04:05:48,440 - puco_eeff.extractor.validation_core - WARNING - ✗ Total Costo de Venta mismatch - PDF: -100,000, XBRL: -110,000 (diff: 10000)
+2025-12-08 04:05:48,443 - puco_eeff.extractor.extraction_pipeline - INFO - No XBRL available for 2024 Q1 - using PDF only
+2025-12-08 04:05:48,443 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 21 - Costo de Venta: sum=0 != total=-54,000 (diff: 54000)
+2025-12-08 04:05:48,443 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 22 - Gastos de Administración y Ventas: sum=0 != total=-12,000 (diff: 12000)
+2025-12-08 04:05:48,445 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 21 - Costo de Venta: sum=0 != total=-170,862 (diff: 170862)
+2025-12-08 04:05:48,445 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 22 - Gastos de Administración y Ventas: sum=0 != total=-17,363 (diff: 17363)
+2025-12-08 04:05:48,445 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -170,862
+2025-12-08 04:05:48,445 - puco_eeff.extractor.validation_core - INFO - ✓ Total Gasto Admin matches XBRL: -17,363
+2025-12-08 04:05:48,446 - puco_eeff.extractor.validation_core - INFO - ⚠ Gross Profit = Revenue - Cost of Sales: skipped - missing gross_profit, ingresos_ordinarios
+2025-12-08 04:05:48,446 - puco_eeff.extractor.extraction_pipeline - INFO - Saved extraction result to: /tmp/pytest-of-alvaro/pytest-98/test_save_creates_json0/detailed_costs.json
+2025-12-08 04:05:48,451 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 21 - Costo de Venta: sum=0 != total=-126,202 (diff: 126202)
+2025-12-08 04:05:48,451 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 22 - Gastos de Administración y Ventas: sum=0 != total=-11,632 (diff: 11632)
+2025-12-08 04:05:48,451 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
+2025-12-08 04:05:48,451 - puco_eeff.extractor.validation_core - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
+2025-12-08 04:05:48,451 - puco_eeff.extractor.validation_core - INFO - ⚠ Gross Profit = Revenue - Cost of Sales: skipped - missing gross_profit, ingresos_ordinarios
+2025-12-08 04:05:48,451 - puco_eeff.extractor.validation_core - INFO - ⚠ Nota 21 - Costo de Venta: no total value to compare (sum=0)
+2025-12-08 04:05:48,452 - puco_eeff.extractor.validation_core - INFO - ⚠ Nota 22 - Gastos de Administración y Ventas: no total value to compare (sum=0)
+2025-12-08 04:05:48,452 - puco_eeff.extractor.validation_core - INFO - Using XBRL value for Total Costo de Venta: -126,202
+2025-12-08 04:05:48,452 - puco_eeff.extractor.validation_core - INFO - Using XBRL value for Total Gasto Admin: -11,632
+2025-12-08 04:05:48,452 - puco_eeff.extractor.validation_core - INFO - ⚠ Gross Profit = Revenue - Cost of Sales: skipped - missing gross_profit, ingresos_ordinarios
+2025-12-08 04:05:48,452 - puco_eeff.extractor.extraction_pipeline - DEBUG - Merged PDF field cv_gastos_personal = -19721 into XBRL data
+2025-12-08 04:05:48,452 - puco_eeff.extractor.extraction_pipeline - DEBUG - Merged PDF field cv_materiales = -23219 into XBRL data
+2025-12-08 04:05:48,452 - puco_eeff.extractor.extraction_pipeline - DEBUG - Merged PDF field ga_gastos_personal = -3818 into XBRL data
+2025-12-08 04:05:48,453 - puco_eeff.extractor.extraction_pipeline - INFO - PDF extraction failed, trying XBRL-only extraction
+2025-12-08 04:05:48,456 - puco_eeff.extractor.extraction - DEBUG - Found text match on page 5
+2025-12-08 04:05:48,457 - puco_eeff.extractor.extraction - INFO - Found section 'ingresos' with details on page 5
+2025-12-08 04:05:48,457 - puco_eeff.extractor.extraction - INFO - Extracted Ingresos from PDF page 5: 80,767
+2025-12-08 04:05:48,458 - puco_eeff.extractor.extraction - WARNING - Could not find Estado de Resultados page for Ingresos extraction
+2025-12-08 04:05:48,459 - puco_eeff.extractor.extraction_pipeline - INFO - No XBRL available, extracting Ingresos from Estado de Resultados
+2025-12-08 04:05:48,459 - puco_eeff.extractor.extraction_pipeline - INFO - Set Ingresos from PDF: 80,767
+2025-12-08 04:05:48,459 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 21 - Costo de Venta: sum=0 != total=-62,982 (diff: 62982)
+2025-12-08 04:05:48,459 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 22 - Gastos de Administración y Ventas: sum=0 != total=-5,137 (diff: 5137)
+2025-12-08 04:05:48,467 - puco_eeff.extractor.validation_core - WARNING - Unsupported formula format (no '=='): a + b
+2025-12-08 04:05:48,468 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 21 - Costo de Venta: sum=-126,202 matches total=-126,202
+2025-12-08 04:05:48,468 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 22 - Gastos de Administración y Ventas: sum=-11,632 matches total=-11,632
+2025-12-08 04:05:48,468 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 21 - Costo de Venta: sum=-126,202 != total=-100,000 (diff: 26202)
+2025-12-08 04:05:48,469 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 22 - Gastos de Administración y Ventas: sum=-11,632 matches total=-11,632
+2025-12-08 04:05:48,469 - puco_eeff.extractor.validation_core - INFO - ⚠ Nota 21 - Costo de Venta: no total value to compare (sum=-126,202)
+2025-12-08 04:05:48,469 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 22 - Gastos de Administración y Ventas: sum=-11,632 matches total=-11,632
+2025-12-08 04:05:48,470 - puco_eeff.extractor.validation_core - INFO - ✓ Gross Profit = Revenue - Cost of Sales: 52,963
+2025-12-08 04:05:48,470 - puco_eeff.extractor.validation_core - INFO - ⚠ Gross Profit = Revenue - Cost of Sales: skipped - missing gross_profit
+2025-12-08 04:05:48,475 - puco_eeff.extractor.validation_core - DEBUG - Syntax error parsing expression '(a': '(' was never closed (<unknown>, line 1)
+2025-12-08 04:05:48,478 - puco_eeff.extractor.validation_core - INFO - ✓ Test cross-validation: 52
+2025-12-08 04:05:48,478 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 21 - Costo de Venta: sum=-126,202 matches total=-126,202
+2025-12-08 04:05:48,478 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 22 - Gastos de Administración y Ventas: sum=-11,632 matches total=-11,632
+2025-12-08 04:05:48,479 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
+2025-12-08 04:05:48,479 - puco_eeff.extractor.validation_core - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
+2025-12-08 04:05:48,479 - puco_eeff.extractor.validation_core - INFO - ✓ Ingresos Ordinarios matches XBRL: 179,165
+2025-12-08 04:05:48,479 - puco_eeff.extractor.validation_core - INFO - ✓ Gross Profit = Revenue - Cost of Sales: 52,963
+2025-12-08 04:05:48,479 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 21 - Costo de Venta: sum=-126,202 matches total=-126,202
+2025-12-08 04:05:48,479 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 22 - Gastos de Administración y Ventas: sum=-11,632 matches total=-11,632
+2025-12-08 04:05:48,480 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
+2025-12-08 04:05:48,480 - puco_eeff.extractor.validation_core - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
+2025-12-08 04:05:48,480 - puco_eeff.extractor.validation_core - INFO - ✓ Ingresos Ordinarios matches XBRL: 179,165
+2025-12-08 04:05:48,481 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -100,000
+2025-12-08 04:05:48,481 - puco_eeff.extractor.validation_core - INFO - Using XBRL value for Total Gasto Admin: -20,000
+2025-12-08 04:05:48,481 - puco_eeff.extractor.validation_core - INFO - Using XBRL value for Ingresos Ordinarios: 200,000
+2025-12-08 04:05:48,481 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -100,000
+2025-12-08 04:05:48,482 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 21 - Costo de Venta: sum=-126,202 matches total=-126,202
+2025-12-08 04:05:48,482 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 22 - Gastos de Administración y Ventas: sum=-11,632 matches total=-11,632
+2025-12-08 04:05:48,482 - puco_eeff.extractor.validation_core - INFO - ⚠ Gross Profit = Revenue - Cost of Sales: skipped - missing gross_profit
+2025-12-08 04:05:48,485 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
+2025-12-08 04:05:48,485 - puco_eeff.extractor.validation_core - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
+2025-12-08 04:05:48,485 - puco_eeff.extractor.validation_core - INFO - ✓ Ingresos Ordinarios matches XBRL: 179,165
+2025-12-08 04:05:48,486 - puco_eeff.extractor.validation_core - INFO - Using XBRL value for Ingresos Ordinarios: 200,000
+2025-12-08 04:05:48,491 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 21 - Costo de Venta: sum=0 != total=-100,000 (diff: 100000)
+2025-12-08 04:05:48,491 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 22 - Gastos de Administración y Ventas: sum=0 != total=-20,000 (diff: 20000)
+2025-12-08 04:05:48,492 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -100,000
+2025-12-08 04:05:48,492 - puco_eeff.extractor.validation_core - INFO - ✓ Total Gasto Admin matches XBRL: -20,000
+2025-12-08 04:05:48,492 - puco_eeff.extractor.validation_core - INFO - ⚠ Gross Profit = Revenue - Cost of Sales: skipped - missing gross_profit, ingresos_ordinarios
+2025-12-08 04:05:48,493 - puco_eeff.extractor.extraction_pipeline - INFO - No XBRL available for 2024 Q1 - using PDF only
+2025-12-08 04:05:48,494 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 21 - Costo de Venta: sum=0 != total=-50,000 (diff: 50000)
+2025-12-08 04:05:48,494 - puco_eeff.extractor.validation_core - INFO - ⚠ Nota 22 - Gastos de Administración y Ventas: no total value to compare (sum=0)
+2025-12-08 04:05:49,351 - puco_eeff.transformer.formatter - WARNING - No reference data found for period: IQ2030
+2025-12-08 04:08:32,851 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -170,862
+2025-12-08 04:08:32,851 - puco_eeff.extractor.validation_core - INFO - ✓ Total Gasto Admin matches XBRL: -17,363
+2025-12-08 04:08:32,852 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -170,862
+2025-12-08 04:08:32,852 - puco_eeff.extractor.validation_core - INFO - ✓ Total Gasto Admin matches XBRL: -17,363
+2025-12-08 04:08:32,853 - puco_eeff.extractor.validation_core - WARNING - ✗ Total Costo de Venta mismatch - PDF: -100,000, XBRL: -110,000 (diff: 10000)
+2025-12-08 04:08:32,856 - puco_eeff.extractor.extraction_pipeline - INFO - No XBRL available for 2024 Q1 - using PDF only
+2025-12-08 04:08:32,856 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 21 - Costo de Venta: sum=0 != total=-54,000 (diff: 54000)
+2025-12-08 04:08:32,856 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 22 - Gastos de Administración y Ventas: sum=0 != total=-12,000 (diff: 12000)
+2025-12-08 04:08:32,858 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 21 - Costo de Venta: sum=0 != total=-170,862 (diff: 170862)
+2025-12-08 04:08:32,858 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 22 - Gastos de Administración y Ventas: sum=0 != total=-17,363 (diff: 17363)
+2025-12-08 04:08:32,858 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -170,862
+2025-12-08 04:08:32,858 - puco_eeff.extractor.validation_core - INFO - ✓ Total Gasto Admin matches XBRL: -17,363
+2025-12-08 04:08:32,859 - puco_eeff.extractor.validation_core - INFO - ⚠ Gross Profit = Revenue - Cost of Sales: skipped - missing gross_profit, ingresos_ordinarios
+2025-12-08 04:08:32,859 - puco_eeff.extractor.extraction_pipeline - INFO - Saved extraction result to: /tmp/pytest-of-alvaro/pytest-99/test_save_creates_json0/detailed_costs.json
+2025-12-08 04:08:32,864 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 21 - Costo de Venta: sum=0 != total=-126,202 (diff: 126202)
+2025-12-08 04:08:32,864 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 22 - Gastos de Administración y Ventas: sum=0 != total=-11,632 (diff: 11632)
+2025-12-08 04:08:32,864 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
+2025-12-08 04:08:32,864 - puco_eeff.extractor.validation_core - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
+2025-12-08 04:08:32,864 - puco_eeff.extractor.validation_core - INFO - ⚠ Gross Profit = Revenue - Cost of Sales: skipped - missing gross_profit, ingresos_ordinarios
+2025-12-08 04:08:32,864 - puco_eeff.extractor.validation_core - INFO - ⚠ Nota 21 - Costo de Venta: no total value to compare (sum=0)
+2025-12-08 04:08:32,865 - puco_eeff.extractor.validation_core - INFO - ⚠ Nota 22 - Gastos de Administración y Ventas: no total value to compare (sum=0)
+2025-12-08 04:08:32,865 - puco_eeff.extractor.validation_core - INFO - Using XBRL value for Total Costo de Venta: -126,202
+2025-12-08 04:08:32,865 - puco_eeff.extractor.validation_core - INFO - Using XBRL value for Total Gasto Admin: -11,632
+2025-12-08 04:08:32,865 - puco_eeff.extractor.validation_core - INFO - ⚠ Gross Profit = Revenue - Cost of Sales: skipped - missing gross_profit, ingresos_ordinarios
+2025-12-08 04:08:32,865 - puco_eeff.extractor.extraction_pipeline - DEBUG - Merged PDF field cv_gastos_personal = -19721 into XBRL data
+2025-12-08 04:08:32,865 - puco_eeff.extractor.extraction_pipeline - DEBUG - Merged PDF field cv_materiales = -23219 into XBRL data
+2025-12-08 04:08:32,865 - puco_eeff.extractor.extraction_pipeline - DEBUG - Merged PDF field ga_gastos_personal = -3818 into XBRL data
+2025-12-08 04:08:32,866 - puco_eeff.extractor.extraction_pipeline - INFO - PDF extraction failed, trying XBRL-only extraction
+2025-12-08 04:08:32,869 - puco_eeff.extractor.extraction - DEBUG - Found text match on page 5
+2025-12-08 04:08:32,869 - puco_eeff.extractor.extraction - INFO - Found section 'ingresos' with details on page 5
+2025-12-08 04:08:32,869 - puco_eeff.extractor.extraction - INFO - Extracted Ingresos from PDF page 5: 80,767
+2025-12-08 04:08:32,870 - puco_eeff.extractor.extraction - WARNING - Could not find Estado de Resultados page for Ingresos extraction
+2025-12-08 04:08:32,871 - puco_eeff.extractor.extraction_pipeline - INFO - No XBRL available, extracting Ingresos from Estado de Resultados
+2025-12-08 04:08:32,872 - puco_eeff.extractor.extraction_pipeline - INFO - Set Ingresos from PDF: 80,767
+2025-12-08 04:08:32,872 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 21 - Costo de Venta: sum=0 != total=-62,982 (diff: 62982)
+2025-12-08 04:08:32,872 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 22 - Gastos de Administración y Ventas: sum=0 != total=-5,137 (diff: 5137)
+2025-12-08 04:08:32,880 - puco_eeff.extractor.validation_core - WARNING - Unsupported formula format (no '=='): a + b
+2025-12-08 04:08:32,881 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 21 - Costo de Venta: sum=-126,202 matches total=-126,202
+2025-12-08 04:08:32,881 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 22 - Gastos de Administración y Ventas: sum=-11,632 matches total=-11,632
+2025-12-08 04:08:32,881 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 21 - Costo de Venta: sum=-126,202 != total=-100,000 (diff: 26202)
+2025-12-08 04:08:32,881 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 22 - Gastos de Administración y Ventas: sum=-11,632 matches total=-11,632
+2025-12-08 04:08:32,882 - puco_eeff.extractor.validation_core - INFO - ⚠ Nota 21 - Costo de Venta: no total value to compare (sum=-126,202)
+2025-12-08 04:08:32,882 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 22 - Gastos de Administración y Ventas: sum=-11,632 matches total=-11,632
+2025-12-08 04:08:32,882 - puco_eeff.extractor.validation_core - INFO - ✓ Gross Profit = Revenue - Cost of Sales: 52,963
+2025-12-08 04:08:32,883 - puco_eeff.extractor.validation_core - INFO - ⚠ Gross Profit = Revenue - Cost of Sales: skipped - missing gross_profit
+2025-12-08 04:08:32,888 - puco_eeff.extractor.validation_core - DEBUG - Syntax error parsing expression '(a': '(' was never closed (<unknown>, line 1)
+2025-12-08 04:08:32,891 - puco_eeff.extractor.validation_core - INFO - ✓ Test cross-validation: 52
+2025-12-08 04:08:32,891 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 21 - Costo de Venta: sum=-126,202 matches total=-126,202
+2025-12-08 04:08:32,891 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 22 - Gastos de Administración y Ventas: sum=-11,632 matches total=-11,632
+2025-12-08 04:08:32,892 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
+2025-12-08 04:08:32,892 - puco_eeff.extractor.validation_core - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
+2025-12-08 04:08:32,892 - puco_eeff.extractor.validation_core - INFO - ✓ Ingresos Ordinarios matches XBRL: 179,165
+2025-12-08 04:08:32,892 - puco_eeff.extractor.validation_core - INFO - ✓ Gross Profit = Revenue - Cost of Sales: 52,963
+2025-12-08 04:08:32,892 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 21 - Costo de Venta: sum=-126,202 matches total=-126,202
+2025-12-08 04:08:32,892 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 22 - Gastos de Administración y Ventas: sum=-11,632 matches total=-11,632
+2025-12-08 04:08:32,893 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
+2025-12-08 04:08:32,893 - puco_eeff.extractor.validation_core - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
+2025-12-08 04:08:32,893 - puco_eeff.extractor.validation_core - INFO - ✓ Ingresos Ordinarios matches XBRL: 179,165
+2025-12-08 04:08:32,894 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -100,000
+2025-12-08 04:08:32,894 - puco_eeff.extractor.validation_core - INFO - Using XBRL value for Total Gasto Admin: -20,000
+2025-12-08 04:08:32,894 - puco_eeff.extractor.validation_core - INFO - Using XBRL value for Ingresos Ordinarios: 200,000
+2025-12-08 04:08:32,894 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -100,000
+2025-12-08 04:08:32,895 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 21 - Costo de Venta: sum=-126,202 matches total=-126,202
+2025-12-08 04:08:32,895 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 22 - Gastos de Administración y Ventas: sum=-11,632 matches total=-11,632
+2025-12-08 04:08:32,895 - puco_eeff.extractor.validation_core - INFO - ⚠ Gross Profit = Revenue - Cost of Sales: skipped - missing gross_profit
+2025-12-08 04:08:32,898 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
+2025-12-08 04:08:32,898 - puco_eeff.extractor.validation_core - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
+2025-12-08 04:08:32,898 - puco_eeff.extractor.validation_core - INFO - ✓ Ingresos Ordinarios matches XBRL: 179,165
+2025-12-08 04:08:32,899 - puco_eeff.extractor.validation_core - INFO - Using XBRL value for Ingresos Ordinarios: 200,000
+2025-12-08 04:08:32,905 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 21 - Costo de Venta: sum=0 != total=-100,000 (diff: 100000)
+2025-12-08 04:08:32,905 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 22 - Gastos de Administración y Ventas: sum=0 != total=-20,000 (diff: 20000)
+2025-12-08 04:08:32,905 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -100,000
+2025-12-08 04:08:32,905 - puco_eeff.extractor.validation_core - INFO - ✓ Total Gasto Admin matches XBRL: -20,000
+2025-12-08 04:08:32,905 - puco_eeff.extractor.validation_core - INFO - ⚠ Gross Profit = Revenue - Cost of Sales: skipped - missing gross_profit, ingresos_ordinarios
+2025-12-08 04:08:32,906 - puco_eeff.extractor.extraction_pipeline - INFO - No XBRL available for 2024 Q1 - using PDF only
+2025-12-08 04:08:32,907 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 21 - Costo de Venta: sum=0 != total=-50,000 (diff: 50000)
+2025-12-08 04:08:32,907 - puco_eeff.extractor.validation_core - INFO - ⚠ Nota 22 - Gastos de Administración y Ventas: no total value to compare (sum=0)
+2025-12-08 04:08:33,593 - puco_eeff.transformer.formatter - WARNING - No reference data found for period: IQ2030
+2025-12-08 04:12:36,914 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -170,862
+2025-12-08 04:12:36,914 - puco_eeff.extractor.validation_core - INFO - ✓ Total Gasto Admin matches XBRL: -17,363
+2025-12-08 04:12:36,914 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -170,862
+2025-12-08 04:12:36,914 - puco_eeff.extractor.validation_core - INFO - ✓ Total Gasto Admin matches XBRL: -17,363
+2025-12-08 04:12:36,916 - puco_eeff.extractor.validation_core - WARNING - ✗ Total Costo de Venta mismatch - PDF: -100,000, XBRL: -110,000 (diff: 10000)
+2025-12-08 04:12:36,919 - puco_eeff.extractor.extraction_pipeline - INFO - No XBRL available for 2024 Q1 - using PDF only
+2025-12-08 04:12:36,919 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 21 - Costo de Venta: sum=0 != total=-54,000 (diff: 54000)
+2025-12-08 04:12:36,919 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 22 - Gastos de Administración y Ventas: sum=0 != total=-12,000 (diff: 12000)
+2025-12-08 04:12:36,921 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 21 - Costo de Venta: sum=0 != total=-170,862 (diff: 170862)
+2025-12-08 04:12:36,921 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 22 - Gastos de Administración y Ventas: sum=0 != total=-17,363 (diff: 17363)
+2025-12-08 04:12:36,921 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -170,862
+2025-12-08 04:12:36,921 - puco_eeff.extractor.validation_core - INFO - ✓ Total Gasto Admin matches XBRL: -17,363
+2025-12-08 04:12:36,921 - puco_eeff.extractor.validation_core - INFO - ⚠ Gross Profit = Revenue - Cost of Sales: skipped - missing gross_profit, ingresos_ordinarios
+2025-12-08 04:12:36,922 - puco_eeff.extractor.extraction_pipeline - INFO - Saved extraction result to: /tmp/pytest-of-alvaro/pytest-100/test_save_creates_json0/detailed_costs.json
+2025-12-08 04:12:36,926 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 21 - Costo de Venta: sum=0 != total=-126,202 (diff: 126202)
+2025-12-08 04:12:36,926 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 22 - Gastos de Administración y Ventas: sum=0 != total=-11,632 (diff: 11632)
+2025-12-08 04:12:36,926 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
+2025-12-08 04:12:36,926 - puco_eeff.extractor.validation_core - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
+2025-12-08 04:12:36,926 - puco_eeff.extractor.validation_core - INFO - ⚠ Gross Profit = Revenue - Cost of Sales: skipped - missing gross_profit, ingresos_ordinarios
+2025-12-08 04:12:36,927 - puco_eeff.extractor.validation_core - INFO - ⚠ Nota 21 - Costo de Venta: no total value to compare (sum=0)
+2025-12-08 04:12:36,927 - puco_eeff.extractor.validation_core - INFO - ⚠ Nota 22 - Gastos de Administración y Ventas: no total value to compare (sum=0)
+2025-12-08 04:12:36,927 - puco_eeff.extractor.validation_core - INFO - Using XBRL value for Total Costo de Venta: -126,202
+2025-12-08 04:12:36,927 - puco_eeff.extractor.validation_core - INFO - Using XBRL value for Total Gasto Admin: -11,632
+2025-12-08 04:12:36,927 - puco_eeff.extractor.validation_core - INFO - ⚠ Gross Profit = Revenue - Cost of Sales: skipped - missing gross_profit, ingresos_ordinarios
+2025-12-08 04:12:36,928 - puco_eeff.extractor.extraction_pipeline - DEBUG - Merged PDF field cv_gastos_personal = -19721 into XBRL data
+2025-12-08 04:12:36,928 - puco_eeff.extractor.extraction_pipeline - DEBUG - Merged PDF field cv_materiales = -23219 into XBRL data
+2025-12-08 04:12:36,928 - puco_eeff.extractor.extraction_pipeline - DEBUG - Merged PDF field ga_gastos_personal = -3818 into XBRL data
+2025-12-08 04:12:36,929 - puco_eeff.extractor.extraction_pipeline - INFO - PDF extraction failed, trying XBRL-only extraction
+2025-12-08 04:12:36,931 - puco_eeff.extractor.extraction - DEBUG - Found text match on page 5
+2025-12-08 04:12:36,931 - puco_eeff.extractor.extraction - INFO - Found section 'ingresos' with details on page 5
+2025-12-08 04:12:36,931 - puco_eeff.extractor.extraction - INFO - Extracted Ingresos from PDF page 5: 80,767
+2025-12-08 04:12:36,933 - puco_eeff.extractor.extraction - WARNING - Could not find Estado de Resultados page for Ingresos extraction
+2025-12-08 04:12:36,934 - puco_eeff.extractor.extraction_pipeline - INFO - No XBRL available, extracting Ingresos from Estado de Resultados
+2025-12-08 04:12:36,934 - puco_eeff.extractor.extraction_pipeline - INFO - Set Ingresos from PDF: 80,767
+2025-12-08 04:12:36,934 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 21 - Costo de Venta: sum=0 != total=-62,982 (diff: 62982)
+2025-12-08 04:12:36,934 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 22 - Gastos de Administración y Ventas: sum=0 != total=-5,137 (diff: 5137)
+2025-12-08 04:12:36,943 - puco_eeff.extractor.validation_core - WARNING - Unsupported formula format (no '=='): a + b
+2025-12-08 04:12:36,943 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 21 - Costo de Venta: sum=-126,202 matches total=-126,202
+2025-12-08 04:12:36,943 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 22 - Gastos de Administración y Ventas: sum=-11,632 matches total=-11,632
+2025-12-08 04:12:36,944 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 21 - Costo de Venta: sum=-126,202 != total=-100,000 (diff: 26202)
+2025-12-08 04:12:36,944 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 22 - Gastos de Administración y Ventas: sum=-11,632 matches total=-11,632
+2025-12-08 04:12:36,944 - puco_eeff.extractor.validation_core - INFO - ⚠ Nota 21 - Costo de Venta: no total value to compare (sum=-126,202)
+2025-12-08 04:12:36,944 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 22 - Gastos de Administración y Ventas: sum=-11,632 matches total=-11,632
+2025-12-08 04:12:36,945 - puco_eeff.extractor.validation_core - INFO - ✓ Gross Profit = Revenue - Cost of Sales: 52,963
+2025-12-08 04:12:36,945 - puco_eeff.extractor.validation_core - INFO - ⚠ Gross Profit = Revenue - Cost of Sales: skipped - missing gross_profit
+2025-12-08 04:12:36,950 - puco_eeff.extractor.validation_core - DEBUG - Syntax error parsing expression '(a': '(' was never closed (<unknown>, line 1)
+2025-12-08 04:12:36,953 - puco_eeff.extractor.validation_core - INFO - ✓ Test cross-validation: 52
+2025-12-08 04:12:36,954 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 21 - Costo de Venta: sum=-126,202 matches total=-126,202
+2025-12-08 04:12:36,954 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 22 - Gastos de Administración y Ventas: sum=-11,632 matches total=-11,632
+2025-12-08 04:12:36,954 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
+2025-12-08 04:12:36,954 - puco_eeff.extractor.validation_core - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
+2025-12-08 04:12:36,954 - puco_eeff.extractor.validation_core - INFO - ✓ Ingresos Ordinarios matches XBRL: 179,165
+2025-12-08 04:12:36,954 - puco_eeff.extractor.validation_core - INFO - ✓ Gross Profit = Revenue - Cost of Sales: 52,963
+2025-12-08 04:12:36,955 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 21 - Costo de Venta: sum=-126,202 matches total=-126,202
+2025-12-08 04:12:36,955 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 22 - Gastos de Administración y Ventas: sum=-11,632 matches total=-11,632
+2025-12-08 04:12:36,955 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
+2025-12-08 04:12:36,955 - puco_eeff.extractor.validation_core - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
+2025-12-08 04:12:36,955 - puco_eeff.extractor.validation_core - INFO - ✓ Ingresos Ordinarios matches XBRL: 179,165
+2025-12-08 04:12:36,956 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -100,000
+2025-12-08 04:12:36,956 - puco_eeff.extractor.validation_core - INFO - Using XBRL value for Total Gasto Admin: -20,000
+2025-12-08 04:12:36,956 - puco_eeff.extractor.validation_core - INFO - Using XBRL value for Ingresos Ordinarios: 200,000
+2025-12-08 04:12:36,956 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -100,000
+2025-12-08 04:12:36,957 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 21 - Costo de Venta: sum=-126,202 matches total=-126,202
+2025-12-08 04:12:36,957 - puco_eeff.extractor.validation_core - INFO - ✓ Nota 22 - Gastos de Administración y Ventas: sum=-11,632 matches total=-11,632
+2025-12-08 04:12:36,957 - puco_eeff.extractor.validation_core - INFO - ⚠ Gross Profit = Revenue - Cost of Sales: skipped - missing gross_profit
+2025-12-08 04:12:36,960 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -126,202
+2025-12-08 04:12:36,960 - puco_eeff.extractor.validation_core - INFO - ✓ Total Gasto Admin matches XBRL: -11,632
+2025-12-08 04:12:36,960 - puco_eeff.extractor.validation_core - INFO - ✓ Ingresos Ordinarios matches XBRL: 179,165
+2025-12-08 04:12:36,961 - puco_eeff.extractor.validation_core - INFO - Using XBRL value for Ingresos Ordinarios: 200,000
+2025-12-08 04:12:36,967 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 21 - Costo de Venta: sum=0 != total=-100,000 (diff: 100000)
+2025-12-08 04:12:36,967 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 22 - Gastos de Administración y Ventas: sum=0 != total=-20,000 (diff: 20000)
+2025-12-08 04:12:36,967 - puco_eeff.extractor.validation_core - INFO - ✓ Total Costo de Venta matches XBRL: -100,000
+2025-12-08 04:12:36,967 - puco_eeff.extractor.validation_core - INFO - ✓ Total Gasto Admin matches XBRL: -20,000
+2025-12-08 04:12:36,967 - puco_eeff.extractor.validation_core - INFO - ⚠ Gross Profit = Revenue - Cost of Sales: skipped - missing gross_profit, ingresos_ordinarios
+2025-12-08 04:12:36,968 - puco_eeff.extractor.extraction_pipeline - INFO - No XBRL available for 2024 Q1 - using PDF only
+2025-12-08 04:12:36,969 - puco_eeff.extractor.validation_core - WARNING - ✗ Nota 21 - Costo de Venta: sum=0 != total=-50,000 (diff: 50000)
+2025-12-08 04:12:36,969 - puco_eeff.extractor.validation_core - INFO - ⚠ Nota 22 - Gastos de Administración y Ventas: no total value to compare (sum=0)
+2025-12-08 04:12:37,646 - puco_eeff.transformer.formatter - WARNING - No reference data found for period: IQ2030

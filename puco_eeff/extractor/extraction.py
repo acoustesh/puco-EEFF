@@ -352,6 +352,43 @@ def find_section_page(
 # =============================================================================
 
 
+def _score_table_match(
+    table: list[list[str | None]],
+    expected_items: list[str],
+    unique_items: list[str],
+    exclude_items: list[str],
+) -> int:
+    """Score how well a table matches the expected content.
+
+    Args:
+        table: The extracted table data
+        expected_items: Items that should be in the table
+        unique_items: Items that strongly indicate the correct table (+5 each)
+        exclude_items: Items that indicate the wrong table (-5 each)
+
+    Returns:
+        Match score (higher is better)
+    """
+    table_text = str(table).lower()
+    score = sum(1 for item in expected_items if item.lower() in table_text)
+
+    for unique_item in unique_items:
+        if unique_item.lower() in table_text:
+            score += 5
+        normalized = _normalize_for_matching(unique_item)
+        if normalized in table_text and normalized != unique_item.lower():
+            score += 5
+
+    for exclude_item in exclude_items:
+        if exclude_item.lower() in table_text:
+            score -= 5
+        normalized = _normalize_for_matching(exclude_item)
+        if normalized in table_text and normalized != exclude_item.lower():
+            score -= 5
+
+    return score
+
+
 def extract_table_from_page(
     pdf_path: Path,
     page_index: int,
@@ -387,26 +424,9 @@ def extract_table_from_page(
         for table in tables:
             if not table:
                 continue
-
-            table_text = str(table).lower()
-            match_count = sum(1 for item in expected_items if item.lower() in table_text)
-
-            for unique_item in unique_items:
-                if unique_item.lower() in table_text:
-                    match_count += 5
-                normalized = _normalize_for_matching(unique_item)
-                if normalized in table_text and normalized != unique_item.lower():
-                    match_count += 5
-
-            for exclude_item in exclude_items:
-                if exclude_item.lower() in table_text:
-                    match_count -= 5
-                normalized = _normalize_for_matching(exclude_item)
-                if normalized in table_text and normalized != exclude_item.lower():
-                    match_count -= 5
-
-            if match_count > best_score:
-                best_score = match_count
+            score = _score_table_match(table, expected_items, unique_items, exclude_items)
+            if score > best_score:
+                best_score = score
                 best_table = table
 
         if best_table is None or best_score < 3:
@@ -587,6 +607,54 @@ def extract_pdf_section(
     return breakdown
 
 
+def _find_label_index(labels: list[str], match_keywords: list[str]) -> int | None:
+    """Find the index of a label that matches all keywords."""
+    for i, label in enumerate(labels):
+        if all(kw.lower() in label.lower() for kw in match_keywords):
+            return i
+    return None
+
+
+def _count_value_offset(labels: list[str], target_idx: int) -> int:
+    """Count how many prior labels have trailing digits (value offset)."""
+    offset = 0
+    for i in range(target_idx):
+        label = labels[i].strip()
+        if label:
+            parts = label.split()
+            if parts and any(c.isdigit() for c in parts[-1]):
+                offset += 1
+    return offset
+
+
+def _extract_value_from_row(row: list[Any], match_keywords: list[str], min_threshold: int) -> int | None:
+    """Try to extract ingresos value from a table row."""
+    first_col = str(row[0] or "").lower()
+    if not all(kw.lower() in first_col for kw in match_keywords):
+        return None
+
+    labels = first_col.split("\n")
+    values_col = str(row[1] or "") if len(row) > 1 else ""
+    values = values_col.split("\n")
+
+    # Try aligned extraction based on label position
+    ingresos_idx = _find_label_index(labels, match_keywords)
+    if ingresos_idx is not None:
+        value_idx = _count_value_offset(labels, ingresos_idx)
+        if value_idx < len(values):
+            value = parse_chilean_number(values[value_idx].strip())
+            if value is not None and value > min_threshold:
+                return value
+
+    # Fallback: try any value above threshold
+    for val_str in values:
+        value = parse_chilean_number(val_str.strip())
+        if value is not None and value > min_threshold:
+            return value
+
+    return None
+
+
 def extract_ingresos_from_pdf(pdf_path: Path) -> int | None:
     """Extract Ingresos de actividades ordinarias from Estado de Resultados page."""
     ingresos_spec = get_sheet1_section_spec("ingresos")
@@ -612,39 +680,10 @@ def extract_ingresos_from_pdf(pdf_path: Path) -> int | None:
             for row in table:
                 if not row or len(row) < 2:
                     continue
-
-                first_col = str(row[0] or "").lower()
-                if not all(kw.lower() in first_col for kw in match_keywords):
-                    continue
-
-                labels = first_col.split("\n")
-                values_col = str(row[1] or "") if len(row) > 1 else ""
-                values = values_col.split("\n")
-
-                ingresos_idx = None
-                for i, label in enumerate(labels):
-                    if all(kw.lower() in label.lower() for kw in match_keywords):
-                        ingresos_idx = i
-                        break
-
-                if ingresos_idx is not None:
-                    value_idx = 0
-                    for i in range(ingresos_idx):
-                        label = labels[i].strip()
-                        if label and any(c.isdigit() for c in label.split()[-1] if label.split()):
-                            value_idx += 1
-
-                    if value_idx < len(values):
-                        value = parse_chilean_number(values[value_idx].strip())
-                        if value is not None and value > min_threshold:
-                            logger.info(f"Extracted Ingresos from PDF page {page_idx + 1}: {value:,}")
-                            return value
-
-                for val_str in values:
-                    value = parse_chilean_number(val_str.strip())
-                    if value is not None and value > min_threshold:
-                        logger.info(f"Extracted Ingresos from PDF page {page_idx + 1}: {value:,}")
-                        return value
+                value = _extract_value_from_row(row, match_keywords, min_threshold)
+                if value is not None:
+                    logger.info(f"Extracted Ingresos from PDF page {page_idx + 1}: {value:,}")
+                    return value
 
     logger.warning("Could not extract Ingresos from Estado de Resultados page")
     return None

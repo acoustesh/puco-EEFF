@@ -41,8 +41,8 @@
     "xbrl_parser.py:extract_xbrl_aggregates": 15
   },
   "config": {
-    "cc_threshold": 30,
-    "cog_threshold": 70,
+    "cc_threshold": 25,
+    "cog_threshold": 40,
     "mi_threshold": 13,
     "min_loc_for_similarity": 15,
     "pca_variance_threshold": 0.99,
@@ -50,7 +50,7 @@
     "refactor_index_top_n": 5,
     "similarity_threshold_neighbor": 0.8,
     "similarity_threshold_pair": 0.86,
-    "total_lines_baseline": 3054
+    "total_lines_baseline": 3092
   },
   "function_hashes": {
     "config.py:_deep_merge:436": "d28b2d05a536c1247761236cee8e67c253d6f47bcf46fec908cd47c285225503",
@@ -152,24 +152,41 @@
     "extractor/cost_extractor.py:save_extraction_result:1596": "cb38419975ad99f76ece6e0037455043a07c18595e9e6117e25b95e1ed0e5d87",
     "extractor/cost_extractor.py:validate_extraction:1431": "4f560de378eb6633c80fd6e1fd3ed786006278c677dd3e56673d93e958a99223",
     "extractor/extraction.py:SectionBreakdown:88": "4c346fde5444cc3a837b58ef622c08a9fd5dcad332ccacba24051081f5ce2e70",
+    "extractor/extraction.py:_extract_value_from_row:610": "8eac4e723816875fdff604e144416fd3d54246264cb1d6aed4c18faa5c80dc78",
+    "extractor/extraction.py:_extract_value_from_row:630": "8eac4e723816875fdff604e144416fd3d54246264cb1d6aed4c18faa5c80dc78",
     "extractor/extraction.py:_get_extraction_labels:138": "eabaef9ae62d8d557b93a4fb28f2d26c6aaef02dfb2a445c8a51303148fd51ce",
     "extractor/extraction.py:_match_item:237": "e3791dcea637f05f022f009b1c6138da274600efafcaa5e0b605076b89bfa23b",
     "extractor/extraction.py:_parse_cost_table:419": "f4693b07d7829e9ad27633daa8c2c5bda37bdedc2136fe52bc734acbccaad452",
     "extractor/extraction.py:_parse_cost_table:489": "8a3e4e3dfce1afb6664d7327100ea04bcdd517759a18679204f7d6fc5ea9bd47",
+    "extractor/extraction.py:_parse_cost_table:509": "8a3e4e3dfce1afb6664d7327100ea04bcdd517759a18679204f7d6fc5ea9bd47",
     "extractor/extraction.py:_parse_multiline_row:419": "49be4529dd36c18229837e7dea2f224704138101e057432db0c384462adbb85d",
+    "extractor/extraction.py:_parse_multiline_row:439": "49be4529dd36c18229837e7dea2f224704138101e057432db0c384462adbb85d",
     "extractor/extraction.py:_parse_single_row:456": "a956927d45cc9b066b0a98473694601ca16cf6f955295c7f4aefd0c3ca005cad",
+    "extractor/extraction.py:_parse_single_row:476": "a956927d45cc9b066b0a98473694601ca16cf6f955295c7f4aefd0c3ca005cad",
+    "extractor/extraction.py:_score_table_match:355": "01746da1ded5dc12601cbb9464482ca100ba3d276aaecb9ecb7911c444c21d04",
     "extractor/extraction.py:extract_ingresos_from_pdf:547": "d5b02be16c16b51e59828a3addb6bec8d91f3d1c012570ccfb95e00d42e1ae60",
     "extractor/extraction.py:extract_ingresos_from_pdf:590": "d5b02be16c16b51e59828a3addb6bec8d91f3d1c012570ccfb95e00d42e1ae60",
+    "extractor/extraction.py:extract_ingresos_from_pdf:638": "f9c63dfcb02ab5ea61aa1649a6e3e9a0caef832bfbb11fb3be3a73b2a4ee9bbb",
+    "extractor/extraction.py:extract_ingresos_from_pdf:640": "f9c63dfcb02ab5ea61aa1649a6e3e9a0caef832bfbb11fb3be3a73b2a4ee9bbb",
+    "extractor/extraction.py:extract_ingresos_from_pdf:658": "f9c63dfcb02ab5ea61aa1649a6e3e9a0caef832bfbb11fb3be3a73b2a4ee9bbb",
     "extractor/extraction.py:extract_pdf_section:482": "7ff57319fae33a91d7d775b8a5bbd0272a8aa790fa2a7cbca7dd09d55b780809",
     "extractor/extraction.py:extract_pdf_section:525": "7ff57319fae33a91d7d775b8a5bbd0272a8aa790fa2a7cbca7dd09d55b780809",
+    "extractor/extraction.py:extract_pdf_section:545": "7ff57319fae33a91d7d775b8a5bbd0272a8aa790fa2a7cbca7dd09d55b780809",
     "extractor/extraction.py:extract_table_from_page:355": "375068f87cf08931df9824a5e041cc1799d77262bb5e4f0ec7bae6517ce1806a",
+    "extractor/extraction.py:extract_table_from_page:392": "8ad37ecd4e8fa69e05a9d4ecf5321078d5a7555b4c422dc4d7e046992893c276",
     "extractor/extraction.py:extract_xbrl_totals:615": "b6238ce76e4d355def1ad1a83cff01603dce68b228c8f6bad6ee8d660c68c043",
     "extractor/extraction.py:extract_xbrl_totals:658": "b6238ce76e4d355def1ad1a83cff01603dce68b228c8f6bad6ee8d660c68c043",
+    "extractor/extraction.py:extract_xbrl_totals:677": "b6238ce76e4d355def1ad1a83cff01603dce68b228c8f6bad6ee8d660c68c043",
+    "extractor/extraction.py:extract_xbrl_totals:679": "b6238ce76e4d355def1ad1a83cff01603dce68b228c8f6bad6ee8d660c68c043",
+    "extractor/extraction.py:extract_xbrl_totals:697": "b6238ce76e4d355def1ad1a83cff01603dce68b228c8f6bad6ee8d660c68c043",
     "extractor/extraction.py:find_section_page:308": "e7bc59dd905b476376b5a7b8fcebb629761f161876681c9d54bab0d727af41cf",
     "extractor/extraction.py:find_text_page:263": "ed89669d2ea478dc49fa8380874edc92bf913132af6e3e42c0e26b1805b934c5",
     "extractor/extraction.py:parse_chilean_number:197": "b17725dd5a9ac47462d2871350e1063e30907510ced04661420a1d05d0eb5319",
     "extractor/extraction.py:quarter_to_roman:668": "6c2112b11cf590e1f24352f31a3e2f05cc02b63c1c7cf4a1f1e6bb051fa21d5b",
     "extractor/extraction.py:quarter_to_roman:711": "6c2112b11cf590e1f24352f31a3e2f05cc02b63c1c7cf4a1f1e6bb051fa21d5b",
+    "extractor/extraction.py:quarter_to_roman:730": "6c2112b11cf590e1f24352f31a3e2f05cc02b63c1c7cf4a1f1e6bb051fa21d5b",
+    "extractor/extraction.py:quarter_to_roman:732": "6c2112b11cf590e1f24352f31a3e2f05cc02b63c1c7cf4a1f1e6bb051fa21d5b",
+    "extractor/extraction.py:quarter_to_roman:750": "6c2112b11cf590e1f24352f31a3e2f05cc02b63c1c7cf4a1f1e6bb051fa21d5b",
     "extractor/extraction_pipeline.py:_breakdown_to_dict:364": "eb38653370907ae0cf52ad7b975f48e62c39628d42a2db72143fa2391bb51967",
     "extractor/extraction_pipeline.py:_merge_pdf_into_xbrl_data:347": "86156b8dec41dbc6c57e1d9688aff2f00f31a335cce6bf4378eeca2eaaa4a3c9",
     "extractor/extraction_pipeline.py:extract_detailed_costs:72": "c40486eb747f21509b99d420bb281b97f27cd0fc6460b31761ddb1fe2f1b0958",
@@ -223,6 +240,7 @@
     "extractor/validation_core.py:SumValidationResult:117": "cc4209919835f61796e4bf7455e20c06b7c1aa28ab40eebe123ac1a11c1b4d69",
     "extractor/validation_core.py:ValidationReport:164": "93688e056cb4e0f33029526be4461235979b03433a62d16cbdbd7488c09b958b",
     "extractor/validation_core.py:ValidationResult:67": "58127b21b7869b81d423abcb528955a734723786ae94e035296c4c5c93db33d7",
+    "extractor/validation_core.py:_eval_ast_node:512": "eab60efa57cd93a79f614472d508e4055f7899b31b88812fac59450c64092109",
     "extractor/validation_core.py:_eval_node:524": "c93196b4debd5d1824a59f47f9d2c7ba8daa9ba1dc6b049a485ee8b541ef014b",
     "extractor/validation_core.py:_evaluate_cross_validation:479": "524ae13759120f2c67ae658ad88eac665a9d0744b6646e69704f9abe994ef7ee",
     "extractor/validation_core.py:_resolve_cross_validation_values:443": "e6712201411092ef4b0dae14fab6c3fa3713d45b51c3d63ceb629cb1f6953d4d",
@@ -230,6 +248,7 @@
     "extractor/validation_core.py:_run_pdf_xbrl_validations:328": "08aa534453535add5f9d7766e6f907e7d97460055f0c12f8f5303f5cd85b7512",
     "extractor/validation_core.py:_run_sum_validations:283": "7e0a7888cfb7bd829288cf751af7625426b5201c1e1d67b98beaa3709426c8f9",
     "extractor/validation_core.py:_safe_eval_expression:512": "4f7730820c76916377cc0b1839035d5bcff643b827dfbea83b77fe79d57dca3d",
+    "extractor/validation_core.py:_safe_eval_expression:555": "2551d38414655da4f70bcc426222335e8cbc4ecff31de0708f4289d22f53cb05",
     "extractor/validation_core.py:_section_breakdowns_to_sheet1data:635": "96f1e2b5ca1ff0ae12c57d4e88090e83d8e2e251d1fa19230b9d75280b12d0c4",
     "extractor/validation_core.py:_section_breakdowns_to_sheet1data:636": "96f1e2b5ca1ff0ae12c57d4e88090e83d8e2e251d1fa19230b9d75280b12d0c4",
     "extractor/validation_core.py:format_validation_report:194": "451acf081d312be27531422e05e4f7b4636a7a2638a720f45ef2f2d1750cf2f0",
@@ -355,20 +374,22 @@
   },
   "line_baselines": {
     "__init__.py": 86,
-    "extraction.py": 735,
+    "extraction.py": 774,
     "extraction_pipeline.py": 500,
     "ocr_fallback.py": 241,
     "ocr_mistral.py": 209,
     "pdf_parser.py": 165,
-    "validation_core.py": 666,
+    "validation_core.py": 665,
     "xbrl_parser.py": 452
   },
   "mi_baselines": {
-    "cost_extractor.py": 9
+    "cost_extractor.py": 9,
+    "extraction.py": 12.91
   },
   "mi_baselines_by_dir": {
     "extractor": {
-      "cost_extractor.py": 9
+      "cost_extractor.py": 9,
+      "extraction.py": 12.91
     }
   }
 }

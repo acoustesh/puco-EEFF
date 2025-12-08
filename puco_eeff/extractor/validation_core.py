@@ -509,6 +509,49 @@ def _evaluate_cross_validation(
         return None, None, True, None
 
 
+def _eval_ast_node(node: ast.AST, values: dict[str, int]) -> int | None:
+    """Recursively evaluate an AST node to an integer value.
+
+    Supports: integer constants, unary +/-, variable names, binary +/-/*,
+    and the abs() function call.
+    """
+    if isinstance(node, ast.Constant) and isinstance(node.value, int):
+        return node.value
+
+    if isinstance(node, ast.UnaryOp):
+        if isinstance(node.op, ast.USub):
+            operand = _eval_ast_node(node.operand, values)
+            return -operand if operand is not None else None
+        elif isinstance(node.op, ast.UAdd):
+            return _eval_ast_node(node.operand, values)
+        return None
+
+    if isinstance(node, ast.Name):
+        return values.get(node.id)
+
+    if isinstance(node, ast.BinOp):
+        left = _eval_ast_node(node.left, values)
+        right = _eval_ast_node(node.right, values)
+        if left is None or right is None:
+            return None
+        if isinstance(node.op, ast.Add):
+            return left + right
+        elif isinstance(node.op, ast.Sub):
+            return left - right
+        elif isinstance(node.op, ast.Mult):
+            return left * right
+        return None
+
+    if isinstance(node, ast.Call):
+        if isinstance(node.func, ast.Name) and node.func.id == "abs":
+            if len(node.args) == 1 and not node.keywords:
+                arg_val = _eval_ast_node(node.args[0], values)
+                return abs(arg_val) if arg_val is not None else None
+        return None
+
+    return None
+
+
 def _safe_eval_expression(expr: str, values: dict[str, int]) -> int | None:
     """Safely evaluate a simple arithmetic expression using AST parsing."""
     expr = expr.strip()
@@ -521,52 +564,8 @@ def _safe_eval_expression(expr: str, values: dict[str, int]) -> int | None:
         logger.debug(f"Syntax error parsing expression '{expr}': {e}")
         return None
 
-    def _eval_node(node: ast.AST) -> int | None:
-        """Recursively evaluate an AST node to an integer value."""
-        if isinstance(node, ast.Constant) and isinstance(node.value, int):
-            return node.value
-
-        if isinstance(node, ast.UnaryOp):
-            if isinstance(node.op, ast.USub):
-                operand = _eval_node(node.operand)
-                return -operand if operand is not None else None
-            elif isinstance(node.op, ast.UAdd):
-                return _eval_node(node.operand)
-            else:
-                return None
-
-        if isinstance(node, ast.Name):
-            var_name = node.id
-            if var_name in values:
-                return values[var_name]
-            else:
-                return None
-
-        if isinstance(node, ast.BinOp):
-            left = _eval_node(node.left)
-            right = _eval_node(node.right)
-            if left is None or right is None:
-                return None
-            if isinstance(node.op, ast.Add):
-                return left + right
-            elif isinstance(node.op, ast.Sub):
-                return left - right
-            elif isinstance(node.op, ast.Mult):
-                return left * right
-            else:
-                return None
-
-        if isinstance(node, ast.Call):
-            if isinstance(node.func, ast.Name) and node.func.id == "abs":
-                if len(node.args) == 1 and not node.keywords:
-                    arg_val = _eval_node(node.args[0])
-                    return abs(arg_val) if arg_val is not None else None
-            return None
-
-        return None
-
     try:
-        return _eval_node(tree.body)
+        return _eval_ast_node(tree.body, values)
     except Exception:
         return None
 
