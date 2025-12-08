@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import ast
 import re
-from collections.abc import Mapping
 from dataclasses import dataclass, field
 from functools import singledispatch
 from typing import TYPE_CHECKING
@@ -30,6 +29,7 @@ from puco_eeff.sheets.sheet1 import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from pathlib import Path
 
     from puco_eeff.extractor.extraction import SectionBreakdown

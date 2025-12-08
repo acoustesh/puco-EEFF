@@ -1,5 +1,7 @@
 """Tests for formatter module with mock config."""
 
+from typing import Any
+
 import pytest
 
 from puco_eeff.transformer.formatter import (
@@ -16,7 +18,7 @@ from puco_eeff.transformer.formatter import (
 
 
 @pytest.fixture
-def mock_config():
+def mock_config() -> dict[str, Any]:
     """Create a mock config for testing."""
     return {
         "sheets": {
@@ -70,7 +72,7 @@ def mock_config():
 class TestGetStandardStructure:
     """Tests for get_standard_structure."""
 
-    def test_returns_ordered_list(self, mock_config) -> None:
+    def test_returns_ordered_list(self, mock_config: dict[str, Any]) -> None:
         """Structure should be ordered by row number."""
         structure = get_standard_structure("sheet1", mock_config)
 
@@ -79,7 +81,7 @@ class TestGetStandardStructure:
         assert structure[1]["row"] == 2
         assert structure[4]["row"] == 5
 
-    def test_includes_field_and_label(self, mock_config) -> None:
+    def test_includes_field_and_label(self, mock_config: dict[str, Any]) -> None:
         """Each row should have field, label, section."""
         structure = get_standard_structure("sheet1", mock_config)
 
@@ -91,7 +93,7 @@ class TestGetStandardStructure:
 class TestGetFieldLabels:
     """Tests for get_field_labels."""
 
-    def test_returns_labels_dict(self, mock_config) -> None:
+    def test_returns_labels_dict(self, mock_config: dict[str, Any]) -> None:
         """Should return field to label mapping."""
         labels = get_field_labels("sheet1", mock_config)
 
@@ -102,7 +104,7 @@ class TestGetFieldLabels:
 class TestMapToStructure:
     """Tests for map_to_structure."""
 
-    def test_maps_data_to_rows(self, mock_config) -> None:
+    def test_maps_data_to_rows(self, mock_config: dict[str, Any]) -> None:
         """Should map data values to row structure."""
         data = {
             "ingresos_ordinarios": 100000,
@@ -116,7 +118,7 @@ class TestMapToStructure:
         assert rows[0]["concepto"] == "Ingresos"
         assert rows[2]["valor"] == -5000
 
-    def test_missing_values_are_none(self, mock_config) -> None:
+    def test_missing_values_are_none(self, mock_config: dict[str, Any]) -> None:
         """Missing data should result in None values."""
         data = {"ingresos_ordinarios": 100000}
 
@@ -208,7 +210,7 @@ class TestValidateBalanceSheet:
 class TestValidateAgainstReference:
     """Tests for validate_against_reference."""
 
-    def test_all_match(self, mock_config) -> None:
+    def test_all_match(self, mock_config: dict[str, Any]) -> None:
         """Exact match should pass all validations."""
         extracted = {
             "ingresos_ordinarios": 179165,
@@ -222,7 +224,7 @@ class TestValidateAgainstReference:
         matching = [r for r in results if r.match]
         assert len(matching) == 4
 
-    def test_mismatch_detected(self, mock_config) -> None:
+    def test_mismatch_detected(self, mock_config: dict[str, Any]) -> None:
         """Mismatched values should be flagged."""
         extracted = {
             "ingresos_ordinarios": 179165,
@@ -237,13 +239,13 @@ class TestValidateAgainstReference:
         assert cv_result.actual == -20000
         assert cv_result.difference == -279
 
-    def test_missing_reference_period(self, mock_config) -> None:
+    def test_missing_reference_period(self, mock_config: dict[str, Any]) -> None:
         """Unknown period should return empty list."""
         results = validate_against_reference({}, "IQ2030", mock_config)
 
         assert results == []
 
-    def test_ignores_metadata_fields(self, mock_config) -> None:
+    def test_ignores_metadata_fields(self, mock_config: dict[str, Any]) -> None:
         """Should not validate 'source' and 'xbrl_available'."""
         extracted = {"source": "cmf", "xbrl_available": True}
 
@@ -253,7 +255,7 @@ class TestValidateAgainstReference:
         assert "source" not in field_names
         assert "xbrl_available" not in field_names
 
-    def test_missing_extracted_value(self, mock_config) -> None:
+    def test_missing_extracted_value(self, mock_config: dict[str, Any]) -> None:
         """Missing extracted values should be flagged."""
         extracted = {}  # No values extracted
 

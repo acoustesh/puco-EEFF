@@ -16,7 +16,7 @@ import os
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from dotenv import load_dotenv
 
@@ -217,7 +217,7 @@ def get_xbrl_scaling_factor() -> int:
 
     """
     xbrl_specs = get_xbrl_specs()
-    return xbrl_specs.get("scaling_factor", 1000)
+    return cast(int, xbrl_specs.get("scaling_factor", 1000))
 
 
 def get_xbrl_namespaces() -> dict[str, str]:
@@ -228,7 +228,7 @@ def get_xbrl_namespaces() -> dict[str, str]:
 
     """
     xbrl_specs = get_xbrl_specs()
-    return xbrl_specs.get("namespaces", {})
+    return cast(dict[str, str], xbrl_specs.get("namespaces", {}))
 
 
 # =============================================================================
@@ -248,7 +248,7 @@ def get_period_type_config(period_type: str = "quarterly") -> dict[str, Any]:
     """
     config = get_config()
     period_types = config.get("period_types", {})
-    return period_types.get(period_type, period_types.get("quarterly", {}))
+    return cast(dict[str, Any], period_types.get(period_type, period_types.get("quarterly", {})))
 
 
 def format_period_key(
@@ -300,7 +300,7 @@ def quarter_to_roman(quarter: int) -> str:
 
     type_config = get_period_type_config("quarterly")
     roman_map = type_config.get("roman_numerals", {"1": "I", "2": "II", "3": "III", "4": "IV"})
-    return roman_map[str(quarter)]
+    return cast(str, roman_map[str(quarter)])
 
 
 def format_period_display(
@@ -383,7 +383,7 @@ def get_file_pattern(file_type: str) -> str:
     config = get_config()
     patterns = config.get("file_patterns", {})
     file_config = patterns.get(file_type, {})
-    return file_config.get("pattern", f"{file_type}_{{year}}_Q{{quarter}}")
+    return cast(str, file_config.get("pattern", f"{file_type}_{{year}}_Q{{quarter}}"))
 
 
 def get_file_pattern_alternatives(file_type: str) -> list[str]:
@@ -399,7 +399,7 @@ def get_file_pattern_alternatives(file_type: str) -> list[str]:
     config = get_config()
     patterns = config.get("file_patterns", {})
     file_config = patterns.get(file_type, {})
-    return file_config.get("alt_patterns", [])
+    return cast(list[str], file_config.get("alt_patterns", []))
 
 
 def format_filename(
@@ -478,10 +478,10 @@ def get_total_row_markers() -> list[str]:
     specs = get_extraction_specs()
     doc_structure = specs.get("document_structure", {})
     markers = doc_structure.get("section_markers", {})
-    return markers.get("table_end_markers", ["Totales", "Total"])
+    return cast(list[str], markers.get("table_end_markers", ["Totales", "Total"]))
 
 
-def _deep_merge(base: dict, overlay: dict) -> dict:
+def _deep_merge(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
     """Deep merge two dictionaries, with overlay values taking precedence.
 
     Args:
@@ -530,10 +530,10 @@ def extract_pdf_page_to_temp(
 
     """
     try:
-        from pypdf import PdfReader, PdfWriter
-    except ImportError:
+        from pypdf import PdfReader, PdfWriter  # type: ignore[import-not-found]
+    except ImportError as err:
         msg = "pypdf is required for page extraction. Install with: pip install pypdf"
-        raise ImportError(msg)
+        raise ImportError(msg) from err
 
     reader = PdfReader(pdf_path)
     total_pages = len(reader.pages)

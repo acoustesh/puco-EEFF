@@ -859,11 +859,15 @@ class TestExtractSheet1MainEntry:
         )
 
         with patch("puco_eeff.extractor.extraction_pipeline.extract_sheet1_from_analisis_razonado") as mock_pdf:
-            mock_pdf.return_value = expected_data
+            mock_pdf.return_value = (
+                expected_data,
+                None,
+            )  # Return tuple as expected by implementation
 
             result = extract_sheet1(2024, 2, prefer_source="pdf")
 
             assert result is not None
+            assert isinstance(result, Sheet1Data)  # Type narrowing for mypy/pyright
             assert result.quarter == "IIQ2024"
             mock_pdf.assert_called_once()
 
@@ -880,14 +884,15 @@ class TestExtractSheet1MainEntry:
         )
 
         with patch("puco_eeff.extractor.extraction_pipeline.extract_sheet1_from_analisis_razonado") as mock_pdf:
-            mock_pdf.return_value = None  # PDF failed
+            mock_pdf.return_value = (None, None)  # PDF failed - return tuple
 
             with patch("puco_eeff.extractor.extraction_pipeline.extract_sheet1_from_xbrl") as mock_xbrl:
-                mock_xbrl.return_value = xbrl_data
+                mock_xbrl.return_value = (xbrl_data, None)  # Return tuple as expected
 
                 result = extract_sheet1(2024, 2, prefer_source="pdf")
 
                 assert result is not None
+                assert isinstance(result, Sheet1Data)  # Type narrowing
                 assert result.total_costo_venta == -126202
                 mock_xbrl.assert_called_once()
 
@@ -997,6 +1002,9 @@ class TestIngresosPDFFallback:
                         result = extract_sheet1_from_analisis_razonado(2024, 1)
 
                         assert result is not None
+                        from puco_eeff.sheets.sheet1 import Sheet1Data
+
+                        assert isinstance(result, Sheet1Data)  # Type narrowing for mypy/pyright
                         assert result.ingresos_ordinarios == 80767
                         assert result.total_costo_venta == -62982
                         assert result.total_gasto_admin == -5137
@@ -2101,6 +2109,7 @@ class TestExtractionResultValidationReport:
             quarter=2,
         )
 
+        assert result.validation_report is not None  # Type narrowing for mypy/pyright
         assert result.validations is result.validation_report.pdf_xbrl_validations
 
 

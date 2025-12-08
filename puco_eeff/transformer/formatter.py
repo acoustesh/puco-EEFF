@@ -10,12 +10,12 @@ This module provides functions to:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 from puco_eeff.config import get_config, setup_logging
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    pass
 
 logger = setup_logging(__name__)
 
@@ -42,7 +42,19 @@ class ValidationResult:
         return f"✗ Mismatch (diff: {self.difference:,})"
 
 
-def get_standard_structure(sheet_name: str = "sheet1", config: dict | None = None) -> list[dict]:
+class ValidatorFunc(Protocol):
+    """Protocol for validator functions with optional config parameter."""
+
+    def __call__(
+        self, data: dict[str, Any], config: dict[str, Any] | None = None
+    ) -> ValidationResult:
+        """Call validator with data and optional config."""
+        ...
+
+
+def get_standard_structure(
+    sheet_name: str = "sheet1", config: dict[str, Any] | None = None
+) -> list[dict[str, Any]]:
     """Get the standard row structure for a sheet.
 
     Args:
@@ -75,7 +87,9 @@ def get_standard_structure(sheet_name: str = "sheet1", config: dict | None = Non
     return structure
 
 
-def get_field_labels(sheet_name: str = "sheet1", config: dict | None = None) -> dict[str, str]:
+def get_field_labels(
+    sheet_name: str = "sheet1", config: dict[str, Any] | None = None
+) -> dict[str, str]:
     """Get field to label mapping for a sheet.
 
     Args:
@@ -98,8 +112,8 @@ def get_field_labels(sheet_name: str = "sheet1", config: dict | None = None) -> 
 def map_to_structure(
     data: dict[str, Any],
     sheet_name: str = "sheet1",
-    config: dict | None = None,
-) -> list[dict]:
+    config: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     """Map extracted data to standard sheet structure.
 
     Args:
@@ -193,10 +207,10 @@ def _make_total_validator(
     item_fields: list[str],
     total_field: str,
     name: str,
-) -> Callable[[dict[str, Any], dict | None], ValidationResult]:
+) -> ValidatorFunc:
     """Factory to create total validation functions without duplicated bodies."""
 
-    def _validator(data: dict[str, Any], config: dict | None = None) -> ValidationResult:
+    def _validator(data: dict[str, Any], config: dict[str, Any] | None = None) -> ValidationResult:
         """Validate section total via factory-configured helper."""
         return _validate_section_total(data, item_fields, total_field)
 
@@ -222,7 +236,7 @@ validate_gasto_admin_total = _make_total_validator(
 
 def validate_balance_sheet(
     data: dict[str, Any],
-    config: dict | None = None,
+    config: dict[str, Any] | None = None,
 ) -> list[ValidationResult]:
     """Validate all balance sheet totals.
 
@@ -248,7 +262,7 @@ def validate_balance_sheet(
 def validate_against_reference(
     extracted_data: dict[str, Any],
     period: str,
-    config: dict | None = None,
+    config: dict[str, Any] | None = None,
 ) -> list[ValidationResult]:
     """Validate extracted data against reference values from config.
 
