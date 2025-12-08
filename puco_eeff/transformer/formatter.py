@@ -124,6 +124,64 @@ def map_to_structure(
     return rows
 
 
+def _validate_section_total(
+    data: dict[str, Any],
+    item_fields: list[str],
+    total_field: str,
+) -> ValidationResult:
+    """Validate that section items sum to total.
+
+    Generic validation function for any section with line items that
+    should sum to a total field.
+
+    Args:
+        data: Dictionary of field_name -> value
+        item_fields: List of field names for line items
+        total_field: Name of the total field to validate against
+
+    Returns:
+        ValidationResult with comparison
+    """
+    calculated_sum = sum(data.get(f, 0) or 0 for f in item_fields)
+    reported_total = data.get(total_field)
+
+    match = calculated_sum == reported_total if reported_total is not None else False
+    difference = (reported_total - calculated_sum) if reported_total is not None else None
+
+    return ValidationResult(
+        field=total_field,
+        expected=reported_total,
+        actual=calculated_sum,
+        match=match,
+        difference=difference,
+    )
+
+
+# Field definitions for each section
+_COSTO_VENTA_FIELDS = [
+    "cv_gastos_personal",
+    "cv_materiales",
+    "cv_energia",
+    "cv_servicios_terceros",
+    "cv_depreciacion_amort",
+    "cv_deprec_leasing",
+    "cv_deprec_arrend",
+    "cv_serv_mineros",
+    "cv_fletes",
+    "cv_gastos_diferidos",
+    "cv_convenios",
+]
+
+_GASTO_ADMIN_FIELDS = [
+    "ga_gastos_personal",
+    "ga_materiales",
+    "ga_servicios_terceros",
+    "ga_gratificacion",
+    "ga_comercializacion",
+    "ga_otros",
+]
+
+
 def validate_costo_venta_total(
     data: dict[str, Any],
     config: dict | None = None,
@@ -132,39 +190,12 @@ def validate_costo_venta_total(
 
     Args:
         data: Dictionary of field_name -> value
-        config: Configuration dict, or None to load from file
+        config: Configuration dict (unused, kept for API compatibility)
 
     Returns:
         ValidationResult with comparison
     """
-    # Costo de Venta item fields
-    cv_fields = [
-        "cv_gastos_personal",
-        "cv_materiales",
-        "cv_energia",
-        "cv_servicios_terceros",
-        "cv_depreciacion_amort",
-        "cv_deprec_leasing",
-        "cv_deprec_arrend",
-        "cv_serv_mineros",
-        "cv_fletes",
-        "cv_gastos_diferidos",
-        "cv_convenios",
-    ]
-
-    calculated_sum = sum(data.get(f, 0) or 0 for f in cv_fields)
-    reported_total = data.get("total_costo_venta")
-
-    match = calculated_sum == reported_total if reported_total is not None else False
-    difference = (reported_total - calculated_sum) if reported_total is not None else None
-
-    return ValidationResult(
-        field="total_costo_venta",
-        expected=reported_total,
-        actual=calculated_sum,
-        match=match,
-        difference=difference,
-    )
+    return _validate_section_total(data, _COSTO_VENTA_FIELDS, "total_costo_venta")
 
 
 def validate_gasto_admin_total(
@@ -175,34 +206,12 @@ def validate_gasto_admin_total(
 
     Args:
         data: Dictionary of field_name -> value
-        config: Configuration dict, or None to load from file
+        config: Configuration dict (unused, kept for API compatibility)
 
     Returns:
         ValidationResult with comparison
     """
-    # Gasto Admin item fields
-    ga_fields = [
-        "ga_gastos_personal",
-        "ga_materiales",
-        "ga_servicios_terceros",
-        "ga_gratificacion",
-        "ga_comercializacion",
-        "ga_otros",
-    ]
-
-    calculated_sum = sum(data.get(f, 0) or 0 for f in ga_fields)
-    reported_total = data.get("total_gasto_admin")
-
-    match = calculated_sum == reported_total if reported_total is not None else False
-    difference = (reported_total - calculated_sum) if reported_total is not None else None
-
-    return ValidationResult(
-        field="total_gasto_admin",
-        expected=reported_total,
-        actual=calculated_sum,
-        match=match,
-        difference=difference,
-    )
+    return _validate_section_total(data, _GASTO_ADMIN_FIELDS, "total_gasto_admin")
 
 
 def validate_balance_sheet(
