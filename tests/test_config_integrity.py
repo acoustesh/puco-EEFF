@@ -18,13 +18,13 @@ from puco_eeff.config import (
     get_extraction_specs,
     get_xbrl_specs,
 )
-from puco_eeff.extractor.cost_extractor import (
-    Sheet1Data,
+from puco_eeff.extractor.extraction import (
     _get_extraction_labels,
     _get_table_identifiers,
 )
 from puco_eeff.sheets.sheet1 import (
     SHEET1_CONFIG_DIR,
+    Sheet1Data,
     get_sheet1_extraction_config,
     get_sheet1_fields,
     get_sheet1_reference_data,

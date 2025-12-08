@@ -25,11 +25,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from puco_eeff.extractor.cost_extractor import (
-    CrossValidationResult,
-    ExtractionResult,
+from puco_eeff.extractor.extraction import (
     LineItem,
     SectionBreakdown,
+    parse_chilean_number,
+)
+from puco_eeff.extractor.validation_core import (
+    CrossValidationResult,
+    ExtractionResult,
     SumValidationResult,
     ValidationReport,
     ValidationResult,
@@ -40,7 +43,6 @@ from puco_eeff.extractor.cost_extractor import (
     _safe_eval_expression,
     _section_breakdowns_to_sheet1data,
     format_validation_report,
-    parse_chilean_number,
     run_sheet1_validations,
     validate_extraction,
 )
@@ -432,8 +434,8 @@ class TestExtractDetailedCostsMocked:
             "audit": tmp_path / "audit",
         }
 
-    @patch("puco_eeff.extractor.cost_extractor.get_period_paths")
-    @patch("puco_eeff.extractor.cost_extractor.extract_pdf_section")
+    @patch("puco_eeff.extractor.extraction_pipeline.get_period_paths")
+    @patch("puco_eeff.extractor.extraction_pipeline.extract_pdf_section")
     def test_extraction_without_xbrl(
         self,
         mock_extract_pdf_section: MagicMock,
@@ -441,7 +443,7 @@ class TestExtractDetailedCostsMocked:
         mock_paths: dict[str, Path],
     ) -> None:
         """Test extraction when no XBRL is available (Pucobre.cl case)."""
-        from puco_eeff.extractor.cost_extractor import extract_detailed_costs
+        from puco_eeff.extractor.extraction_pipeline import extract_detailed_costs
 
         # Setup mocks
         mock_paths_fn.return_value = mock_paths
@@ -478,9 +480,9 @@ class TestExtractDetailedCostsMocked:
         assert result.sections.get("nota_22") is not None
         assert all(v.source == "pdf_only" for v in result.validations)
 
-    @patch("puco_eeff.extractor.cost_extractor.get_period_paths")
-    @patch("puco_eeff.extractor.cost_extractor.extract_pdf_section")
-    @patch("puco_eeff.extractor.cost_extractor.extract_xbrl_totals")
+    @patch("puco_eeff.extractor.extraction_pipeline.get_period_paths")
+    @patch("puco_eeff.extractor.extraction_pipeline.extract_pdf_section")
+    @patch("puco_eeff.extractor.extraction_pipeline.extract_xbrl_totals")
     def test_extraction_with_xbrl_validation(
         self,
         mock_xbrl: MagicMock,
@@ -489,7 +491,7 @@ class TestExtractDetailedCostsMocked:
         mock_paths: dict[str, Path],
     ) -> None:
         """Test extraction with XBRL validation (CMF case)."""
-        from puco_eeff.extractor.cost_extractor import extract_detailed_costs
+        from puco_eeff.extractor.extraction_pipeline import extract_detailed_costs
 
         # Setup mocks
         mock_paths_fn.return_value = mock_paths
@@ -543,7 +545,7 @@ class TestSaveExtractionResult:
 
     def test_save_creates_json(self, tmp_path: Path) -> None:
         """Should create a JSON file with extraction data."""
-        from puco_eeff.extractor.cost_extractor import save_extraction_result
+        from puco_eeff.extractor.extraction_pipeline import save_extraction_result
 
         result = ExtractionResult(
             year=2024,
@@ -582,7 +584,7 @@ class TestSheet1Data:
 
     def test_create_with_sample_data(self) -> None:
         """Create Sheet1Data with Q2 2024 sample values."""
-        from puco_eeff.extractor.cost_extractor import Sheet1Data
+        from puco_eeff.sheets.sheet1 import Sheet1Data
 
         data = Sheet1Data(
             quarter="IIQ2024",
@@ -619,7 +621,7 @@ class TestSheet1Data:
 
     def test_to_dict(self) -> None:
         """Test conversion to dictionary."""
-        from puco_eeff.extractor.cost_extractor import Sheet1Data
+        from puco_eeff.sheets.sheet1 import Sheet1Data
 
         data = Sheet1Data(
             quarter="IQ2024",
@@ -643,7 +645,7 @@ class TestSheet1Data:
 
     def test_to_row_list_has_27_rows(self) -> None:
         """Row list should have exactly 27 rows."""
-        from puco_eeff.extractor.cost_extractor import Sheet1Data
+        from puco_eeff.sheets.sheet1 import Sheet1Data
 
         data = Sheet1Data(
             quarter="IIQ2024",
@@ -657,7 +659,7 @@ class TestSheet1Data:
 
     def test_to_row_list_structure(self) -> None:
         """Row list should have correct structure."""
-        from puco_eeff.extractor.cost_extractor import Sheet1Data
+        from puco_eeff.sheets.sheet1 import Sheet1Data
 
         data = Sheet1Data(
             quarter="IIQ2024",
@@ -687,7 +689,7 @@ class TestSheet1Data:
 
     def test_totales_disambiguation(self) -> None:
         """Ensure 'Totales' in row 27 is distinct from 'Total Costo de Venta'."""
-        from puco_eeff.extractor.cost_extractor import Sheet1Data
+        from puco_eeff.sheets.sheet1 import Sheet1Data
 
         data = Sheet1Data(
             quarter="IIQ2024",
@@ -714,7 +716,7 @@ class TestQuarterFormatting:
 
     def test_quarter_to_roman(self) -> None:
         """Test Roman numeral conversion."""
-        from puco_eeff.extractor.cost_extractor import quarter_to_roman
+        from puco_eeff.extractor.extraction import quarter_to_roman
 
         assert quarter_to_roman(1) == "I"
         assert quarter_to_roman(2) == "II"
@@ -723,7 +725,7 @@ class TestQuarterFormatting:
 
     def test_format_quarter_label(self) -> None:
         """Test quarter label formatting."""
-        from puco_eeff.extractor.cost_extractor import format_quarter_label
+        from puco_eeff.extractor.extraction import format_quarter_label
 
         assert format_quarter_label(2024, 1) == "IQ2024"
         assert format_quarter_label(2024, 2) == "IIQ2024"
@@ -736,7 +738,7 @@ class TestSaveSheet1Data:
 
     def test_save_creates_json(self, tmp_path: Path) -> None:
         """Should create a JSON file with Sheet1 data."""
-        from puco_eeff.extractor.cost_extractor import Sheet1Data, save_sheet1_data
+        from puco_eeff.sheets.sheet1 import Sheet1Data, save_sheet1_data
 
         data = Sheet1Data(
             quarter="IIQ2024",
@@ -770,7 +772,8 @@ class TestXBRLExtraction:
 
     def test_validate_sheet1_with_xbrl_match(self) -> None:
         """Should log match when PDF and XBRL totals agree."""
-        from puco_eeff.extractor.cost_extractor import Sheet1Data, _validate_sheet1_with_xbrl
+        from puco_eeff.extractor.extraction_pipeline import _validate_sheet1_with_xbrl
+        from puco_eeff.sheets.sheet1 import Sheet1Data
 
         data = Sheet1Data(
             quarter="IIQ2024",
@@ -781,7 +784,7 @@ class TestXBRLExtraction:
         )
 
         # Mock XBRL extraction to return matching values
-        with patch("puco_eeff.extractor.cost_extractor.extract_xbrl_totals") as mock_xbrl:
+        with patch("puco_eeff.extractor.extraction_pipeline.extract_xbrl_totals") as mock_xbrl:
             mock_xbrl.return_value = {
                 "cost_of_sales": -126202,
                 "admin_expense": -11632,
@@ -795,7 +798,8 @@ class TestXBRLExtraction:
 
     def test_validate_sheet1_with_xbrl_fallback(self) -> None:
         """Should use XBRL values when PDF extraction failed."""
-        from puco_eeff.extractor.cost_extractor import Sheet1Data, _validate_sheet1_with_xbrl
+        from puco_eeff.extractor.extraction_pipeline import _validate_sheet1_with_xbrl
+        from puco_eeff.sheets.sheet1 import Sheet1Data
 
         data = Sheet1Data(
             quarter="IIQ2024",
@@ -805,7 +809,7 @@ class TestXBRLExtraction:
             total_gasto_admin=None,
         )
 
-        with patch("puco_eeff.extractor.cost_extractor.extract_xbrl_totals") as mock_xbrl:
+        with patch("puco_eeff.extractor.extraction_pipeline.extract_xbrl_totals") as mock_xbrl:
             mock_xbrl.return_value = {
                 "cost_of_sales": -126202,
                 "admin_expense": -11632,
@@ -819,7 +823,8 @@ class TestXBRLExtraction:
 
     def test_merge_pdf_into_xbrl_data(self) -> None:
         """Should copy detailed items from PDF to XBRL data."""
-        from puco_eeff.extractor.cost_extractor import Sheet1Data, _merge_pdf_into_xbrl_data
+        from puco_eeff.extractor.extraction_pipeline import _merge_pdf_into_xbrl_data
+        from puco_eeff.sheets.sheet1 import Sheet1Data
 
         pdf_data = Sheet1Data(
             quarter="IIQ2024",
@@ -839,7 +844,7 @@ class TestXBRLExtraction:
             total_gasto_admin=-11632,
         )
 
-        _merge_pdf_into_xbrl_data(pdf_data, xbrl_data)
+        _merge_pdf_into_xbrl_data(xbrl_data, pdf_data)
 
         # Detail items should be copied from PDF
         assert xbrl_data.cv_gastos_personal == -19721
@@ -855,8 +860,9 @@ class TestExtractSheet1MainEntry:
     """Tests for the main extract_sheet1 entry point."""
 
     def test_extract_sheet1_pdf_priority(self) -> None:
-        """Should try PDF first when prefer_pdf=True."""
-        from puco_eeff.extractor.cost_extractor import Sheet1Data, extract_sheet1
+        """Should try PDF first when prefer_source="pdf"."""
+        from puco_eeff.extractor.extraction_pipeline import extract_sheet1
+        from puco_eeff.sheets.sheet1 import Sheet1Data
 
         expected_data = Sheet1Data(
             quarter="IIQ2024",
@@ -865,10 +871,10 @@ class TestExtractSheet1MainEntry:
             ingresos_ordinarios=179165,
         )
 
-        with patch("puco_eeff.extractor.cost_extractor.extract_sheet1_from_analisis_razonado") as mock_pdf:
+        with patch("puco_eeff.extractor.extraction_pipeline.extract_sheet1_from_analisis_razonado") as mock_pdf:
             mock_pdf.return_value = expected_data
 
-            result = extract_sheet1(2024, 2, prefer_pdf=True)
+            result = extract_sheet1(2024, 2, prefer_source="pdf")
 
             assert result is not None
             assert result.quarter == "IIQ2024"
@@ -876,7 +882,8 @@ class TestExtractSheet1MainEntry:
 
     def test_extract_sheet1_xbrl_fallback(self) -> None:
         """Should fall back to XBRL when PDF fails."""
-        from puco_eeff.extractor.cost_extractor import Sheet1Data, extract_sheet1
+        from puco_eeff.extractor.extraction_pipeline import extract_sheet1
+        from puco_eeff.sheets.sheet1 import Sheet1Data
 
         xbrl_data = Sheet1Data(
             quarter="IIQ2024",
@@ -885,13 +892,13 @@ class TestExtractSheet1MainEntry:
             total_costo_venta=-126202,
         )
 
-        with patch("puco_eeff.extractor.cost_extractor.extract_sheet1_from_analisis_razonado") as mock_pdf:
+        with patch("puco_eeff.extractor.extraction_pipeline.extract_sheet1_from_analisis_razonado") as mock_pdf:
             mock_pdf.return_value = None  # PDF failed
 
-            with patch("puco_eeff.extractor.cost_extractor.extract_sheet1_from_xbrl") as mock_xbrl:
+            with patch("puco_eeff.extractor.extraction_pipeline.extract_sheet1_from_xbrl") as mock_xbrl:
                 mock_xbrl.return_value = xbrl_data
 
-                result = extract_sheet1(2024, 2, prefer_pdf=True)
+                result = extract_sheet1(2024, 2, prefer_source="pdf")
 
                 assert result is not None
                 assert result.total_costo_venta == -126202
@@ -903,7 +910,7 @@ class TestIngresosPDFFallback:
 
     def test_extract_ingresos_from_pdf_function(self) -> None:
         """extract_ingresos_from_pdf should parse Estado de Resultados page."""
-        from puco_eeff.extractor.cost_extractor import extract_ingresos_from_pdf
+        from puco_eeff.extractor.extraction import extract_ingresos_from_pdf
 
         # Mock pdfplumber to return Estado de Resultados table structure
         mock_table = [
@@ -933,7 +940,7 @@ class TestIngresosPDFFallback:
 
     def test_extract_ingresos_from_pdf_returns_none_when_not_found(self) -> None:
         """Should return None if Estado de Resultados page not found."""
-        from puco_eeff.extractor.cost_extractor import extract_ingresos_from_pdf
+        from puco_eeff.extractor.extraction import extract_ingresos_from_pdf
 
         with patch("pdfplumber.open") as mock_pdf_open:
             mock_page = MagicMock()
@@ -952,15 +959,15 @@ class TestIngresosPDFFallback:
 
     def test_sheet1_uses_pdf_ingresos_when_no_xbrl(self) -> None:
         """extract_sheet1_from_analisis_razonado should extract Ingresos from PDF when no XBRL."""
-        from puco_eeff.extractor.cost_extractor import extract_sheet1_from_analisis_razonado
+        from puco_eeff.extractor.extraction_pipeline import extract_sheet1_from_analisis_razonado
 
-        with patch("puco_eeff.extractor.cost_extractor.get_period_paths") as mock_paths:
+        with patch("puco_eeff.extractor.extraction_pipeline.get_period_paths") as mock_paths:
             mock_paths.return_value = {
                 "raw_pdf": Path("/fake/pdf"),
                 "raw_xbrl": Path("/fake/xbrl"),
             }
 
-            with patch("puco_eeff.extractor.cost_extractor.find_file_with_alternatives") as mock_find:
+            with patch("puco_eeff.extractor.extraction_pipeline.find_file_with_alternatives") as mock_find:
                 # Create mock paths that "exist"
                 mock_pdf_path = MagicMock(spec=Path)
                 mock_pdf_path.exists.return_value = True
@@ -978,7 +985,7 @@ class TestIngresosPDFFallback:
 
                 mock_find.side_effect = find_side_effect
 
-                with patch("puco_eeff.extractor.cost_extractor.extract_pdf_section") as mock_extract:
+                with patch("puco_eeff.extractor.extraction_pipeline.extract_pdf_section") as mock_extract:
 
                     def extract_section_side_effect(path, section_name):
                         if section_name == "nota_21":
@@ -997,7 +1004,7 @@ class TestIngresosPDFFallback:
 
                     mock_extract.side_effect = extract_section_side_effect
 
-                    with patch("puco_eeff.extractor.cost_extractor.extract_ingresos_from_pdf") as mock_ingresos:
+                    with patch("puco_eeff.extractor.extraction_pipeline.extract_ingresos_from_pdf") as mock_ingresos:
                         mock_ingresos.return_value = 80767
 
                         result = extract_sheet1_from_analisis_razonado(2024, 1)
@@ -1535,7 +1542,7 @@ class TestCompareWithTolerance:
 
     def test_exact_match(self) -> None:
         """Exact match should return True with diff 0."""
-        from puco_eeff.extractor.cost_extractor import _compare_with_tolerance
+        from puco_eeff.extractor.validation_core import _compare_with_tolerance
 
         match, diff = _compare_with_tolerance(100, 100, tolerance=1)
         assert match is True
@@ -1543,7 +1550,7 @@ class TestCompareWithTolerance:
 
     def test_within_tolerance(self) -> None:
         """Within tolerance should return True."""
-        from puco_eeff.extractor.cost_extractor import _compare_with_tolerance
+        from puco_eeff.extractor.validation_core import _compare_with_tolerance
 
         match, diff = _compare_with_tolerance(100, 101, tolerance=5)
         assert match is True
@@ -1551,7 +1558,7 @@ class TestCompareWithTolerance:
 
     def test_outside_tolerance(self) -> None:
         """Outside tolerance should return False."""
-        from puco_eeff.extractor.cost_extractor import _compare_with_tolerance
+        from puco_eeff.extractor.validation_core import _compare_with_tolerance
 
         match, diff = _compare_with_tolerance(100, 110, tolerance=5)
         assert match is False
@@ -1559,7 +1566,7 @@ class TestCompareWithTolerance:
 
     def test_sign_agnostic(self) -> None:
         """Sign should not matter (absolute comparison)."""
-        from puco_eeff.extractor.cost_extractor import _compare_with_tolerance
+        from puco_eeff.extractor.validation_core import _compare_with_tolerance
 
         match, diff = _compare_with_tolerance(-100, 100, tolerance=1)
         assert match is True
@@ -1567,7 +1574,7 @@ class TestCompareWithTolerance:
 
     def test_none_values(self) -> None:
         """None values should return True with diff 0."""
-        from puco_eeff.extractor.cost_extractor import _compare_with_tolerance
+        from puco_eeff.extractor.validation_core import _compare_with_tolerance
 
         match, diff = _compare_with_tolerance(None, 100, tolerance=1)
         assert match is True
@@ -1617,8 +1624,8 @@ class TestPerRuleTolerance:
         # With global tolerance=1, this would fail
         # With per-rule tolerance=5, it should pass
         with (
-            patch("puco_eeff.extractor.cost_extractor.get_sheet1_cross_validations") as mock_cross,
-            patch("puco_eeff.extractor.cost_extractor.get_sheet1_sum_tolerance") as mock_tolerance,
+            patch("puco_eeff.extractor.validation_core.get_sheet1_cross_validations") as mock_cross,
+            patch("puco_eeff.extractor.validation_core.get_sheet1_sum_tolerance") as mock_tolerance,
         ):
             mock_tolerance.return_value = 1  # Global tolerance
             mock_cross.return_value = [
@@ -2046,9 +2053,9 @@ class TestSectionsToSheet1Data:
 class TestExtractionResultValidationReport:
     """Tests for the validation_report field on ExtractionResult."""
 
-    @patch("puco_eeff.extractor.cost_extractor.get_period_paths")
-    @patch("puco_eeff.extractor.cost_extractor.extract_pdf_section")
-    @patch("puco_eeff.extractor.cost_extractor.extract_xbrl_totals")
+    @patch("puco_eeff.extractor.extraction_pipeline.get_period_paths")
+    @patch("puco_eeff.extractor.extraction_pipeline.extract_pdf_section")
+    @patch("puco_eeff.extractor.extraction_pipeline.extract_xbrl_totals")
     def test_validation_report_populated(
         self,
         mock_xbrl: MagicMock,
@@ -2057,7 +2064,7 @@ class TestExtractionResultValidationReport:
         tmp_path: Path,
     ) -> None:
         """extract_detailed_costs populates validation_report field."""
-        from puco_eeff.extractor.cost_extractor import extract_detailed_costs
+        from puco_eeff.extractor.extraction_pipeline import extract_detailed_costs
 
         # Setup paths
         raw_pdf = tmp_path / "raw" / "pdf"
@@ -2105,8 +2112,8 @@ class TestExtractionResultValidationReport:
         assert result.validation_report.pdf_xbrl_validations is not None
         assert len(result.validation_report.pdf_xbrl_validations) >= 2
 
-    @patch("puco_eeff.extractor.cost_extractor.get_period_paths")
-    @patch("puco_eeff.extractor.cost_extractor.extract_pdf_section")
+    @patch("puco_eeff.extractor.extraction_pipeline.get_period_paths")
+    @patch("puco_eeff.extractor.extraction_pipeline.extract_pdf_section")
     def test_validation_report_pdf_only(
         self,
         mock_extract_pdf_section: MagicMock,
@@ -2114,7 +2121,7 @@ class TestExtractionResultValidationReport:
         tmp_path: Path,
     ) -> None:
         """validation_report works without XBRL (pdf_only source)."""
-        from puco_eeff.extractor.cost_extractor import extract_detailed_costs
+        from puco_eeff.extractor.extraction_pipeline import extract_detailed_costs
 
         # Setup paths - no XBRL
         raw_pdf = tmp_path / "raw" / "pdf"

@@ -216,6 +216,7 @@ def download_from_pucobre(
         pdf_content: bytes | None = None
 
         def capture_pdf_response(response):
+            """Capture PDF response content from browser network traffic."""
             nonlocal pdf_url, pdf_content
             content_type = response.headers.get("content-type", "")
             if "pdf" in content_type.lower():

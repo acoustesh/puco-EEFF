@@ -1,11 +1,13 @@
 """
-Code Quality Metrics Tests for puco_eeff/extractor/
+Code Quality Metrics Tests for puco_eeff/
 
 This module enforces code quality standards via CI:
 - Docstring coverage (warnings for missing docstrings)
-- File line count limits (prevents code bloat)
-- Cyclomatic complexity caps (keeps functions maintainable)
-- Near-duplicate function detection (using OpenAI embeddings)
+- File line count limits (prevents code bloat) - extractor only
+- Cyclomatic complexity caps (keeps functions maintainable) - extractor only
+- Cognitive complexity caps - extractor only
+- Maintainability Index - all directories
+- Near-duplicate function detection (using OpenAI embeddings) - all directories
 
 Baseline Management:
     Run `pytest --update-baselines` to update metrics baselines.
@@ -41,7 +43,14 @@ if TYPE_CHECKING:
 # Constants
 # =============================================================================
 
-EXTRACTOR_DIR = Path(__file__).parent.parent / "puco_eeff" / "extractor"
+# Base directories
+PUCO_EEFF_DIR = Path(__file__).parent.parent / "puco_eeff"
+EXTRACTOR_DIR = PUCO_EEFF_DIR / "extractor"
+
+# All subdirectories under puco_eeff (for tests that span all)
+PUCO_EEFF_SUBDIRS = ["extractor", "scraper", "sheets", "transformer", "writer"]
+
+# Baseline files
 BASELINES_FILE = Path(__file__).parent / "baselines" / "extractor_metrics.json"
 EMBEDDINGS_FILE = Path(__file__).parent / "baselines" / "embeddings_cache.json.zlib"
 
@@ -195,9 +204,35 @@ def extract_functions_from_file(
             yield node, source
 
 
+def extract_items_with_docstrings(file_path: Path) -> list[tuple[str, int, bool, str]]:
+    """
+    Extract functions, methods, and classes with their docstring status.
+
+    Args:
+        file_path: Path to the Python file
+
+    Returns:
+        List of (name, line_number, has_docstring, kind) tuples
+        where kind is "function", "method", or "class"
+    """
+    results = []
+    source = file_path.read_text(encoding="utf-8")
+    try:
+        tree = ast.parse(source, filename=str(file_path))
+    except SyntaxError:
+        return results
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
+            has_docstring = ast.get_docstring(node) is not None
+            kind = "class" if isinstance(node, ast.ClassDef) else "function"
+            results.append((node.name, node.lineno, has_docstring, kind))
+    return results
+
+
 def extract_functions_with_docstrings(file_path: Path) -> list[tuple[str, int, bool]]:
     """
-    Extract functions with their docstring status.
+    Extract functions with their docstring status (legacy compatibility).
 
     Returns:
         List of (function_name, line_number, has_docstring) tuples
@@ -245,19 +280,24 @@ def compute_content_hash(normalized_tokens: str) -> str:
 
 def extract_function_infos(
     min_loc: int = 15,
+    directory: Path | None = None,
 ) -> list[FunctionInfo]:
     """
-    Extract all functions from extractor directory meeting LOC threshold.
+    Extract all functions and classes from a directory meeting LOC threshold.
 
     Args:
         min_loc: Minimum lines of code for inclusion
+        directory: Directory to scan (default: EXTRACTOR_DIR)
 
     Returns:
         List of FunctionInfo objects
     """
+    if directory is None:
+        directory = EXTRACTOR_DIR
+
     functions = []
 
-    for py_file in EXTRACTOR_DIR.glob("*.py"):
+    for py_file in directory.glob("*.py"):
         source = py_file.read_text(encoding="utf-8")
         try:
             tree = ast.parse(source, filename=str(py_file))
@@ -265,7 +305,7 @@ def extract_function_infos(
             continue
 
         for node in ast.walk(tree):
-            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
                 start = node.lineno
                 end = node.end_lineno or start
                 loc = end - start + 1
@@ -288,6 +328,61 @@ def extract_function_infos(
                     )
 
     return functions
+
+
+def extract_all_function_infos(min_loc: int = 15) -> list[FunctionInfo]:
+    """
+    Extract all functions and classes from ALL puco_eeff directories meeting LOC threshold.
+
+    Args:
+        min_loc: Minimum lines of code for inclusion
+
+    Returns:
+        List of FunctionInfo objects from all directories
+    """
+    all_functions = []
+
+    for subdir in PUCO_EEFF_SUBDIRS:
+        dir_path = PUCO_EEFF_DIR / subdir
+        if dir_path.exists():
+            functions = extract_function_infos(min_loc=min_loc, directory=dir_path)
+            # Update file field to include subdir for uniqueness
+            for func in functions:
+                func.file = f"{subdir}/{func.file}"
+            all_functions.extend(functions)
+
+    # Also check root-level files in puco_eeff/
+    for py_file in PUCO_EEFF_DIR.glob("*.py"):
+        source = py_file.read_text(encoding="utf-8")
+        try:
+            tree = ast.parse(source, filename=str(py_file))
+        except SyntaxError:
+            continue
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
+                start = node.lineno
+                end = node.end_lineno or start
+                loc = end - start + 1
+
+                if loc >= min_loc:
+                    text = get_function_text(node, source)
+                    normalized = normalize_ast_tokens(node)
+                    content_hash = compute_content_hash(normalized)
+
+                    all_functions.append(
+                        FunctionInfo(
+                            name=node.name,
+                            file=py_file.name,
+                            start_line=start,
+                            end_line=end,
+                            loc=loc,
+                            hash=content_hash,
+                            text=text,
+                        )
+                    )
+
+    return all_functions
 
 
 def extract_function_infos_from_file(
@@ -343,7 +438,10 @@ def fit_pca_on_all_embeddings(
     variance_threshold: float = 0.95,
 ):
     """
-    Fit PCA on all cached embeddings from the extractor directory.
+    Fit PCA on all cached embeddings from puco_eeff directories.
+
+    Uses ALL cached embeddings (from extractor, scraper, sheets, etc.)
+    to fit a single PCA model for dimensionality reduction.
 
     Args:
         baselines: Baselines dict with cached embeddings
@@ -398,7 +496,6 @@ def cluster_functions_kmeans_with_pca(
         Tuple of (list of function lists per cluster, list of cluster names)
     """
     from sklearn.cluster import KMeans
-    from sklearn.preprocessing import normalize
 
     # Build embedding matrix
     embeddings = []
@@ -416,8 +513,8 @@ def cluster_functions_kmeans_with_pca(
     # Transform using PCA (reduce dimensionality)
     emb_reduced = pca_model.transform(emb_matrix)[:, :n_components]
 
-    # Normalize for cosine similarity in reduced space
-    emb_normalized = normalize(emb_reduced, norm="l2")
+    # Since PCA components are orthogonal, no need to normalize
+    emb_normalized = emb_reduced
 
     # Run k-means on reduced embeddings
     kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=20, max_iter=3000)
@@ -823,23 +920,65 @@ def get_refactor_priority_message(
     return "\n".join(lines)
 
 
-def _load_complexity_maps() -> tuple[dict[str, int], dict[str, int]]:
+def _load_complexity_maps(directory: Path | None = None) -> tuple[dict[str, int], dict[str, int]]:
     """
-    Load cyclomatic and cognitive complexity maps for all extractor functions.
+    Load cyclomatic and cognitive complexity maps for functions in a directory.
+
+    Args:
+        directory: Directory to scan (default: EXTRACTOR_DIR)
 
     Returns:
         Tuple of (cc_map, cog_map) where each maps "file:func" to complexity value
     """
+    if directory is None:
+        directory = EXTRACTOR_DIR
+
     cc_map: dict[str, int] = {}
     cog_map: dict[str, int] = {}
 
-    for py_file in EXTRACTOR_DIR.glob("*.py"):
+    for py_file in directory.glob("*.py"):
         # Load cyclomatic complexity
         for func_name, _, cc in get_all_function_complexities(py_file):
             key = f"{py_file.name}:{func_name}"
             cc_map[key] = cc
 
         # Load cognitive complexity
+        for func_name, _, cog in get_all_cognitive_complexities(py_file):
+            key = f"{py_file.name}:{func_name}"
+            cog_map[key] = cog
+
+    return cc_map, cog_map
+
+
+def _load_all_complexity_maps() -> tuple[dict[str, int], dict[str, int]]:
+    """
+    Load cyclomatic and cognitive complexity maps for ALL puco_eeff functions.
+
+    Returns:
+        Tuple of (cc_map, cog_map) where each maps "subdir/file:func" to complexity value
+    """
+    cc_map: dict[str, int] = {}
+    cog_map: dict[str, int] = {}
+
+    for subdir in PUCO_EEFF_SUBDIRS:
+        dir_path = PUCO_EEFF_DIR / subdir
+        if dir_path.exists():
+            for py_file in dir_path.glob("*.py"):
+                # Load cyclomatic complexity
+                for func_name, _, cc in get_all_function_complexities(py_file):
+                    key = f"{subdir}/{py_file.name}:{func_name}"
+                    cc_map[key] = cc
+
+                # Load cognitive complexity
+                for func_name, _, cog in get_all_cognitive_complexities(py_file):
+                    key = f"{subdir}/{py_file.name}:{func_name}"
+                    cog_map[key] = cog
+
+    # Also check root-level files
+    for py_file in PUCO_EEFF_DIR.glob("*.py"):
+        for func_name, _, cc in get_all_function_complexities(py_file):
+            key = f"{py_file.name}:{func_name}"
+            cc_map[key] = cc
         for func_name, _, cog in get_all_cognitive_complexities(py_file):
             key = f"{py_file.name}:{func_name}"
             cog_map[key] = cog
@@ -857,6 +996,7 @@ def _get_refactor_priority_suffix() -> str:
     Get the refactoring priority message to append to assertion errors.
 
     Loads embeddings and complexity data to compute refactor indices.
+    Uses ALL puco_eeff directories for comprehensive analysis.
     Returns empty string if no functions meet the threshold.
     """
     try:
@@ -868,8 +1008,8 @@ def _get_refactor_priority_suffix() -> str:
         threshold = config.get("refactor_index_threshold", DEFAULT_REFACTOR_INDEX_THRESHOLD)
         top_n = config.get("refactor_index_top_n", DEFAULT_REFACTOR_INDEX_TOP_N)
 
-        # Extract functions meeting LOC threshold
-        functions = extract_function_infos(min_loc=min_loc)
+        # Extract functions from ALL puco_eeff directories
+        functions = extract_all_function_infos(min_loc=min_loc)
         if len(functions) < 2:
             return ""
 
@@ -883,8 +1023,8 @@ def _get_refactor_priority_suffix() -> str:
         if not any(f.embedding is not None for f in functions):
             return ""
 
-        # Load complexity maps
-        cc_map, cog_map = _load_complexity_maps()
+        # Load complexity maps for all directories
+        cc_map, cog_map = _load_all_complexity_maps()
 
         # Get refactor priority message
         msg = get_refactor_priority_message(functions, cc_map, cog_map, threshold=threshold, top_n=top_n)
@@ -895,39 +1035,74 @@ def _get_refactor_priority_suffix() -> str:
 
 
 class TestDocstringCoverage:
-    """Tests for docstring presence in extractor modules."""
+    """Tests for docstring presence in all puco_eeff modules."""
 
-    def test_docstring_coverage(self) -> None:
+    def test_docstring_coverage_all_directories(self) -> None:
         """
-        Check that all functions have docstrings.
+        Check that all functions, methods, and classes have docstrings.
 
-        Emits warnings for functions lacking docstrings.
-        Fails if count exceeds baseline (initially 0).
+        Tests all puco_eeff directories. Emits warnings for missing docstrings.
+        Fails if any directory exceeds its baseline (initially 0 for all).
         """
-        missing_docstrings: list[str] = []
+        baselines = load_baselines()
+        docstring_baselines = baselines.get("docstring_baselines", {})
+        max_missing_default = baselines.get("config", {}).get("max_missing_docstrings", 0)
 
-        for py_file in EXTRACTOR_DIR.glob("*.py"):
-            functions = extract_functions_with_docstrings(py_file)
-            for func_name, line_no, has_docstring in functions:
+        all_missing: dict[str, list[str]] = {}
+        violations: list[str] = []
+
+        # Check all subdirectories
+        for subdir in PUCO_EEFF_SUBDIRS:
+            dir_path = PUCO_EEFF_DIR / subdir
+            if not dir_path.exists():
+                continue
+
+            missing_in_dir: list[str] = []
+            for py_file in dir_path.glob("*.py"):
+                items = extract_items_with_docstrings(py_file)
+                for name, line_no, has_docstring, kind in items:
+                    if not has_docstring:
+                        location = f"{py_file.name}:{line_no}"
+                        missing_in_dir.append(f"  - {kind} {name} ({location})")
+
+            if missing_in_dir:
+                all_missing[subdir] = missing_in_dir
+                # Check against per-directory baseline
+                baseline = docstring_baselines.get(subdir, max_missing_default)
+                if len(missing_in_dir) > baseline:
+                    violations.append(
+                        f"{subdir}/: {len(missing_in_dir)} missing docstrings, baseline allows {baseline}"
+                    )
+
+        # Also check root-level files in puco_eeff/
+        root_missing: list[str] = []
+        for py_file in PUCO_EEFF_DIR.glob("*.py"):
+            items = extract_items_with_docstrings(py_file)
+            for name, line_no, has_docstring, kind in items:
                 if not has_docstring:
                     location = f"{py_file.name}:{line_no}"
-                    missing_docstrings.append(f"  - {func_name} ({location})")
+                    root_missing.append(f"  - {kind} {name} ({location})")
 
-        if missing_docstrings:
-            warning_msg = f"Found {len(missing_docstrings)} functions without docstrings:\n" + "\n".join(
-                missing_docstrings
-            )
-            warnings.warn(warning_msg, UserWarning, stacklevel=2)
+        if root_missing:
+            all_missing["root"] = root_missing
+            baseline = docstring_baselines.get("root", max_missing_default)
+            if len(root_missing) > baseline:
+                violations.append(f"root/: {len(root_missing)} missing docstrings, baseline allows {baseline}")
 
-        # Baseline: 0 missing docstrings allowed (coverage is currently 100%)
-        baselines = load_baselines()
-        max_missing = baselines.get("config", {}).get("max_missing_docstrings", 0)
+        # Emit warnings for all missing docstrings
+        if all_missing:
+            total = sum(len(v) for v in all_missing.values())
+            warning_lines = [f"Found {total} functions/classes without docstrings:"]
+            for dir_name, items in sorted(all_missing.items()):
+                warning_lines.append(f"\n{dir_name}/ ({len(items)}):")
+                warning_lines.extend(items)
+            warnings.warn("\n".join(warning_lines), UserWarning, stacklevel=2)
 
-        if len(missing_docstrings) > max_missing:
-            error_msg = (
-                f"Docstring coverage regression: {len(missing_docstrings)} functions "
-                f"missing docstrings, baseline allows {max_missing}.\n" + "\n".join(missing_docstrings)
-            )
+        if violations:
+            error_msg = "Docstring coverage regression:\n" + "\n".join(violations)
+            # Show details of missing docstrings
+            for dir_name, items in sorted(all_missing.items()):
+                error_msg += f"\n\n{dir_name}/:\n" + "\n".join(items)
             error_msg += _get_refactor_priority_suffix()
             pytest.fail(error_msg)
 
@@ -1086,16 +1261,96 @@ class TestCognitiveComplexity:
 class TestMaintainabilityIndex:
     """Tests for maintainability index limits using radon."""
 
-    def test_maintainability_index(self, update_baselines: bool) -> None:
+    def test_maintainability_index_all_directories(self, update_baselines: bool) -> None:
         """
-        Check that no file has a Maintainability Index below the threshold.
+        Check that no file in any puco_eeff directory has MI below threshold.
 
         Uses radon for MI analysis. Threshold defaults to 13 (very low).
         MI scale: 0-100, higher is better. 20+ is generally acceptable.
-        Existing low-MI files can be grandfathered in mi_baselines.
+        Baselines are stored per-directory in mi_baselines_by_dir.
 
         For files that fail, generates a k-means clustering proposal to split
         the file into two based on semantic similarity of functions.
+        """
+        baselines = load_baselines()
+        config = baselines.get("config", {})
+        threshold = config.get("mi_threshold", 13)
+        mi_baselines_by_dir = baselines.get("mi_baselines_by_dir", {})
+
+        violations: list[str] = []
+        failing_files: list[Path] = []
+        current_mi_by_dir: dict[str, dict[str, float]] = {}
+
+        # Check all subdirectories
+        for subdir in PUCO_EEFF_SUBDIRS:
+            dir_path = PUCO_EEFF_DIR / subdir
+            if not dir_path.exists():
+                continue
+
+            dir_mi_baselines = mi_baselines_by_dir.get(subdir, {})
+            current_mi: dict[str, float] = {}
+
+            for py_file in dir_path.glob("*.py"):
+                mi = get_maintainability_index(py_file)
+                current_mi[py_file.name] = round(mi, 2)
+
+                # Check against file-specific baseline or global threshold
+                file_baseline = dir_mi_baselines.get(py_file.name, threshold)
+                if mi < file_baseline:
+                    violations.append(
+                        f"{subdir}/{py_file.name} has MI={mi:.2f}, "
+                        f"below {'baseline' if py_file.name in dir_mi_baselines else 'threshold'} of {file_baseline}"
+                    )
+                    failing_files.append(py_file)
+
+            if current_mi:
+                current_mi_by_dir[subdir] = current_mi
+
+        # Also check root-level files
+        root_mi_baselines = mi_baselines_by_dir.get("root", {})
+        root_mi: dict[str, float] = {}
+
+        for py_file in PUCO_EEFF_DIR.glob("*.py"):
+            mi = get_maintainability_index(py_file)
+            root_mi[py_file.name] = round(mi, 2)
+
+            file_baseline = root_mi_baselines.get(py_file.name, threshold)
+            if mi < file_baseline:
+                violations.append(
+                    f"{py_file.name} has MI={mi:.2f}, "
+                    f"below {'baseline' if py_file.name in root_mi_baselines else 'threshold'} of {file_baseline}"
+                )
+                failing_files.append(py_file)
+
+        if root_mi:
+            current_mi_by_dir["root"] = root_mi
+
+        if update_baselines:
+            # Update mi_baselines_by_dir for files below threshold
+            for subdir, mi_dict in current_mi_by_dir.items():
+                for filename, mi in mi_dict.items():
+                    if mi < threshold:
+                        baselines.setdefault("mi_baselines_by_dir", {}).setdefault(subdir, {})[filename] = mi
+            save_baselines(baselines)
+            pytest.skip("Updated MI baselines")
+
+        if violations:
+            error_msg = f"Maintainability Index violations (threshold: {threshold}):\n" + "\n".join(violations)
+
+            # Generate file split proposals for failing files
+            for failing_file in failing_files:
+                split_proposal = generate_file_split_proposal(failing_file, baselines)
+                if split_proposal:
+                    error_msg += "\n" + split_proposal
+
+            error_msg += _get_refactor_priority_suffix()
+            pytest.fail(error_msg)
+
+    def test_maintainability_index_extractor(self, update_baselines: bool) -> None:
+        """
+        Check that no file in extractor/ has MI below threshold.
+
+        Legacy test for backward compatibility. Uses mi_baselines from baselines.
         """
         baselines = load_baselines()
         config = baselines.get("config", {})
@@ -1144,13 +1399,148 @@ class TestMaintainabilityIndex:
 class TestFunctionSimilarity:
     """Tests for detecting near-duplicate functions using embeddings."""
 
+    def test_function_similarity_all_directories(
+        self,
+        update_baselines: bool,
+        cached_only: bool,
+    ) -> None:
+        """
+        Detect near-duplicate functions across ALL puco_eeff directories.
+
+        Uses OpenAI embeddings with hash-based caching.
+        PCA dimensionality reduction is fitted on ALL cached embeddings.
+        Fails if:
+        - Any pair has similarity >= threshold_pair (default: 0.90)
+        - Any function has >=2 neighbors with similarity >= threshold_neighbor (0.85)
+        """
+        baselines = load_baselines()
+        config = baselines.get("config", {})
+        min_loc = config.get("min_loc_for_similarity", 15)
+        threshold_pair = config.get("similarity_threshold_pair", 0.90)
+        threshold_neighbor = config.get("similarity_threshold_neighbor", 0.85)
+
+        # Extract functions from ALL puco_eeff directories
+        functions = extract_all_function_infos(min_loc=min_loc)
+
+        if len(functions) < 2:
+            pytest.skip("Not enough functions to compare")
+
+        # Check cache status
+        uncached_functions: list[FunctionInfo] = []
+        for func in functions:
+            cached = get_cached_embedding(baselines, func.hash)
+            if cached is not None:
+                func.embedding = cached
+            else:
+                uncached_functions.append(func)
+
+        # Handle cached-only mode
+        if cached_only and uncached_functions:
+            uncached_names = [f"{f.file}:{f.name}" for f in uncached_functions]
+            pytest.skip(
+                f"--cached-only mode: {len(uncached_functions)} functions lack "
+                f"cached embeddings:\n  "
+                + "\n  ".join(uncached_names[:10])
+                + (f"\n  ... and {len(uncached_names) - 10} more" if len(uncached_names) > 10 else "")
+            )
+
+        # Get embeddings for uncached functions
+        if uncached_functions:
+            api_key = os.environ.get("OPENAI_API_KEY")
+            if not api_key or api_key.startswith("your_") or api_key.startswith("sk-xxx") or len(api_key) < 20:
+                pytest.skip(
+                    "OPENAI_API_KEY not set (or invalid) and some functions lack cached embeddings. "
+                    "Set a valid API key or run with --cached-only to skip."
+                )
+
+            texts = [f.text for f in uncached_functions]
+            try:
+                new_embeddings = get_embeddings_batch(texts)
+            except Exception as e:
+                error_msg = str(e).lower()
+                if "401" in error_msg or "authentication" in error_msg or "api key" in error_msg:
+                    pytest.skip(
+                        f"Invalid OPENAI_API_KEY and some functions lack cached embeddings. "
+                        f"Set a valid API key or run with --cached-only to skip. Error: {e}"
+                    )
+                pytest.fail(f"Failed to get embeddings from OpenAI: {e}")
+
+            # Update functions and cache
+            for func, embedding in zip(uncached_functions, new_embeddings, strict=True):
+                func.embedding = embedding
+                baselines.setdefault("embeddings", {})[func.hash] = embedding
+
+            # Update hash mappings
+            for func in functions:
+                baselines.setdefault("function_hashes", {})[f"{func.file}:{func.name}:{func.start_line}"] = func.hash
+
+            save_baselines(baselines)
+
+        if update_baselines:
+            pytest.skip("Updated embedding baselines")
+
+        # Build similarity matrix and check violations
+        pair_violations: list[str] = []
+        neighbor_violations: list[str] = []
+
+        # Check all pairs
+        for i, func_a in enumerate(functions):
+            if func_a.embedding is None:
+                continue
+
+            similar_neighbors = []
+
+            for j, func_b in enumerate(functions):
+                if i >= j or func_b.embedding is None:
+                    continue
+
+                similarity = compute_cosine_similarity(func_a.embedding, func_b.embedding)
+
+                # Check pair threshold
+                if similarity >= threshold_pair:
+                    pair_violations.append(
+                        f"{func_a.file}:{func_a.start_line} {func_a.name}() vs "
+                        f"{func_b.file}:{func_b.start_line} {func_b.name}() - "
+                        f"similarity: {similarity:.1%}"
+                    )
+
+                # Track neighbors for neighbor threshold check
+                if similarity >= threshold_neighbor:
+                    similar_neighbors.append((func_b.file, func_b.name, func_b.start_line, similarity))
+
+            # Check if function has too many similar neighbors
+            if len(similar_neighbors) >= 2:
+                neighbor_info = ", ".join(f"{f}:{n}() ({s:.1%})" for f, n, _, s in similar_neighbors[:3])
+                neighbor_violations.append(
+                    f"{func_a.file}:{func_a.start_line} {func_a.name}() has "
+                    f"{len(similar_neighbors)} similar functions: {neighbor_info}"
+                )
+
+        all_violations = []
+        if pair_violations:
+            all_violations.append(f"High similarity pairs (>={threshold_pair:.0%}):\n  " + "\n  ".join(pair_violations))
+        if neighbor_violations:
+            all_violations.append(
+                f"Functions with multiple similar neighbors (>={threshold_neighbor:.0%}):\n  "
+                + "\n  ".join(neighbor_violations)
+            )
+
+        if all_violations:
+            error_msg = "\n\n".join(all_violations)
+            # Compute refactor priority using the already-loaded functions and embeddings
+            cc_map, cog_map = _load_all_complexity_maps()
+            refactor_msg = get_refactor_priority_message(functions, cc_map, cog_map)
+            if refactor_msg:
+                error_msg += refactor_msg
+            pytest.fail(error_msg)
+
     def test_function_similarity(
         self,
         update_baselines: bool,
         cached_only: bool,
     ) -> None:
         """
-        Detect near-duplicate functions using semantic similarity.
+        Detect near-duplicate functions in extractor/ only (legacy test).
 
         Uses OpenAI embeddings with hash-based caching.
         Fails if:
