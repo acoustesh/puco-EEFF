@@ -135,6 +135,23 @@ def extract_detailed_costs(year: int, quarter: int, validate: bool = True) -> Ex
     return result
 
 
+def _resolve_pdf_path(raw_dir: Path, year: int, quarter: int) -> Path | None:
+    """Resolve the Estados Financieros PDF path."""
+    ef_path = find_file_with_alternatives(raw_dir, "estados_financieros_pdf", year, quarter)
+    if not ef_path:
+        ef_path = raw_dir / format_filename("estados_financieros_pdf", year, quarter)
+    return ef_path if ef_path.exists() else None
+
+
+def _resolve_xbrl_path(raw_xbrl_dir: Path, year: int, quarter: int) -> tuple[Path | None, bool]:
+    """Resolve the XBRL path and availability."""
+    xbrl_path = find_file_with_alternatives(raw_xbrl_dir, "estados_financieros_xbrl", year, quarter)
+    if not xbrl_path:
+        xbrl_path = raw_xbrl_dir / format_filename("estados_financieros_xbrl", year, quarter)
+    xbrl_available = xbrl_path.exists() if xbrl_path else False
+    return xbrl_path, xbrl_available
+
+
 def extract_sheet1_from_analisis_razonado(
     year: int,
     quarter: int,
@@ -145,21 +162,15 @@ def extract_sheet1_from_analisis_razonado(
     paths = get_period_paths(year, quarter)
     raw_dir = paths["raw_pdf"]
 
-    ef_path = find_file_with_alternatives(raw_dir, "estados_financieros_pdf", year, quarter)
+    ef_path = _resolve_pdf_path(raw_dir, year, quarter)
     if not ef_path:
-        ef_path = raw_dir / format_filename("estados_financieros_pdf", year, quarter)
-
-    if not ef_path.exists():
-        logger.warning(f"Estados Financieros PDF not found: {ef_path}")
+        logger.warning(f"Estados Financieros PDF not found in {raw_dir}")
         return (None, None) if return_report else None
 
     combined_path = find_file_with_alternatives(raw_dir, "pucobre_combined", year, quarter)
     source = "pucobre.cl" if (combined_path and combined_path.exists()) else "cmf"
 
-    xbrl_path = find_file_with_alternatives(paths["raw_xbrl"], "estados_financieros_xbrl", year, quarter)
-    if not xbrl_path:
-        xbrl_path = paths["raw_xbrl"] / format_filename("estados_financieros_xbrl", year, quarter)
-    xbrl_available = xbrl_path.exists() if xbrl_path else False
+    xbrl_path, xbrl_available = _resolve_xbrl_path(paths["raw_xbrl"], year, quarter)
 
     data = Sheet1Data(
         quarter=format_quarter_label(year, quarter),
@@ -188,7 +199,7 @@ def extract_sheet1_from_analisis_razonado(
 
     report: ValidationReport | None = None
 
-    if xbrl_available and validate_with_xbrl:
+    if xbrl_available and validate_with_xbrl and xbrl_path:
         report = _validate_sheet1_with_xbrl(data, xbrl_path)
     else:
         logger.info("No XBRL available, extracting Ingresos from Estado de Resultados")
@@ -270,6 +281,15 @@ def extract_sheet1_from_xbrl(
     return (data, report) if return_report else data
 
 
+def _unpack_extraction_result(
+    result: Sheet1Data | None | tuple[Sheet1Data | None, ValidationReport | None],
+) -> tuple[Sheet1Data | None, ValidationReport | None]:
+    """Unpack extraction result into (data, report) tuple."""
+    if isinstance(result, tuple):
+        return result
+    return result, None
+
+
 def extract_sheet1(
     year: int,
     quarter: int,
@@ -296,52 +316,36 @@ def extract_sheet1(
 
     if prefer_source == "pdf":
         result = extract_sheet1_from_analisis_razonado(year, quarter, validate_with_xbrl=True, return_report=True)
-        if isinstance(result, tuple):
-            pdf_data, report = result
-        else:
-            pdf_data = result
+        pdf_data, report = _unpack_extraction_result(result)
 
         if pdf_data is not None:
             return (pdf_data, report) if return_report else pdf_data
 
         logger.info("PDF extraction failed, trying XBRL-only extraction")
         result = extract_sheet1_from_xbrl(year, quarter, return_report=True)
-        if isinstance(result, tuple):
-            xbrl_data, report = result
-        else:
-            xbrl_data = result
+        xbrl_data, report = _unpack_extraction_result(result)
         return (xbrl_data, report) if return_report else xbrl_data
 
-    else:
-        result = extract_sheet1_from_xbrl(year, quarter, return_report=True)
-        if isinstance(result, tuple):
-            xbrl_data, report = result
-        else:
-            xbrl_data = result
+    # prefer_source == "xbrl"
+    result = extract_sheet1_from_xbrl(year, quarter, return_report=True)
+    xbrl_data, report = _unpack_extraction_result(result)
 
-        if xbrl_data is None:
-            logger.info("XBRL extraction failed, trying PDF extraction")
-            result = extract_sheet1_from_analisis_razonado(year, quarter, validate_with_xbrl=False, return_report=True)
-            if isinstance(result, tuple):
-                pdf_data, report = result
-            else:
-                pdf_data = result
-            return (pdf_data, report) if return_report else pdf_data
+    if xbrl_data is None:
+        logger.info("XBRL extraction failed, trying PDF extraction")
+        result = extract_sheet1_from_analisis_razonado(year, quarter, validate_with_xbrl=False, return_report=True)
+        pdf_data, report = _unpack_extraction_result(result)
+        return (pdf_data, report) if return_report else pdf_data
 
-        if merge_sources:
-            result = extract_sheet1_from_analisis_razonado(year, quarter, validate_with_xbrl=False, return_report=True)
-            if isinstance(result, tuple):
-                pdf_data, _ = result
-            else:
-                pdf_data = result
+    if merge_sources:
+        result = extract_sheet1_from_analisis_razonado(year, quarter, validate_with_xbrl=False, return_report=True)
+        pdf_data, _ = _unpack_extraction_result(result)
 
-            if pdf_data is not None:
-                xbrl_data = _merge_pdf_into_xbrl_data(xbrl_data, pdf_data)
-                # Skip XBRL validation since we don't have the path
-                sum_results = _run_sum_validations(xbrl_data)
-                report = ValidationReport(sum_validations=sum_results)
+        if pdf_data is not None:
+            xbrl_data = _merge_pdf_into_xbrl_data(xbrl_data, pdf_data)
+            sum_results = _run_sum_validations(xbrl_data)
+            report = ValidationReport(sum_validations=sum_results)
 
-        return (xbrl_data, report) if return_report else xbrl_data
+    return (xbrl_data, report) if return_report else xbrl_data
 
 
 def _merge_pdf_into_xbrl_data(xbrl_data: Sheet1Data, pdf_data: Sheet1Data) -> Sheet1Data:

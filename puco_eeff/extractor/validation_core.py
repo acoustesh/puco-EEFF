@@ -191,51 +191,57 @@ class ValidationReport:
 # =============================================================================
 
 
-def format_validation_report(report: ValidationReport, verbose: bool = True) -> str:
-    """Format validation report for display."""
+def _format_sum_validations(report: ValidationReport) -> list[str]:
+    """Format sum validations section."""
     lines = []
-    separator = "═" * 60
-
-    lines.append(separator)
-    lines.append("                    VALIDATION REPORT")
-    lines.append(separator)
-    lines.append("")
-
     if report.sum_validations:
         lines.append("Sum Validations:")
         for v in report.sum_validations:
             lines.append(f"  {v.status}")
     else:
         lines.append("Sum Validations: (none configured)")
-    lines.append("")
+    return lines
 
+
+def _format_pdf_xbrl_validation_item(v: ValidationResult) -> str:
+    """Format a single PDF-XBRL validation item."""
+    if v.source == "both":
+        symbol = "✓" if v.match else "✗"
+        if v.match:
+            return f"  {symbol} {v.field_name}: {v.pdf_value:,} (PDF) = {v.xbrl_value:,} (XBRL)"
+        return f"  {symbol} {v.field_name}: {v.pdf_value:,} (PDF) ≠ {v.xbrl_value:,} (XBRL) [diff: {v.difference}]"
+    if v.source == "xbrl_only":
+        return f"  ⚠ {v.field_name}: {v.xbrl_value:,} (XBRL only, used as source)"
+    return f"  ⚠ {v.field_name}: {v.pdf_value:,} (PDF only, no XBRL)"
+
+
+def _format_pdf_xbrl_validations(report: ValidationReport) -> list[str]:
+    """Format PDF-XBRL validations section."""
+    lines = []
     if report.pdf_xbrl_validations:
         lines.append("PDF ↔ XBRL Validations:")
         for v in report.pdf_xbrl_validations:
-            if v.source == "both":
-                symbol = "✓" if v.match else "✗"
-                if v.match:
-                    lines.append(f"  {symbol} {v.field_name}: {v.pdf_value:,} (PDF) = {v.xbrl_value:,} (XBRL)")
-                else:
-                    lines.append(
-                        f"  {symbol} {v.field_name}: {v.pdf_value:,} (PDF) ≠ {v.xbrl_value:,} (XBRL) [diff: {v.difference}]"
-                    )
-            elif v.source == "xbrl_only":
-                lines.append(f"  ⚠ {v.field_name}: {v.xbrl_value:,} (XBRL only, used as source)")
-            else:
-                lines.append(f"  ⚠ {v.field_name}: {v.pdf_value:,} (PDF only, no XBRL)")
+            lines.append(_format_pdf_xbrl_validation_item(v))
     else:
         lines.append("PDF ↔ XBRL Validations: (no XBRL available)")
-    lines.append("")
+    return lines
 
+
+def _format_cross_validations(report: ValidationReport) -> list[str]:
+    """Format cross-validations section."""
+    lines = []
     if report.cross_validations:
         lines.append("Cross-Validations:")
         for v in report.cross_validations:
             lines.append(f"  {v.status}")
     else:
         lines.append("Cross-Validations: (none configured)")
-    lines.append("")
+    return lines
 
+
+def _format_reference_validations(report: ValidationReport) -> list[str]:
+    """Format reference validations section."""
+    lines = []
     if report.reference_issues is None:
         lines.append("Reference Validation: (not run - use --validate-reference to enable)")
     elif len(report.reference_issues) == 0:
@@ -244,9 +250,26 @@ def format_validation_report(report: ValidationReport, verbose: bool = True) -> 
         lines.append("Reference Validation: ✗ MISMATCHES FOUND")
         for issue in report.reference_issues:
             lines.append(f"  • {issue}")
+    return lines
 
+
+def format_validation_report(report: ValidationReport, verbose: bool = True) -> str:
+    """Format validation report for display."""
+    separator = "═" * 60
+    lines = [separator, "                    VALIDATION REPORT", separator, ""]
+
+    lines.extend(_format_sum_validations(report))
     lines.append("")
-    lines.append(separator)
+
+    lines.extend(_format_pdf_xbrl_validations(report))
+    lines.append("")
+
+    lines.extend(_format_cross_validations(report))
+    lines.append("")
+
+    lines.extend(_format_reference_validations(report))
+    lines.extend(["", separator])
+
     return "\n".join(lines)
 
 
@@ -509,47 +532,67 @@ def _evaluate_cross_validation(
         return None, None, True, None
 
 
+def _eval_constant(node: ast.Constant, values: dict[str, int]) -> int | None:
+    """Evaluate a constant node."""
+    return node.value if isinstance(node.value, int) else None
+
+
+def _eval_unary(node: ast.UnaryOp, values: dict[str, int]) -> int | None:
+    """Evaluate a unary operation node."""
+    operand = _eval_ast_node(node.operand, values)
+    if operand is None:
+        return None
+    if isinstance(node.op, ast.USub):
+        return -operand
+    if isinstance(node.op, ast.UAdd):
+        return operand
+    return None
+
+
+def _eval_name(node: ast.Name, values: dict[str, int]) -> int | None:
+    """Evaluate a variable name node."""
+    return values.get(node.id)
+
+
+def _eval_binop(node: ast.BinOp, values: dict[str, int]) -> int | None:
+    """Evaluate a binary operation node."""
+    left = _eval_ast_node(node.left, values)
+    right = _eval_ast_node(node.right, values)
+    if left is None or right is None:
+        return None
+    op_map = {ast.Add: lambda l, r: l + r, ast.Sub: lambda l, r: l - r, ast.Mult: lambda l, r: l * r}
+    op_func = op_map.get(type(node.op))
+    return op_func(left, right) if op_func else None
+
+
+def _eval_call(node: ast.Call, values: dict[str, int]) -> int | None:
+    """Evaluate a function call node (only abs() supported)."""
+    if not (isinstance(node.func, ast.Name) and node.func.id == "abs"):
+        return None
+    if len(node.args) != 1 or node.keywords:
+        return None
+    arg_val = _eval_ast_node(node.args[0], values)
+    return abs(arg_val) if arg_val is not None else None
+
+
+# Dispatch table for AST node evaluation
+_AST_EVALUATORS: dict[type, callable] = {
+    ast.Constant: _eval_constant,
+    ast.UnaryOp: _eval_unary,
+    ast.Name: _eval_name,
+    ast.BinOp: _eval_binop,
+    ast.Call: _eval_call,
+}
+
+
 def _eval_ast_node(node: ast.AST, values: dict[str, int]) -> int | None:
     """Recursively evaluate an AST node to an integer value.
 
     Supports: integer constants, unary +/-, variable names, binary +/-/*,
     and the abs() function call.
     """
-    if isinstance(node, ast.Constant) and isinstance(node.value, int):
-        return node.value
-
-    if isinstance(node, ast.UnaryOp):
-        if isinstance(node.op, ast.USub):
-            operand = _eval_ast_node(node.operand, values)
-            return -operand if operand is not None else None
-        elif isinstance(node.op, ast.UAdd):
-            return _eval_ast_node(node.operand, values)
-        return None
-
-    if isinstance(node, ast.Name):
-        return values.get(node.id)
-
-    if isinstance(node, ast.BinOp):
-        left = _eval_ast_node(node.left, values)
-        right = _eval_ast_node(node.right, values)
-        if left is None or right is None:
-            return None
-        if isinstance(node.op, ast.Add):
-            return left + right
-        elif isinstance(node.op, ast.Sub):
-            return left - right
-        elif isinstance(node.op, ast.Mult):
-            return left * right
-        return None
-
-    if isinstance(node, ast.Call):
-        if isinstance(node.func, ast.Name) and node.func.id == "abs":
-            if len(node.args) == 1 and not node.keywords:
-                arg_val = _eval_ast_node(node.args[0], values)
-                return abs(arg_val) if arg_val is not None else None
-        return None
-
-    return None
+    evaluator = _AST_EVALUATORS.get(type(node))
+    return evaluator(node, values) if evaluator else None
 
 
 def _safe_eval_expression(expr: str, values: dict[str, int]) -> int | None:
