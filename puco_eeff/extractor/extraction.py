@@ -43,6 +43,7 @@ from puco_eeff.sheets.sheet1 import (
     get_sheet1_section_expected_items,
     get_sheet1_section_field_mappings,
     get_sheet1_section_spec,
+    get_sheet1_section_table_identifiers,
     get_sheet1_xbrl_fact_mapping,
 )
 
