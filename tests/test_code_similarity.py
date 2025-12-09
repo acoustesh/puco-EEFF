@@ -49,6 +49,13 @@ PUCO_EEFF_SUBDIRS = ["extractor", "scraper", "sheets", "transformer", "writer"]
 BASELINES_FILE = Path(__file__).parent / "baselines" / "similarity_baselines.json"
 FUNCTION_HASHES_FILE = Path(__file__).parent / "baselines" / "function_hashes.json"
 EMBEDDINGS_FILE = Path(__file__).parent / "baselines" / "embeddings_cache.json.zlib"
+CODESTRAL_EMBEDDINGS_FILE = (
+    Path(__file__).parent / "baselines" / "codestral_embeddings_cache.json.zlib"
+)
+
+# OpenRouter config
+OPENROUTER_API_URL = "https://openrouter.ai/api/v1/embeddings"
+CODESTRAL_EMBED_MODEL = "mistralai/codestral-embed-2505"
 
 # Refactor index defaults (can be overridden in config)
 DEFAULT_REFACTOR_INDEX_THRESHOLD = 15.0
@@ -110,13 +117,51 @@ def _save_embeddings(embeddings: dict[str, list[float]]) -> None:
     compressed = {h: _compress_embedding(vec) for h, vec in embeddings.items()}
 
     fd, temp_path = tempfile.mkstemp(
-        suffix=".json.zlib", prefix="embeddings_", dir=EMBEDDINGS_FILE.parent
+        suffix=".json.zlib",
+        prefix="embeddings_",
+        dir=EMBEDDINGS_FILE.parent,
     )
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(compressed, f, indent=2, sort_keys=True)
             f.write("\n")
         Path(temp_path).replace(EMBEDDINGS_FILE)
+    except Exception:
+        if Path(temp_path).exists():
+            Path(temp_path).unlink()
+        raise
+
+
+# =============================================================================
+# Codestral Embeddings Storage Management (OpenRouter)
+# =============================================================================
+
+
+def _load_codestral_embeddings() -> dict[str, list[float]]:
+    """Load and decompress Codestral embeddings from the compressed cache file."""
+    if not CODESTRAL_EMBEDDINGS_FILE.exists():
+        return {}
+    with Path(CODESTRAL_EMBEDDINGS_FILE).open(encoding="utf-8") as f:
+        compressed = json.load(f)
+    return {h: _decompress_embedding(b64) for h, b64 in compressed.items()}
+
+
+def _save_codestral_embeddings(embeddings: dict[str, list[float]]) -> None:
+    """Save Codestral embeddings to compressed cache file atomically."""
+    CODESTRAL_EMBEDDINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+    compressed = {h: _compress_embedding(vec) for h, vec in embeddings.items()}
+
+    fd, temp_path = tempfile.mkstemp(
+        suffix=".json.zlib",
+        prefix="codestral_embeddings_",
+        dir=CODESTRAL_EMBEDDINGS_FILE.parent,
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(compressed, f, indent=2, sort_keys=True)
+            f.write("\n")
+        Path(temp_path).replace(CODESTRAL_EMBEDDINGS_FILE)
     except Exception:
         if Path(temp_path).exists():
             Path(temp_path).unlink()
@@ -151,8 +196,9 @@ def load_baselines() -> dict:
         with Path(FUNCTION_HASHES_FILE).open(encoding="utf-8") as f:
             baselines["function_hashes"] = json.load(f)
 
-    # Load embeddings from separate compressed file
+    # Load embeddings from separate compressed files
     baselines["embeddings"] = _load_embeddings()
+    baselines["codestral_embeddings"] = _load_codestral_embeddings()
 
     return baselines
 
@@ -166,6 +212,7 @@ def save_baselines(baselines: dict) -> None:
 
     # Extract embeddings and function_hashes to save separately
     embeddings = baselines.pop("embeddings", {})
+    codestral_embeddings = baselines.pop("codestral_embeddings", {})
     function_hashes = baselines.pop("function_hashes", {})
 
     # Save main baselines (without embeddings and function_hashes)
@@ -182,6 +229,7 @@ def save_baselines(baselines: dict) -> None:
     finally:
         # Restore embeddings and function_hashes to dict (in case caller continues to use it)
         baselines["embeddings"] = embeddings
+        baselines["codestral_embeddings"] = codestral_embeddings
         baselines["function_hashes"] = function_hashes
 
     # Save function_hashes to separate file
@@ -201,9 +249,13 @@ def save_baselines(baselines: dict) -> None:
                 Path(temp_path).unlink()
             raise
 
-    # Save embeddings to compressed file
+    # Save OpenAI embeddings to compressed file
     if embeddings:
         _save_embeddings(embeddings)
+
+    # Save Codestral embeddings to compressed file
+    if codestral_embeddings:
+        _save_codestral_embeddings(codestral_embeddings)
 
 
 # =============================================================================
@@ -212,7 +264,8 @@ def save_baselines(baselines: dict) -> None:
 
 
 def get_function_text(
-    node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef, source: str
+    node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef,
+    source: str,
 ) -> str:
     """Extract the full text of a function or class from source code.
 
@@ -554,7 +607,10 @@ def generate_file_split_proposal(
 
     # Run k-means clustering on PCA-reduced embeddings
     clusters, _ = cluster_functions_kmeans_with_pca(
-        funcs_with_embeddings, pca_model, n_components, n_clusters=2
+        funcs_with_embeddings,
+        pca_model,
+        n_components,
+        n_clusters=2,
     )
 
     if len(clusters) < 2 or not clusters[0] or not clusters[1]:
@@ -601,6 +657,11 @@ def get_cached_embedding(baselines: dict, content_hash: str) -> list[float] | No
     return baselines.get("embeddings", {}).get(content_hash)
 
 
+def get_cached_codestral_embedding(baselines: dict, content_hash: str) -> list[float] | None:
+    """Return cached Codestral embedding vector if hash exists, else None."""
+    return baselines.get("codestral_embeddings", {}).get(content_hash)
+
+
 def get_embeddings_batch(
     texts: list[str],
     model: str = "text-embedding-3-large",
@@ -635,6 +696,87 @@ def get_embeddings_batch(
             else:
                 raise
         except openai.APITimeoutError:
+            if attempt < max_retries - 1:
+                time.sleep(delays[attempt])
+            else:
+                raise
+
+    return []
+
+
+def _load_openrouter_api_key() -> str | None:
+    """Load OpenRouter API key from .env file or environment."""
+    # First check environment
+    api_key = os.environ.get("OPENROUTER_API_KEY")
+    if api_key:
+        return api_key
+
+    # Try loading from .env file
+    env_file = Path(__file__).parent.parent / ".env"
+    if env_file.exists():
+        with env_file.open(encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("OPENROUTER_API_KEY="):
+                    return line.split("=", 1)[1].strip()
+    return None
+
+
+def get_embeddings_batch_codestral(
+    texts: list[str],
+    model: str = CODESTRAL_EMBED_MODEL,
+    max_retries: int = 3,
+    timeout: float = 60.0,
+) -> list[list[float]]:
+    """Get embeddings for a batch of texts using OpenRouter Codestral Embed API.
+
+    Args:
+        texts: List of text strings to embed
+        model: Codestral model name (default: mistralai/codestral-embed-2505)
+        max_retries: Number of retry attempts for rate limits
+        timeout: Timeout per API call in seconds
+
+    Returns:
+        List of embedding vectors
+
+    """
+    import requests
+
+    api_key = _load_openrouter_api_key()
+    if not api_key:
+        msg = "OPENROUTER_API_KEY not found in environment or .env file"
+        raise ValueError(msg)
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    delays = [1.0, 2.0, 4.0]  # Exponential backoff
+
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(
+                OPENROUTER_API_URL,
+                headers=headers,
+                json={"model": model, "input": texts},
+                timeout=timeout,
+            )
+
+            if response.status_code == 429:  # Rate limit
+                if attempt < max_retries - 1:
+                    time.sleep(delays[attempt])
+                    continue
+                response.raise_for_status()
+
+            response.raise_for_status()
+            data = response.json()
+            if "data" not in data:
+                msg = f"Unexpected API response: {data}"
+                raise ValueError(msg)
+            return [item["embedding"] for item in data["data"]]
+
+        except requests.exceptions.Timeout:
             if attempt < max_retries - 1:
                 time.sleep(delays[attempt])
             else:
@@ -987,7 +1129,11 @@ def get_refactor_priority_message_for_complexity() -> str:
 
         # Get refactor priority message
         msg = get_refactor_priority_message(
-            functions, cc_map, cog_map, threshold=threshold, top_n=top_n
+            functions,
+            cc_map,
+            cog_map,
+            threshold=threshold,
+            top_n=top_n,
         )
         return msg or ""
     except Exception:
@@ -1102,7 +1248,7 @@ def _run_similarity_checks(
     all_violations: list[str] = []
     if pair_violations:
         all_violations.append(
-            f"High similarity pairs (>={threshold_pair:.0%}):\n  " + "\n  ".join(pair_violations)
+            f"High similarity pairs (>={threshold_pair:.0%}):\n  " + "\n  ".join(pair_violations),
         )
     if neighbor_violations:
         all_violations.append(
@@ -1180,6 +1326,196 @@ class TestFunctionSimilarity:
         # Extract functions meeting LOC threshold
         functions = extract_function_infos(min_loc=min_loc)
         _run_similarity_checks(
+            baselines=baselines,
+            functions=functions,
+            update_baselines=update_baselines,
+            cached_only=cached_only,
+            threshold_pair=threshold_pair,
+            threshold_neighbor=threshold_neighbor,
+            load_complexity_maps_fn=_load_complexity_maps,
+        )
+
+
+# =============================================================================
+# Codestral Similarity Checks (OpenRouter)
+# =============================================================================
+
+
+def _run_codestral_similarity_checks(
+    *,
+    baselines: dict,
+    functions: list[FunctionInfo],
+    update_baselines: bool,
+    cached_only: bool,
+    threshold_pair: float,
+    threshold_neighbor: float,
+    load_complexity_maps_fn: Callable[[], tuple[dict[str, int], dict[str, int]]],
+) -> None:
+    """Common workflow for Codestral similarity tests across different scopes."""
+    if len(functions) < 2:
+        pytest.skip("Not enough functions to compare")
+
+    uncached_functions: list[FunctionInfo] = []
+    for func in functions:
+        cached = get_cached_codestral_embedding(baselines, func.hash)
+        if cached is not None:
+            func.embedding = cached
+        else:
+            uncached_functions.append(func)
+
+    if cached_only and uncached_functions:
+        uncached_names = [f"{f.file}:{f.name}" for f in uncached_functions]
+        pytest.skip(
+            f"--cached-only mode: {len(uncached_functions)} functions lack "
+            f"cached Codestral embeddings:\n  "
+            + "\n  ".join(uncached_names[:10])
+            + (f"\n  ... and {len(uncached_names) - 10} more" if len(uncached_names) > 10 else ""),
+        )
+
+    if uncached_functions:
+        api_key = _load_openrouter_api_key()
+        if not api_key or api_key.startswith(("your_", "sk-xxx")) or len(api_key) < 20:
+            pytest.skip(
+                "OPENROUTER_API_KEY not set (or invalid) and some functions lack cached "
+                "Codestral embeddings. Set a valid API key or run with --cached-only to skip.",
+            )
+
+        texts = [f.text for f in uncached_functions]
+        try:
+            new_embeddings = get_embeddings_batch_codestral(texts)
+        except Exception as e:
+            error_msg = str(e).lower()
+            if "401" in error_msg or "authentication" in error_msg or "api key" in error_msg:
+                pytest.skip(
+                    f"Invalid OPENROUTER_API_KEY and some functions lack cached Codestral embeddings. "
+                    f"Set a valid API key or run with --cached-only to skip. Error: {e}",
+                )
+            pytest.fail(f"Failed to get Codestral embeddings from OpenRouter: {e}")
+
+        for func, embedding in zip(uncached_functions, new_embeddings, strict=True):
+            func.embedding = embedding
+            baselines.setdefault("codestral_embeddings", {})[func.hash] = embedding
+
+        for func in functions:
+            baselines.setdefault("function_hashes", {})[
+                f"{func.file}:{func.name}:{func.start_line}"
+            ] = func.hash
+
+        save_baselines(baselines)
+
+    if update_baselines:
+        pytest.skip("Updated Codestral embedding baselines")
+
+    pair_violations: list[str] = []
+    neighbor_violations: list[str] = []
+
+    for i, func_a in enumerate(functions):
+        if func_a.embedding is None:
+            continue
+
+        similar_neighbors = []
+
+        for j, func_b in enumerate(functions):
+            if i >= j or func_b.embedding is None:
+                continue
+
+            similarity = compute_cosine_similarity(func_a.embedding, func_b.embedding)
+
+            if similarity >= threshold_pair:
+                pair_violations.append(
+                    f"{func_a.file}:{func_a.start_line} {func_a.name}() vs "
+                    f"{func_b.file}:{func_b.start_line} {func_b.name}() - "
+                    f"similarity: {similarity:.1%}",
+                )
+
+            if similarity >= threshold_neighbor:
+                similar_neighbors.append((func_b.file, func_b.name, func_b.start_line, similarity))
+
+        if len(similar_neighbors) >= 2:
+            neighbor_info = ", ".join(
+                f"{f}:{n}() ({s:.1%})" for f, n, _, s in similar_neighbors[:3]
+            )
+            neighbor_violations.append(
+                f"{func_a.file}:{func_a.start_line} {func_a.name}() has "
+                f"{len(similar_neighbors)} similar functions: {neighbor_info}",
+            )
+
+    all_violations: list[str] = []
+    if pair_violations:
+        all_violations.append(
+            f"High similarity pairs (>={threshold_pair:.0%}):\n  " + "\n  ".join(pair_violations),
+        )
+    if neighbor_violations:
+        all_violations.append(
+            f"Functions with multiple similar neighbors (>={threshold_neighbor:.0%}):\n  "
+            + "\n  ".join(neighbor_violations),
+        )
+
+    if all_violations:
+        error_msg = "\n\n".join(all_violations)
+        cc_map, cog_map = load_complexity_maps_fn()
+        refactor_msg = get_refactor_priority_message(functions, cc_map, cog_map)
+        if refactor_msg:
+            error_msg += refactor_msg
+        pytest.fail(error_msg)
+
+
+@pytest.mark.similarity
+@pytest.mark.codestral
+class TestFunctionSimilarityCodestral:
+    """Tests for detecting near-duplicate functions using Codestral embeddings via OpenRouter."""
+
+    def test_function_similarity_codestral_all_directories(
+        self,
+        update_baselines: bool,
+        cached_only: bool,
+    ) -> None:
+        """Detect near-duplicate functions across ALL puco_eeff directories.
+
+        Uses Mistral Codestral-embed embeddings via OpenRouter with hash-based caching.
+        Fails if:
+        - Any pair has similarity >= threshold_pair (default: 0.97)
+        - Any function has >=2 neighbors with similarity >= threshold_neighbor (0.93)
+        """
+        baselines = load_baselines()
+        config = baselines.get("config", {})
+        min_loc = config.get("min_loc_for_similarity", 1)
+        threshold_pair = config.get("codestral_similarity_threshold_pair", 0.97)
+        threshold_neighbor = config.get("codestral_similarity_threshold_neighbor", 0.93)
+
+        # Extract functions from ALL puco_eeff directories
+        functions = extract_all_function_infos(min_loc=min_loc)
+        _run_codestral_similarity_checks(
+            baselines=baselines,
+            functions=functions,
+            update_baselines=update_baselines,
+            cached_only=cached_only,
+            threshold_pair=threshold_pair,
+            threshold_neighbor=threshold_neighbor,
+            load_complexity_maps_fn=_load_all_complexity_maps,
+        )
+
+    def test_function_similarity_codestral(
+        self,
+        update_baselines: bool,
+        cached_only: bool,
+    ) -> None:
+        """Detect near-duplicate functions in extractor/ only.
+
+        Uses Mistral Codestral-embed embeddings via OpenRouter with hash-based caching.
+        Fails if:
+        - Any pair has similarity >= threshold_pair (default: 0.97)
+        - Any function has >=2 neighbors with similarity >= threshold_neighbor (0.93)
+        """
+        baselines = load_baselines()
+        config = baselines.get("config", {})
+        min_loc = config.get("min_loc_for_similarity", 1)
+        threshold_pair = config.get("codestral_similarity_threshold_pair", 0.97)
+        threshold_neighbor = config.get("codestral_similarity_threshold_neighbor", 0.93)
+
+        # Extract functions meeting LOC threshold
+        functions = extract_function_infos(min_loc=min_loc)
+        _run_codestral_similarity_checks(
             baselines=baselines,
             functions=functions,
             update_baselines=update_baselines,
