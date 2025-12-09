@@ -205,18 +205,21 @@ def _make_total_validator(
     total_field: str,
     name: str,
 ) -> ValidatorFunc:
-    """Factory to create total validation functions without duplicated bodies."""
+    """Factory to create total validation functions.
 
-    def _validator(data: dict[str, Any], config: dict[str, Any] | None = None) -> ValidationResult:
-        """Validate section total via factory-configured helper."""
-        return _validate_section_total(data, item_fields, total_field)
+    Creates a validator that checks if the sum of item_fields equals total_field.
+    Uses closure to capture field configuration without duplicating validation logic.
+    """
+    # Capture configuration in closure - actual validation is delegated to _validate_section_total
+    fields_tuple = tuple(item_fields)  # Immutable for safety
 
-    # Preserve introspection-friendly attributes
-    _validator.__name__ = name
-    _validator.__doc__ = (
-        f"Validate that {total_field} items sum to the reported total using {_validate_section_total.__name__}."
-    )
-    return _validator
+    def validate(data: dict[str, Any], config: dict[str, Any] | None = None) -> ValidationResult:
+        """Validate section total matches sum of line items."""
+        return _validate_section_total(data, list(fields_tuple), total_field)
+
+    validate.__name__ = name
+    validate.__doc__ = f"Check {total_field} equals sum of {len(fields_tuple)} line items."
+    return validate
 
 
 validate_costo_venta_total = _make_total_validator(

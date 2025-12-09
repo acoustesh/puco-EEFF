@@ -62,7 +62,6 @@ __all__ = [
     "extract_xbrl_totals",
     "find_section_page",
     "find_text_page",
-    "format_period_label",
     "format_quarter_label",
     "get_all_field_labels",
     "get_extraction_labels",
@@ -117,10 +116,11 @@ class SectionBreakdown:
 # =============================================================================
 
 
+# Re-export for backward compatibility (prefers sheet1 implementation)
 def get_section_expected_labels(section_name: str, sheet_name: str = "sheet1") -> list[str]:
-    """Get expected PDF labels for a section from config."""
+    """Adapter for get_sheet1_section_expected_items with sheet dispatch. Only sheet1 supported."""
     if sheet_name != "sheet1":
-        msg = f"Sheet '{sheet_name}' not yet implemented."
+        msg = f"Unsupported sheet: {sheet_name}"
         raise ValueError(msg)
     return get_sheet1_section_expected_items(section_name)
 
@@ -207,9 +207,9 @@ def get_extraction_labels(
 
 
 def get_table_identifiers(section_spec: dict[str, Any]) -> tuple[list[str], list[str]]:
-    """Get unique and exclude items for table identification."""
-    identifiers = section_spec.get("table_identifiers", {})
-    return (identifiers.get("unique_items", []), identifiers.get("exclude_items", []))
+    """Extract unique/exclude items from a section_spec dict. Low-level dict accessor."""
+    ids = section_spec.get("table_identifiers") or {}
+    return (ids.get("unique_items") or [], ids.get("exclude_items") or [])
 
 
 # =============================================================================
@@ -323,18 +323,6 @@ def find_section_page(
 # =============================================================================
 
 
-def _get_table_identifiers_for_section(
-    section_name: str,
-    nota_number: int,
-) -> tuple[list[str], list[str]]:
-    """Get unique and exclude items for a section."""
-    effective_section = section_name or (f"nota_{nota_number}" if nota_number else "")
-    if effective_section:
-        section_spec = get_sheet1_section_spec(effective_section)
-        return get_table_identifiers(section_spec)
-    return [], []
-
-
 def _find_best_matching_table(
     tables: list[list[list[str | None]]],
     expected_items: list[str],
@@ -367,7 +355,9 @@ def extract_table_from_page(
     quarter: int | None = None,
 ) -> list[dict[str, Any]]:
     """Extract cost table data from a specific page."""
-    unique_items, exclude_items = _get_table_identifiers_for_section(section_name, nota_number)
+    # Resolve section name and get identifiers
+    effective = section_name or (f"nota_{nota_number}" if nota_number else "")
+    unique_items, exclude_items = get_sheet1_section_table_identifiers(effective) if effective else ([], [])
 
     with pdfplumber.open(pdf_path) as pdf:
         if page_index >= len(pdf.pages):
@@ -619,19 +609,8 @@ def extract_xbrl_totals(xbrl_path: Path) -> dict[str, int | None]:
     return result
 
 
-# =============================================================================
-# Period Formatting
-# =============================================================================
-
-
-def format_period_label(year: int, period: int, period_type: str = "quarterly") -> str:
-    """Format period label as used in Sheet1 headers."""
-    return format_period_display(year, period, period_type)
-
-
-def format_quarter_label(year: int, quarter: int) -> str:
-    """Format quarter label as used in Sheet1 headers (backward compatible)."""
-    return format_period_label(year, quarter, "quarterly")
+# Re-export format_quarter_label from config for backward compatibility
+from puco_eeff.config import format_quarter_label as format_quarter_label  # noqa: E402, F401
 
 
 # =============================================================================

@@ -400,34 +400,25 @@ def _create_both_sources_result(
     )
 
 
-def _create_xbrl_only_result(
+def _create_single_source_result(
     display_name: str,
-    xbrl_value: int,
-    data: Sheet1Data,
-    field_name: str,
-    use_fallback: bool,
+    pdf_value: int | None,
+    xbrl_value: int | None,
+    data: Sheet1Data | None = None,
+    field_name: str | None = None,
+    use_fallback: bool = False,
 ) -> ValidationResult:
-    """Create validation result when only XBRL value exists."""
-    if use_fallback:
+    """Create ValidationResult when only one source (PDF or XBRL) has a value."""
+    is_xbrl_only = xbrl_value is not None and pdf_value is None
+    if is_xbrl_only and use_fallback and data is not None and field_name is not None:
         logger.info(f"Using XBRL value for {display_name}: {xbrl_value:,}")
         data.set_value(field_name, xbrl_value)
     return ValidationResult(
         field_name=display_name,
-        pdf_value=None,
-        xbrl_value=xbrl_value,
+        pdf_value=pdf_value if not is_xbrl_only else None,
+        xbrl_value=xbrl_value if is_xbrl_only else None,
         match=True,
-        source="xbrl_only",
-    )
-
-
-def _create_pdf_only_result(display_name: str, pdf_value: int) -> ValidationResult:
-    """Create validation result when only PDF value exists."""
-    return ValidationResult(
-        field_name=display_name,
-        pdf_value=pdf_value,
-        xbrl_value=None,
-        match=True,
-        source="pdf_only",
+        source="xbrl_only" if is_xbrl_only else "pdf_only",
     )
 
 
@@ -474,13 +465,11 @@ def _resolve_single_pdf_xbrl_validation(
     """Resolve a single PDF-XBRL validation based on available values."""
     if xbrl_value is not None and pdf_value is not None:
         return _create_both_sources_result(display_name, pdf_value, xbrl_value, tolerance)
-    if xbrl_value is not None:
-        return _create_xbrl_only_result(display_name, xbrl_value, data, field_name, use_fallback)
-    if pdf_value is not None:
-        return _create_pdf_only_result(display_name, pdf_value)
+    if xbrl_value is not None or pdf_value is not None:
+        return _create_single_source_result(
+            display_name, pdf_value, xbrl_value, data, field_name, use_fallback
+        )
     return None
-
-    return results
 
 
 def _run_cross_validations(

@@ -55,7 +55,7 @@ def ocr_with_mistral(
         content = _prepare_image_content(image_path)
         source_desc = f"Image: {image_path.name}"
     else:
-        content = _prepare_base64_content(image_base64)  # type: ignore[arg-type]
+        content = _prepare_image_content(image_base64, is_base64=True)  # type: ignore[arg-type]
         source_desc = "Base64 image"
 
     # Default prompt for financial statement extraction
@@ -143,54 +143,49 @@ def _prepare_pdf_content(pdf_path: Path, page_number: int | None) -> dict[str, A
     return content
 
 
-def _prepare_image_content(image_path: Path) -> dict[str, Any]:
+# MIME type mapping for common image formats
+_MIME_TYPES = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+}
+
+
+def _prepare_image_content(
+    image_source: Path | str,
+    *,
+    is_base64: bool = False,
+    default_mime: str = "image/png",
+) -> dict[str, Any]:
     """Prepare image content for Mistral API.
 
     Args:
-        image_path: Path to image file
+        image_source: Either a Path to an image file, or a base64-encoded string
+        is_base64: If True, treat image_source as base64 string; if False, as file path
+        default_mime: Default MIME type when not determinable (default: image/png)
 
     Returns:
-        Content dictionary for API
+        Content dictionary for API with {"type": "image_url", "image_url": {"url": ...}}
 
     """
-    # Determine MIME type
-    suffix = image_path.suffix.lower()
-    mime_types = {
-        ".png": "image/png",
-        ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg",
-        ".gif": "image/gif",
-        ".webp": "image/webp",
-    }
-    mime_type = mime_types.get(suffix, "image/png")
+    if is_base64:
+        # Handle base64 string input
+        base64_str = str(image_source)
+        if base64_str.startswith("data:"):
+            data_url = base64_str
+        else:
+            data_url = f"data:{default_mime};base64,{base64_str}"
+    else:
+        # Handle file path input
+        image_path = Path(image_source)
+        mime_type = _MIME_TYPES.get(image_path.suffix.lower(), default_mime)
+        with image_path.open("rb") as f:
+            encoded = base64.standard_b64encode(f.read()).decode("utf-8")
+        data_url = f"data:{mime_type};base64,{encoded}"
 
-    with image_path.open("rb") as f:
-        image_base64 = base64.standard_b64encode(f.read()).decode("utf-8")
-
-    return {
-        "type": "image_url",
-        "image_url": {"url": f"data:{mime_type};base64,{image_base64}"},
-    }
-
-
-def _prepare_base64_content(image_base64: str) -> dict[str, Any]:
-    """Prepare base64 image content for Mistral API.
-
-    Args:
-        image_base64: Base64-encoded image
-
-    Returns:
-        Content dictionary for API
-
-    """
-    # Assume PNG if no prefix provided
-    if not image_base64.startswith("data:"):
-        image_base64 = f"data:image/png;base64,{image_base64}"
-
-    return {
-        "type": "image_url",
-        "image_url": {"url": image_base64},
-    }
+    return {"type": "image_url", "image_url": {"url": data_url}}
 
 
 def _save_audit_response(result: dict[str, Any], audit_dir: Path, model: str = "mistral") -> None:

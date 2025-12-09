@@ -390,43 +390,18 @@ def get_sheet1_validation_rules() -> dict[str, Any]:
 
 
 def get_sheet1_sum_tolerance() -> int:
-    """Get sum tolerance for validation (allows for rounding differences).
-
-    Returns:
-        Tolerance value (default 1).
-
-    """
-    rules = get_sheet1_validation_rules()
-    return cast("int", rules.get("sum_tolerance", 1))
+    """Get sum tolerance for validation (allows for rounding differences)."""
+    return cast("int", get_sheet1_validation_rules().get("sum_tolerance", 1))
 
 
 def get_sheet1_total_validations() -> list[dict[str, Any]]:
-    """Get total validation rules from xbrl_mappings.json.
-
-    Returns:
-        List of total validation rules, each containing:
-        - total_field: Field name for the total
-        - sum_fields: List of field names to sum
-        - xbrl_fact: XBRL fact name for cross-validation
-        - description: Human-readable description
-
-    """
-    rules = get_sheet1_validation_rules()
-    return cast("list[dict[str, Any]]", rules.get("total_validations", []))
+    """Get total validation rules (sum_fields → total_field checks)."""
+    return cast("list[dict[str, Any]]", get_sheet1_validation_rules().get("total_validations", []))
 
 
 def get_sheet1_cross_validations() -> list[dict[str, Any]]:
-    """Get cross-validation rules from xbrl_mappings.json.
-
-    Returns:
-        List of cross-validation rules, each containing:
-        - description: Human-readable description
-        - formula: Formula string (e.g., "gross_profit == ingresos - cost")
-        - tolerance: Optional per-rule tolerance (defaults to sum_tolerance)
-
-    """
-    rules = get_sheet1_validation_rules()
-    return cast("list[dict[str, Any]]", rules.get("cross_validations", []))
+    """Get cross-validation rules (formula-based checks)."""
+    return cast("list[dict[str, Any]]", get_sheet1_validation_rules().get("cross_validations", []))
 
 
 def get_sheet1_result_key_mapping() -> dict[str, str]:
@@ -645,23 +620,8 @@ class Sheet1Data:
         return result
 
 
-# =============================================================================
-# Period Formatting (Sheet1-specific)
-# =============================================================================
-
-
-def format_quarter_label(year: int, quarter: int) -> str:
-    """Format quarter label as used in Sheet1 headers.
-
-    Args:
-        year: Year (e.g., 2024)
-        quarter: Quarter number (1-4)
-
-    Returns:
-        Formatted string like "IIQ2024"
-
-    """
-    return format_period_display(year, quarter, "quarterly")
+# Re-export format_quarter_label from config for backward compatibility
+from puco_eeff.config import format_quarter_label as format_quarter_label  # noqa: E402, F401
 
 
 # =============================================================================

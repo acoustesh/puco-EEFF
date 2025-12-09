@@ -250,7 +250,8 @@ def extract_sheet1_from_analisis_razonado(
 
     should_validate_xbrl = xbrl_available and validate_with_xbrl and xbrl_path is not None
     if should_validate_xbrl:
-        report = _validate_sheet1_with_xbrl(data, xbrl_path)  # type: ignore[arg-type]
+        xbrl_totals = extract_xbrl_totals(xbrl_path)  # type: ignore[arg-type]
+        report = run_sheet1_validations(data, xbrl_totals)
     else:
         report = _extract_ingresos_fallback(data, ef_path)
 
@@ -266,12 +267,6 @@ def _map_nota_item_to_sheet1(item: LineItem, data: Sheet1Data, section_name: str
         logger.debug(f"Mapped '{item.concepto}' -> {field_name} = {item.ytd_actual}")
     else:
         logger.warning(f"Could not map item from {section_name}: '{item.concepto}'")
-
-
-def _validate_sheet1_with_xbrl(data: Sheet1Data, xbrl_path: Path) -> ValidationReport:
-    """Validate and supplement Sheet1 data with XBRL totals."""
-    xbrl_totals = extract_xbrl_totals(xbrl_path)
-    return run_sheet1_validations(data, xbrl_totals)
 
 
 def extract_sheet1_from_xbrl(
@@ -331,62 +326,43 @@ def _unpack_extraction_result(
     return result, None
 
 
+def _orchestrate_extraction(
+    year: int, quarter: int, prefer_source: str, merge_sources: bool
+) -> tuple[Sheet1Data | None, ValidationReport | None]:
+    """Internal orchestration of multi-source extraction with fallback and optional merge."""
+    extractors = {
+        "pdf": lambda: extract_sheet1_from_analisis_razonado(year, quarter, validate_with_xbrl=True, return_report=True),
+        "xbrl": lambda: extract_sheet1_from_xbrl(year, quarter, return_report=True),
+    }
+    primary, secondary = (prefer_source, "xbrl" if prefer_source == "pdf" else "pdf")
+    data, report = _unpack_extraction_result(extractors[primary]())
+
+    if data is None:
+        logger.info("%s extraction failed, trying %s extraction", primary.upper(), secondary.upper())
+        fallback = (
+            lambda: extract_sheet1_from_xbrl(year, quarter, return_report=True)
+            if secondary == "xbrl"
+            else extract_sheet1_from_analisis_razonado(year, quarter, validate_with_xbrl=False, return_report=True)
+        )
+        return _unpack_extraction_result(fallback())
+
+    if primary == "xbrl" and merge_sources:
+        pdf_data, _ = _unpack_extraction_result(
+            extract_sheet1_from_analisis_razonado(year, quarter, validate_with_xbrl=False, return_report=True)
+        )
+        if pdf_data is not None:
+            data = _merge_pdf_into_xbrl_data(data, pdf_data)
+            report = ValidationReport(sum_validations=_run_sum_validations(data))
+
+    return data, report
+
+
 def extract_sheet1(
-    year: int,
-    quarter: int,
-    prefer_source: str = "pdf",
-    merge_sources: bool = True,
-    return_report: bool = False,
+    year: int, quarter: int, prefer_source: str = "pdf", merge_sources: bool = True, return_report: bool = False
 ) -> Sheet1Data | None | tuple[Sheet1Data | None, ValidationReport | None]:
-    """Extract Sheet1 data from available sources.
-
-    Args:
-        year: Year
-        quarter: Quarter number (1-4)
-        prefer_source: "pdf" or "xbrl" - which source to prefer
-        merge_sources: If True, merge PDF data into XBRL data
-        return_report: If True, return (data, report) tuple
-
-    Returns:
-        Sheet1Data or None, optionally with ValidationReport
-
-    """
-    pdf_data: Sheet1Data | None = None
-    xbrl_data: Sheet1Data | None = None
-    report: ValidationReport | None = None
-
-    if prefer_source == "pdf":
-        result = extract_sheet1_from_analisis_razonado(year, quarter, validate_with_xbrl=True, return_report=True)
-        pdf_data, report = _unpack_extraction_result(result)
-
-        if pdf_data is not None:
-            return (pdf_data, report) if return_report else pdf_data
-
-        logger.info("PDF extraction failed, trying XBRL-only extraction")
-        result = extract_sheet1_from_xbrl(year, quarter, return_report=True)
-        xbrl_data, report = _unpack_extraction_result(result)
-        return (xbrl_data, report) if return_report else xbrl_data
-
-    # prefer_source == "xbrl"
-    result = extract_sheet1_from_xbrl(year, quarter, return_report=True)
-    xbrl_data, report = _unpack_extraction_result(result)
-
-    if xbrl_data is None:
-        logger.info("XBRL extraction failed, trying PDF extraction")
-        result = extract_sheet1_from_analisis_razonado(year, quarter, validate_with_xbrl=False, return_report=True)
-        pdf_data, report = _unpack_extraction_result(result)
-        return (pdf_data, report) if return_report else pdf_data
-
-    if merge_sources:
-        result = extract_sheet1_from_analisis_razonado(year, quarter, validate_with_xbrl=False, return_report=True)
-        pdf_data, _ = _unpack_extraction_result(result)
-
-        if pdf_data is not None:
-            xbrl_data = _merge_pdf_into_xbrl_data(xbrl_data, pdf_data)
-            sum_results = _run_sum_validations(xbrl_data)
-            report = ValidationReport(sum_validations=sum_results)
-
-    return (xbrl_data, report) if return_report else xbrl_data
+    """High-level API: extract Sheet1 data from available sources with optional merge and fallback."""
+    result = _orchestrate_extraction(year, quarter, prefer_source, merge_sources)
+    return result if return_report else result[0]
 
 
 def _merge_pdf_into_xbrl_data(xbrl_data: Sheet1Data, pdf_data: Sheet1Data) -> Sheet1Data:

@@ -227,17 +227,6 @@ def _build_value_columns(row: list[str | None]) -> list[list[str]]:
     return value_columns
 
 
-def _parse_multiline_cell(
-    concept_cell: str,
-    row: list[str | None],
-    expected_items: list[str],
-) -> list[dict[str, Any]]:
-    """Parse a multi-line concept cell."""
-    concepts = concept_cell.split("\n")
-    value_columns = _build_value_columns(row)
-    return parse_multiline_row(concepts, value_columns, expected_items)
-
-
 def parse_cost_table(table: list[list[str | None]], expected_items: list[str]) -> list[dict[str, Any]]:
     """Parse a cost breakdown table."""
     parsed_rows = []
@@ -251,7 +240,10 @@ def parse_cost_table(table: list[list[str | None]], expected_items: list[str]) -
             continue
 
         if "\n" in concept_cell:
-            parsed_rows.extend(_parse_multiline_cell(concept_cell, row, expected_items))
+            # Multi-line concept cell: split and parse each concept
+            concepts = concept_cell.split("\n")
+            value_columns = _build_value_columns(row)
+            parsed_rows.extend(parse_multiline_row(concepts, value_columns, expected_items))
         else:
             result = parse_single_row(concept_cell, row, expected_items)
             if result:

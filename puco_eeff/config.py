@@ -332,6 +332,11 @@ def format_period_display(
     return f"{period}_{year}"
 
 
+def format_quarter_label(year: int, quarter: int) -> str:
+    """Format quarter label for display (e.g., "IIQ2024"). Shorthand for format_period_display."""
+    return format_period_display(year, quarter, "quarterly")
+
+
 def parse_period_key(period_key: str) -> tuple[int, int, str]:
     """Parse a period key into its components.
 
