@@ -52,6 +52,7 @@ PUCO_EEFF_SUBDIRS = ["extractor", "scraper", "sheets", "transformer", "writer"]
 
 # Baseline files
 BASELINES_FILE = Path(__file__).parent / "baselines" / "extractor_metrics.json"
+FUNCTION_HASHES_FILE = Path(__file__).parent / "baselines" / "function_hashes.json"
 EMBEDDINGS_FILE = Path(__file__).parent / "baselines" / "embeddings_cache.json.zlib"
 
 # Refactor index defaults (can be overridden in config)
@@ -143,6 +144,11 @@ def load_baselines() -> dict:
         with Path(BASELINES_FILE).open(encoding="utf-8") as f:
             baselines.update(json.load(f))
 
+    # Load function_hashes from separate file
+    if FUNCTION_HASHES_FILE.exists():
+        with Path(FUNCTION_HASHES_FILE).open(encoding="utf-8") as f:
+            baselines["function_hashes"] = json.load(f)
+
     # Load embeddings from separate compressed file
     baselines["embeddings"] = _load_embeddings()
 
@@ -152,14 +158,15 @@ def load_baselines() -> dict:
 def save_baselines(baselines: dict) -> None:
     """Save baselines atomically (write to temp, then rename).
 
-    Embeddings are saved separately to a compressed file.
+    Embeddings and function_hashes are saved separately to their own files.
     """
     BASELINES_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-    # Extract embeddings to save separately
+    # Extract embeddings and function_hashes to save separately
     embeddings = baselines.pop("embeddings", {})
+    function_hashes = baselines.pop("function_hashes", {})
 
-    # Save main baselines (without embeddings)
+    # Save main baselines (without embeddings and function_hashes)
     fd, temp_path = tempfile.mkstemp(suffix=".json", prefix="baselines_", dir=BASELINES_FILE.parent)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
@@ -171,8 +178,22 @@ def save_baselines(baselines: dict) -> None:
             Path(temp_path).unlink()
         raise
     finally:
-        # Restore embeddings to dict (in case caller continues to use it)
+        # Restore embeddings and function_hashes to dict (in case caller continues to use it)
         baselines["embeddings"] = embeddings
+        baselines["function_hashes"] = function_hashes
+
+    # Save function_hashes to separate file
+    if function_hashes:
+        fd, temp_path = tempfile.mkstemp(suffix=".json", prefix="function_hashes_", dir=FUNCTION_HASHES_FILE.parent)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(function_hashes, f, indent=2, sort_keys=True)
+                f.write("\n")
+            Path(temp_path).replace(FUNCTION_HASHES_FILE)
+        except Exception:
+            if Path(temp_path).exists():
+                Path(temp_path).unlink()
+            raise
 
     # Save embeddings to compressed file
     if embeddings:
