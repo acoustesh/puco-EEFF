@@ -388,7 +388,7 @@ def _create_both_sources_result(
         logger.info(f"✓ {display_name} matches XBRL: {pdf_value:,}")
     else:
         logger.warning(
-            f"✗ {display_name} mismatch - PDF: {pdf_value:,}, XBRL: {xbrl_value:,} (diff: {diff})"
+            f"✗ {display_name} mismatch - PDF: {pdf_value:,}, XBRL: {xbrl_value:,} (diff: {diff})",
         )
     return ValidationResult(
         field_name=display_name,
@@ -535,6 +535,39 @@ def _run_cross_validations(
     return results
 
 
+def _extract_formula_variables(formula: str) -> set[str]:
+    """Extract variable names from a formula, excluding keywords."""
+    var_pattern = re.compile(r"\b([a-z_]+)\b")
+    var_names = set(var_pattern.findall(formula))
+    keywords = {"abs", "and", "or", "not", "if", "else", "true", "false"}
+    return var_names - keywords
+
+
+def _lookup_xbrl_value(
+    var: str,
+    xbrl_totals: Mapping[str, int | None],
+    xbrl_key_map: dict[str, str],
+) -> int | None:
+    """Look up a variable value from XBRL totals using key mapping."""
+    for xbrl_key, mapped_name in xbrl_key_map.items():
+        if var in {mapped_name, xbrl_key}:
+            return xbrl_totals.get(xbrl_key)
+    return xbrl_totals.get(var)
+
+
+def _resolve_single_variable(
+    var: str,
+    data: Sheet1Data,
+    xbrl_totals: Mapping[str, int | None] | None,
+    xbrl_key_map: dict[str, str],
+) -> int | None:
+    """Resolve a single variable from data or XBRL totals."""
+    value = data.get_value(var)
+    if value is None and xbrl_totals:
+        value = _lookup_xbrl_value(var, xbrl_totals, xbrl_key_map)
+    return value
+
+
 def _resolve_cross_validation_values(
     data: Sheet1Data,
     xbrl_totals: Mapping[str, int | None] | None,
@@ -543,26 +576,12 @@ def _resolve_cross_validation_values(
     """Resolve values needed for a cross-validation formula."""
     field_to_result = get_sheet1_result_key_mapping()
     xbrl_key_map = {v: k for k, v in field_to_result.items()}
-
-    var_pattern = re.compile(r"\b([a-z_]+)\b")
-    var_names = set(var_pattern.findall(formula))
-    keywords = {"abs", "and", "or", "not", "if", "else", "true", "false"}
-    var_names -= keywords
+    var_names = _extract_formula_variables(formula)
 
     values = {}
     missing = []
-
     for var in var_names:
-        value = data.get_value(var)
-
-        if value is None and xbrl_totals:
-            for xbrl_key, mapped_name in xbrl_key_map.items():
-                if var in {mapped_name, xbrl_key}:
-                    value = xbrl_totals.get(xbrl_key)
-                    break
-            if value is None:
-                value = xbrl_totals.get(var)
-
+        value = _resolve_single_variable(var, data, xbrl_totals, xbrl_key_map)
         if value is not None:
             values[var] = value
         else:
@@ -609,32 +628,32 @@ def _eval_constant(node: ast.Constant, values: dict[str, int]) -> int | None:
     return node.value if isinstance(node.value, int) else None
 
 
-def _eval_numeric_op(node: ast.UnaryOp | ast.BinOp, values: dict[str, int]) -> int | None:
-    """Evaluate unary or binary arithmetic nodes in a single helper."""
+def _eval_arithmetic_op(node: ast.UnaryOp | ast.BinOp, values: dict[str, int]) -> int | None:
+    """Evaluate unary or binary arithmetic nodes using dispatch tables.
+
+    Unary: +x, -x
+    Binary: x+y, x-y, x*y
+    """
     if isinstance(node, ast.UnaryOp):
         operand = _eval_ast_node(node.operand, values)
         if operand is None:
             return None
-        if isinstance(node.op, ast.USub):
-            return -operand
-        if isinstance(node.op, ast.UAdd):
-            return operand
-        return None
+        unary_ops = {ast.USub: lambda x: -x, ast.UAdd: lambda x: x}
+        op_func = unary_ops.get(type(node.op))
+        return op_func(operand) if op_func else None
 
-    if isinstance(node, ast.BinOp):
-        left = _eval_ast_node(node.left, values)
-        right = _eval_ast_node(node.right, values)
-        if left is None or right is None:
-            return None
-        if isinstance(node.op, ast.Add):
-            return left + right
-        if isinstance(node.op, ast.Sub):
-            return left - right
-        if isinstance(node.op, ast.Mult):
-            return left * right
+    # BinOp case
+    left = _eval_ast_node(node.left, values)
+    right = _eval_ast_node(node.right, values)
+    if left is None or right is None:
         return None
-
-    return None
+    binary_ops = {
+        ast.Add: lambda a, b: a + b,
+        ast.Sub: lambda a, b: a - b,
+        ast.Mult: lambda a, b: a * b,
+    }
+    op_func = binary_ops.get(type(node.op))
+    return op_func(left, right) if op_func else None
 
 
 def _eval_name(node: ast.Name, values: dict[str, int]) -> int | None:
@@ -655,8 +674,8 @@ def _eval_call(node: ast.Call, values: dict[str, int]) -> int | None:
 # Dispatch table for AST node evaluation
 _AST_EVALUATORS: dict[type, callable] = {
     ast.Constant: _eval_constant,
-    ast.UnaryOp: _eval_numeric_op,
-    ast.BinOp: _eval_numeric_op,
+    ast.UnaryOp: _eval_arithmetic_op,
+    ast.BinOp: _eval_arithmetic_op,
     ast.Name: _eval_name,
     ast.Call: _eval_call,
 }

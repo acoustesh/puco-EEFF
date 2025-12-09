@@ -3,14 +3,24 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from playwright.sync_api import Browser, BrowserContext, Page, sync_playwright
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import Callable, Generator
 
     from playwright.sync_api import Playwright
+
+
+@dataclass
+class PeriodExtractor:
+    """Configuration for extracting periods from a web page."""
+
+    url: str
+    page_extractor: Callable[[Page], list[dict]]
+    source_name: str = ""
 
 
 def create_browser(playwright: Playwright, headless: bool = True) -> Browser:
@@ -99,3 +109,22 @@ def wait_for_download(page: Page, trigger_action: Any, download_path: str) -> st
     download.save_as(download_path)
 
     return download_path
+
+
+def list_periods_from_page(
+    extractor: PeriodExtractor,
+    headless: bool = True,
+) -> list[dict]:
+    """Generic period listing using a configured extractor.
+
+    Args:
+        extractor: Configuration for how to extract periods from page
+        headless: Run browser in headless mode
+
+    Returns:
+        List of period dicts extracted from the page
+
+    """
+    with browser_session(headless=headless) as (_browser, _context, page):
+        page.goto(extractor.url, wait_until="networkidle", timeout=60000)
+        return extractor.page_extractor(page)

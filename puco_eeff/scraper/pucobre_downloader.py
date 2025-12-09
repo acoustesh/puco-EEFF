@@ -21,7 +21,7 @@ from playwright.sync_api import Locator, Page, Response
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
 from puco_eeff.config import get_config, get_period_paths, setup_logging
-from puco_eeff.scraper.browser import browser_session
+from puco_eeff.scraper.browser import PeriodExtractor, browser_session, list_periods_from_page
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -367,7 +367,10 @@ def download_from_pucobre(
 
 
 def _find_period_link(
-    page: Page, year: int, quarter: int, quarter_to_date: dict[int, str]
+    page: Page,
+    year: int,
+    quarter: int,
+    quarter_to_date: dict[int, str],
 ) -> Locator | None:
     """Find the download link for a specific period using various patterns.
 
@@ -403,52 +406,59 @@ def _find_period_link(
     return None
 
 
+def _extract_pucobre_periods_from_page(page: Page) -> list[dict]:
+    """Extract available periods from Pucobre page links."""
+    time.sleep(2)  # Allow page to settle
+
+    periods: list[dict] = []
+    links = page.locator("a:has-text('Estados Financieros')")
+    count = links.count()
+
+    for i in range(count):
+        link_text = links.nth(i).inner_text()
+        match = re.search(r"(\d{2})-(\d{2})-(\d{4})", link_text)
+        if not match:
+            continue
+
+        _day, month, year = match.groups()
+        month_to_quarter = {"03": 1, "06": 2, "09": 3, "12": 4}
+        quarter = month_to_quarter.get(month)
+        if quarter:
+            periods.append(
+                {
+                    "year": int(year),
+                    "quarter": quarter,
+                    "link_text": link_text,
+                    "source": "pucobre.cl",
+                },
+            )
+
+    return periods
+
+
 def list_pucobre_periods(headless: bool = True, config: dict | None = None) -> list[dict]:
     """List all available periods from Pucobre.cl.
+
+    Wraps the generic period extraction with Pucobre-specific configuration
+    and logging of the found periods.
 
     Args:
         headless: Run browser in headless mode
         config: Configuration dict, or None to load from file
 
     Returns:
-        List of available periods with year, quarter, and link text
+        List of available periods with year, quarter, link_text, and source
 
     """
     pucobre_url, _ = _get_pucobre_config(config)
-    periods: list[dict] = []
-
-    with browser_session(headless=headless) as (_browser, _context, page):
-        page.goto(pucobre_url, wait_until="networkidle", timeout=60000)
-        time.sleep(2)
-
-        # Find all "Estados Financieros" links
-        links = page.locator("a:has-text('Estados Financieros')")
-        count = links.count()
-
-        for i in range(count):
-            link_text = links.nth(i).inner_text()
-
-            # Parse date from link text: "Estados Financieros DD-MM-YYYY"
-            match = re.search(r"(\d{2})-(\d{2})-(\d{4})", link_text)
-            if match:
-                _day, month, year = match.groups()
-
-                # Map end-month to quarter
-                month_to_quarter = {"03": 1, "06": 2, "09": 3, "12": 4}
-                quarter = month_to_quarter.get(month)
-
-                if quarter:
-                    periods.append(
-                        {
-                            "year": int(year),
-                            "quarter": quarter,
-                            "link_text": link_text,
-                            "source": "pucobre.cl",
-                        },
-                    )
-
-    logger.info(f"Found {len(periods)} periods on Pucobre.cl")
-    return periods
+    extractor = PeriodExtractor(
+        url=pucobre_url,
+        page_extractor=_extract_pucobre_periods_from_page,
+        source_name="pucobre.cl",
+    )
+    found_periods = list_periods_from_page(extractor, headless=headless)
+    logger.info("Found %d periods on Pucobre.cl", len(found_periods))
+    return found_periods
 
 
 def check_pucobre_availability(

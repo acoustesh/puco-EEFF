@@ -141,6 +141,31 @@ def get_all_field_labels(sheet_name: str = "sheet1") -> dict[str, str]:
     return field_labels
 
 
+def _extract_labels_for_section(
+    section_name: str,
+    section_index: int,
+    section1_items: list[str],
+    section2_items: list[str],
+    field_labels: dict[str, str],
+) -> None:
+    """Extract labels from a section and populate items/labels dicts."""
+    section_spec = get_sheet1_section_spec(section_name)
+    field_mappings = section_spec.get("field_mappings", {})
+
+    for field_name, field_spec in field_mappings.items():
+        labels = field_spec.get("pdf_labels", [])
+        if not labels:
+            continue
+        field_labels[field_name] = labels[0]
+        # Exclude totals from items lists
+        if field_name.startswith("total_"):
+            continue
+        if section_index == 0:
+            section1_items.append(labels[0])
+        elif section_index == 1:
+            section2_items.append(labels[0])
+
+
 def get_extraction_labels(
     config: dict | None = None,
 ) -> tuple[list[str], list[str], dict[str, str]]:
@@ -160,33 +185,23 @@ def get_extraction_labels(
         ValueError: If config loading fails
 
     """
-    # Get all extraction sections from config
     sections = get_sheet1_extraction_sections()
     if len(sections) < 2:
         msg = f"Expected at least 2 extraction sections in config, got {len(sections)}"
         raise ValueError(msg)
 
-    # Build items lists for the first two cost sections
     section1_items: list[str] = []
     section2_items: list[str] = []
     field_labels: dict[str, str] = {}
 
     for i, section_name in enumerate(sections):
-        section_spec = get_sheet1_section_spec(section_name)
-        field_mappings = section_spec.get("field_mappings", {})
-
-        for field_name, field_spec in field_mappings.items():
-            labels = field_spec.get("pdf_labels", [])
-            if labels:
-                # Build field_labels for all sections
-                field_labels[field_name] = labels[0]
-
-                # Build items lists (excluding totals) for first two cost sections
-                if not field_name.startswith("total_"):
-                    if i == 0:
-                        section1_items.append(labels[0])
-                    elif i == 1:
-                        section2_items.append(labels[0])
+        _extract_labels_for_section(
+            section_name,
+            i,
+            section1_items,
+            section2_items,
+            field_labels,
+        )
 
     return section1_items, section2_items, field_labels
 
@@ -250,7 +265,9 @@ def find_text_page(
     with pdfplumber.open(pdf_path) as pdf:
         for page_idx, page in enumerate(pdf.pages):
             page_text = (page.extract_text() or "").lower()
-            if _page_matches_criteria(page_text, required_normalized, optional_normalized, min_required, min_optional):
+            if _page_matches_criteria(
+                page_text, required_normalized, optional_normalized, min_required, min_optional
+            ):
                 logger.debug(f"Found text match on page {page_idx + 1}")
                 return page_idx
 
@@ -307,7 +324,8 @@ def find_section_page(
 
 
 def _get_table_identifiers_for_section(
-    section_name: str, nota_number: int
+    section_name: str,
+    nota_number: int,
 ) -> tuple[list[str], list[str]]:
     """Get unique and exclude items for a section."""
     effective_section = section_name or (f"nota_{nota_number}" if nota_number else "")
@@ -374,7 +392,10 @@ def extract_table_from_page(
 
 
 def _find_section_page_with_fallback(
-    pdf_path: Path, section_name: str, year: int | None, quarter: int | None,
+    pdf_path: Path,
+    section_name: str,
+    year: int | None,
+    quarter: int | None,
 ) -> int | None:
     """Find section page, trying fallback section if primary not found."""
     page_idx = find_section_page(pdf_path, section_name, year, quarter)
@@ -397,12 +418,46 @@ def _extract_table_with_next_page_fallback(
 ) -> list[dict[str, Any]]:
     """Extract table from page, trying next page if empty."""
     rows = extract_table_from_page(
-        pdf_path, page_idx, expected_items, section_name=section_name, year=year, quarter=quarter,
+        pdf_path,
+        page_idx,
+        expected_items,
+        section_name=section_name,
+        year=year,
+        quarter=quarter,
     )
     if rows:
         return rows
     return extract_table_from_page(
-        pdf_path, page_idx + 1, expected_items, section_name=section_name, year=year, quarter=quarter,
+        pdf_path,
+        page_idx + 1,
+        expected_items,
+        section_name=section_name,
+        year=year,
+        quarter=quarter,
+    )
+
+
+def _safe_get_value(values: list, index: int) -> int | None:
+    """Safely get value at index or None if out of bounds."""
+    return values[index] if len(values) > index else None
+
+
+def _set_breakdown_totals(breakdown: SectionBreakdown, values: list) -> None:
+    """Set total values on breakdown from extracted values list."""
+    breakdown.total_ytd_actual = _safe_get_value(values, 0)
+    breakdown.total_ytd_anterior = _safe_get_value(values, 1)
+    breakdown.total_quarter_actual = _safe_get_value(values, 2)
+    breakdown.total_quarter_anterior = _safe_get_value(values, 3)
+
+
+def _create_line_item(concepto: str, values: list) -> LineItem:
+    """Create a LineItem from concept and values list."""
+    return LineItem(
+        concepto=concepto,
+        ytd_actual=_safe_get_value(values, 0),
+        ytd_anterior=_safe_get_value(values, 1),
+        quarter_actual=_safe_get_value(values, 2),
+        quarter_anterior=_safe_get_value(values, 3),
     )
 
 
@@ -413,19 +468,9 @@ def _populate_breakdown_from_rows(breakdown: SectionBreakdown, rows: list[dict[s
         values = row.get("values", [])
 
         if concepto.lower() in {"totales", "total"}:
-            breakdown.total_ytd_actual = values[0] if len(values) > 0 else None
-            breakdown.total_ytd_anterior = values[1] if len(values) > 1 else None
-            breakdown.total_quarter_actual = values[2] if len(values) > 2 else None
-            breakdown.total_quarter_anterior = values[3] if len(values) > 3 else None
+            _set_breakdown_totals(breakdown, values)
         else:
-            item = LineItem(
-                concepto=concepto,
-                ytd_actual=values[0] if len(values) > 0 else None,
-                ytd_anterior=values[1] if len(values) > 1 else None,
-                quarter_actual=values[2] if len(values) > 2 else None,
-                quarter_anterior=values[3] if len(values) > 3 else None,
-            )
-            breakdown.items.append(item)
+            breakdown.items.append(_create_line_item(concepto, values))
 
 
 def extract_pdf_section(
@@ -445,7 +490,9 @@ def extract_pdf_section(
         logger.error("Could not find section '%s' in PDF", section_name)
         return None
 
-    rows = _extract_table_with_next_page_fallback(pdf_path, page_idx, expected_items, section_name, year, quarter)
+    rows = _extract_table_with_next_page_fallback(
+        pdf_path, page_idx, expected_items, section_name, year, quarter
+    )
     if not rows:
         logger.error("Could not extract table for section '%s'", section_name)
         return None
@@ -461,8 +508,8 @@ def extract_pdf_section(
     return breakdown
 
 
-def extract_ingresos_from_pdf(pdf_path: Path) -> int | None:
-    """Extract Ingresos de actividades ordinarias from Estado de Resultados page."""
+def _get_ingresos_config() -> tuple[list[str], int]:
+    """Get ingresos match keywords and minimum threshold from config."""
     ingresos_spec = get_sheet1_section_spec("ingresos")
     field_mappings = ingresos_spec.get("field_mappings", {})
     ingresos_mapping = field_mappings.get("ingresos_ordinarios", {})
@@ -470,9 +517,29 @@ def extract_ingresos_from_pdf(pdf_path: Path) -> int | None:
     if not match_keywords:
         msg = "ingresos.field_mappings.ingresos_ordinarios.match_keywords missing from config."
         raise KeyError(msg)
-
     pdf_config = get_ingresos_pdf_fallback_config()
-    min_threshold = pdf_config["min_value_threshold"]
+    return match_keywords, pdf_config["min_value_threshold"]
+
+
+def _search_tables_for_ingresos(
+    tables: list,
+    match_keywords: list[str],
+    min_threshold: int,
+) -> int | None:
+    """Search tables for ingresos value matching keywords."""
+    for table in tables:
+        for row in table:
+            if not row or len(row) < 2:
+                continue
+            value = extract_value_from_row(row, match_keywords, min_threshold)
+            if value is not None:
+                return value
+    return None
+
+
+def extract_ingresos_from_pdf(pdf_path: Path) -> int | None:
+    """Extract Ingresos de actividades ordinarias from Estado de Resultados page."""
+    match_keywords, min_threshold = _get_ingresos_config()
 
     page_idx = find_section_page(pdf_path, "ingresos")
     if page_idx is None:
@@ -481,16 +548,11 @@ def extract_ingresos_from_pdf(pdf_path: Path) -> int | None:
 
     with pdfplumber.open(pdf_path) as pdf:
         page = pdf.pages[page_idx]
-        tables = page.extract_tables()
+        value = _search_tables_for_ingresos(page.extract_tables(), match_keywords, min_threshold)
 
-        for table in tables:
-            for row in table:
-                if not row or len(row) < 2:
-                    continue
-                value = extract_value_from_row(row, match_keywords, min_threshold)
-                if value is not None:
-                    logger.info(f"Extracted Ingresos from PDF page {page_idx + 1}: {value:,}")
-                    return value
+    if value is not None:
+        logger.info(f"Extracted Ingresos from PDF page {page_idx + 1}: {value:,}")
+        return value
 
     logger.warning("Could not extract Ingresos from Estado de Resultados page")
     return None

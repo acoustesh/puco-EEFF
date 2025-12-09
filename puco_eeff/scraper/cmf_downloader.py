@@ -22,7 +22,7 @@ from playwright.sync_api import Download, Page
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
 from puco_eeff.config import get_config, get_period_paths, setup_logging
-from puco_eeff.scraper.browser import browser_session
+from puco_eeff.scraper.browser import PeriodExtractor, browser_session, list_periods_from_page
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -588,59 +588,55 @@ def _extract_xbrl_zip(
         return None
 
 
+def _extract_cmf_periods_from_page(page: Page) -> list[dict]:
+    """Extract available periods from CMF page selectors."""
+    config = get_config()
+    month_to_quarter = config["sources"]["cmf_chile"]["filters"]["month_to_quarter"]
+    periods: list[dict] = []
+
+    year_select = page.query_selector("select[name='aa']")
+    month_select = page.query_selector("select[name='mm']")
+
+    if not year_select or not month_select:
+        return periods
+
+    years = [
+        opt.get_attribute("value")
+        for opt in year_select.query_selector_all("option")
+        if opt.get_attribute("value")
+    ]
+    months = [
+        opt.get_attribute("value")
+        for opt in month_select.query_selector_all("option")
+        if opt.get_attribute("value")
+    ]
+
+    for year in years:
+        for month in months:
+            quarter = month_to_quarter.get(month) if year and month else None
+            if quarter:
+                periods.append({"year": int(year), "month": month, "quarter": quarter})
+
+    return periods
+
+
 def list_available_periods(headless: bool = True) -> list[dict]:
     """List all available periods from the CMF Chile page.
 
-    Useful for discovering what periods are available for download.
+    Discovers what periods are available for download by extracting
+    year/month combinations from the CMF filter dropdown selectors.
 
     Args:
         headless: Run browser in headless mode
 
     Returns:
-        List of available periods with year, month, and quarter
+        List of available periods with year, month, and quarter keys
 
     """
-    config = get_config()
-    cmf_config = config["sources"]["cmf_chile"]
-    base_url = cmf_config["base_url"]
-    month_to_quarter = cmf_config["filters"]["month_to_quarter"]
-
-    periods: list[dict] = []
-
-    with browser_session(headless=headless) as (_browser, _context, page):
-        page.goto(base_url, wait_until="networkidle", timeout=60000)
-
-        # Get available years
-        year_select = page.query_selector("select[name='aa']")
-        if year_select:
-            year_options = year_select.query_selector_all("option")
-            years = [
-                opt.get_attribute("value") for opt in year_options if opt.get_attribute("value")
-            ]
-            logger.debug("Available years: %s", years)
-
-            # Get available months
-            month_select = page.query_selector("select[name='mm']")
-            if month_select:
-                month_options = month_select.query_selector_all("option")
-                months = [
-                    opt.get_attribute("value")
-                    for opt in month_options
-                    if opt.get_attribute("value")
-                ]
-                logger.debug("Available months: %s", months)
-
-                for year in years:
-                    for month in months:
-                        if year and month:
-                            quarter = month_to_quarter.get(month)
-                            if quarter:
-                                periods.append(
-                                    {
-                                        "year": int(year),
-                                        "month": month,
-                                        "quarter": quarter,
-                                    },
-                                )
-
-    return periods
+    cmf_config = get_config()["sources"]["cmf_chile"]
+    extractor = PeriodExtractor(
+        url=cmf_config["base_url"],
+        page_extractor=_extract_cmf_periods_from_page,
+        source_name="cmf_chile",
+    )
+    return list_periods_from_page(extractor, headless=headless)
