@@ -14,7 +14,7 @@ import json
 import logging
 import os
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -100,7 +100,7 @@ def setup_logging(name: str = "puco_eeff") -> logging.Logger:
         logger.addHandler(console_handler)
 
         # File handler
-        log_filename = f"{datetime.now().strftime('%Y-%m-%d')}_run.log"
+        log_filename = f"{datetime.now(UTC).strftime('%Y-%m-%d')}_run.log"
         file_handler = logging.FileHandler(LOGS_DIR / log_filename)
         file_handler.setLevel(logging.DEBUG)
         file_format = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")

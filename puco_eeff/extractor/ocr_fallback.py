@@ -241,7 +241,7 @@ def _encode_image(image_path: Path) -> str:
     }
     mime_type = mime_types.get(suffix, "image/png")
 
-    with open(image_path, "rb") as f:
+    with image_path.open("rb") as f:
         image_base64 = base64.standard_b64encode(f.read()).decode("utf-8")
 
     return f"data:{mime_type};base64,{image_base64}"

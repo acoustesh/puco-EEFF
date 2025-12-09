@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from puco_eeff.config import AUDIT_DIR, setup_logging
@@ -24,7 +24,7 @@ class SourceInfo:
     location: str  # XPath for XML, page/section for PDF
     extraction_method: str  # "direct", "pdfplumber", "mistral_ocr", etc.
     confidence: float = 1.0  # Confidence score (1.0 for direct extraction)
-    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     raw_value: str | None = None
 
 
@@ -98,7 +98,7 @@ class SourceTracker:
         """
         return {
             "period": self.period,
-            "generated_at": datetime.now().isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
             "mappings": {
                 field: [
                     {
@@ -130,7 +130,7 @@ class SourceTracker:
         save_dir.mkdir(parents=True, exist_ok=True)
         filepath = save_dir / "source_mapping.json"
 
-        with open(filepath, "w", encoding="utf-8") as f:
+        with filepath.open("w", encoding="utf-8") as f:
             json.dump(self.to_dict(), f, indent=2, ensure_ascii=False)
 
         logger.info("Saved source mapping to: %s", filepath)
@@ -147,7 +147,7 @@ class SourceTracker:
             SourceTracker instance
 
         """
-        with open(filepath, encoding="utf-8") as f:
+        with filepath.open(encoding="utf-8") as f:
             data = json.load(f)
 
         tracker = cls(period=data["period"])
@@ -205,6 +205,6 @@ def create_source_mapping(
             "method": extraction_method,
             "confidence": confidence,
             "raw_value": raw_value,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         },
     }

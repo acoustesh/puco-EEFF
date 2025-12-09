@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import json
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from puco_eeff.config import AUDIT_DIR, get_mistral_client, setup_logging
@@ -127,7 +128,7 @@ def _prepare_pdf_content(pdf_path: Path, page_number: int | None) -> dict[str, A
         Content dictionary for API
 
     """
-    with open(pdf_path, "rb") as f:
+    with pdf_path.open("rb") as f:
         pdf_base64 = base64.standard_b64encode(f.read()).decode("utf-8")
 
     content: dict[str, Any] = {
@@ -163,7 +164,7 @@ def _prepare_image_content(image_path: Path) -> dict[str, Any]:
     }
     mime_type = mime_types.get(suffix, "image/png")
 
-    with open(image_path, "rb") as f:
+    with image_path.open("rb") as f:
         image_base64 = base64.standard_b64encode(f.read()).decode("utf-8")
 
     return {
@@ -201,17 +202,15 @@ def _save_audit_response(result: dict[str, Any], audit_dir: Path, model: str = "
         model: Model name for filename (default: "mistral")
 
     """
-    from datetime import datetime
-
     audit_dir.mkdir(parents=True, exist_ok=True)
 
     # Create a safe filename from model name
     model_safe = model.replace("/", "_").replace(".", "_")
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     filename = f"ocr_{model_safe}_{timestamp}.json"
     filepath = audit_dir / filename
 
-    with open(filepath, "w", encoding="utf-8") as f:
+    with filepath.open("w", encoding="utf-8") as f:
         json.dump(result, f, indent=2, ensure_ascii=False)
 
     logger.debug("Audit response saved: %s", filepath)

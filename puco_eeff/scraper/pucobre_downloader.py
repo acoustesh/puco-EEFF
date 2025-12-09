@@ -17,7 +17,7 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from playwright.sync_api import Page
+from playwright.sync_api import Locator, Page, Response
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
 from puco_eeff.config import get_config, get_period_paths, setup_logging
@@ -224,7 +224,7 @@ def download_from_pucobre(
         pdf_url: str | None = None
         pdf_content: bytes | None = None
 
-        def capture_pdf_response(response) -> None:
+        def capture_pdf_response(response: Response) -> None:
             """Capture PDF response content from browser network traffic."""
             nonlocal pdf_url, pdf_content
             content_type = response.headers.get("content-type", "")
@@ -366,7 +366,9 @@ def download_from_pucobre(
             )
 
 
-def _find_period_link(page: Page, year: int, quarter: int, quarter_to_date: dict[int, str]):
+def _find_period_link(
+    page: Page, year: int, quarter: int, quarter_to_date: dict[int, str]
+) -> Locator | None:
     """Find the download link for a specific period using various patterns.
 
     Args:

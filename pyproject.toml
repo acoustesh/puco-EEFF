@@ -71,8 +71,41 @@ line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "B", "SIM"]
-ignore = ["E501"]
+select = ["ALL"]
+# select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = [
+    "E501",      # Line too long (handled by formatter)
+    "C901",      # Complex structure
+    "PLR2004",   # Magic numbers
+    "PLR0911",   # Too many returns
+    "PLR0912",   # Too many branches
+    "PLR0913",   # Too many arguments
+    "PLR0915",   # Too many statements
+    "S101",      # Assert statements (legitimate in tests)
+    "FBT001",    # Boolean positional arg in function definition
+    "FBT002",    # Boolean default value in function definition
+    "FBT003",    # Boolean positional value in function call
+    "TRY300",    # Consider else block (not always applicable)
+    "D203",      # One blank line before class (conflicts with D211)
+    "D213",      # Multi-line summary second line (conflicts with D212)
+    "G004",      # Logging f-string (acceptable for readability)
+    "TRY401",    # Verbose log message (redundant with good error handling)
+    "D401",      # Non-imperative mood (docstrings can vary)
+    "ERA001",    # Commented code (some comments are intentional)
+    "PLW2901",   # Redefined loop name (sometimes intentional)
+    "SLF001",    # Private member access (sometimes necessary)
+    "PLC0415",   # Import outside top-level (lazy imports are intentional)
+    "ANN401",    # Dynamically typed expressions (typing.Any) - sometimes necessary
+    "ARG001",    # Unused function argument (interface compatibility, future use)
+    "BLE001",    # Blind except (sometimes necessary for robustness)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "ANN001",    # Missing type annotations in test functions
+    "ANN201",    # Missing return type annotation
+    "ANN202",    # Missing return type annotation for private functions
+]
 
 [tool.mypy]
 python_version = "3.12"

@@ -458,7 +458,7 @@ def save_xbrl_aggregates(
         "aggregates": aggregates.get("aggregates"),
     }
 
-    with open(output_path, "w", encoding="utf-8") as f:
+    with output_path.open("w", encoding="utf-8") as f:
         json.dump(save_data, f, indent=2, ensure_ascii=False)
 
     logger.info("Saved XBRL aggregates to: %s", output_path)

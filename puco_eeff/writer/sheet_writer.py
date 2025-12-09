@@ -134,7 +134,7 @@ def save_sheet_data(
         "content": data_dict,
     }
 
-    with open(filepath, "w", encoding="utf-8") as f:
+    with filepath.open("w", encoding="utf-8") as f:
         json.dump(output, f, indent=2, ensure_ascii=False, default=str)
 
     logger.info("Saved sheet data: %s", filepath)
@@ -170,7 +170,7 @@ def load_sheet_data(
         msg = f"Sheet data not found: {filepath}"
         raise FileNotFoundError(msg)
 
-    with open(filepath, encoding="utf-8") as f:
+    with filepath.open(encoding="utf-8") as f:
         data = json.load(f)
 
     content = data["content"]
@@ -190,7 +190,7 @@ def load_sheet_json(filepath: Path) -> dict[str, Any]:
         Dictionary with sheet data including metadata
 
     """
-    with open(filepath, encoding="utf-8") as f:
+    with filepath.open(encoding="utf-8") as f:
         return json.load(f)  # type: ignore[no-any-return]
 
 

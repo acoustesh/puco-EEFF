@@ -14,13 +14,13 @@ if TYPE_CHECKING:
 logger = setup_logging(__name__)
 
 
-async def download_file(url: str, destination: Path, timeout: float = 60.0) -> Path:
+async def download_file(url: str, destination: Path, request_timeout: float = 60.0) -> Path:
     """Download a file from URL to destination.
 
     Args:
         url: URL to download from
         destination: Path to save the file
-        timeout: Request timeout in seconds
+        request_timeout: Request timeout in seconds
 
     Returns:
         Path to the downloaded file
@@ -34,11 +34,11 @@ async def download_file(url: str, destination: Path, timeout: float = 60.0) -> P
     logger.info("Downloading: %s", url)
     logger.debug("Destination: %s", destination)
 
-    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+    async with httpx.AsyncClient(timeout=request_timeout, follow_redirects=True) as client:
         response = await client.get(url)
         response.raise_for_status()
 
-        with open(destination, "wb") as f:
+        with destination.open("wb") as f:
             f.write(response.content)
 
     logger.info(f"Downloaded: {destination.name} ({destination.stat().st_size} bytes)")
@@ -69,7 +69,7 @@ def download_file_sync(url: str, destination: Path, timeout: float = 60.0) -> Pa
         response = client.get(url)
         response.raise_for_status()
 
-        with open(destination, "wb") as f:
+        with destination.open("wb") as f:
             f.write(response.content)
 
     logger.info(f"Downloaded: {destination.name} ({destination.stat().st_size} bytes)")

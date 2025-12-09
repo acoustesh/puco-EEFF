@@ -80,7 +80,7 @@ def _load_sheet1_config(filename: str) -> dict[str, Any]:
         msg = f"Sheet1 config not found: {config_path}"
         raise FileNotFoundError(msg)
 
-    with open(config_path, encoding="utf-8") as f:
+    with config_path.open(encoding="utf-8") as f:
         return cast("dict[str, Any]", json.load(f))
 
 
@@ -687,7 +687,7 @@ def save_sheet1_data(data: Sheet1Data, output_dir: Path | None = None) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / f"sheet1_{data.quarter}.json"
 
-    with open(output_path, "w", encoding="utf-8") as f:
+    with output_path.open("w", encoding="utf-8") as f:
         json.dump(data.to_dict(), f, indent=2, ensure_ascii=False)
 
     logger.info("Saved Sheet1 data to: %s", output_path)

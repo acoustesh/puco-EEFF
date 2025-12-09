@@ -16,7 +16,7 @@ import ast
 import re
 from dataclasses import dataclass, field
 from functools import singledispatch
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from puco_eeff.config import setup_logging
 from puco_eeff.sheets.sheet1 import (
@@ -179,7 +179,7 @@ def _format_match_status(match: bool, success_msg: str, failure_msg: str) -> str
 
 
 @singledispatch
-def format_status(result) -> str:
+def format_status(result: Any) -> str:
     """Format validation status for supported result types."""
     return ""  # Fallback for unexpected objects
 
