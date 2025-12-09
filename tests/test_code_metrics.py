@@ -185,7 +185,9 @@ def save_baselines(baselines: dict) -> None:
     # Save function_hashes to separate file
     if function_hashes:
         fd, temp_path = tempfile.mkstemp(
-            suffix=".json", prefix="function_hashes_", dir=FUNCTION_HASHES_FILE.parent
+            suffix=".json",
+            prefix="function_hashes_",
+            dir=FUNCTION_HASHES_FILE.parent,
         )
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as f:

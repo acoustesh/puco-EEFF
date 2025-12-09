@@ -215,6 +215,29 @@ def parse_single_row(
     return {"concepto": matched_item, "values": values}
 
 
+def _build_value_columns(row: list[str | None]) -> list[list[str]]:
+    """Build value columns from row cells (skipping first cell)."""
+    value_columns: list[list[str]] = []
+    for cell in row[1:]:
+        if cell:
+            values = str(cell).strip().split("\n")
+            value_columns.append(values)
+        else:
+            value_columns.append([])
+    return value_columns
+
+
+def _parse_multiline_cell(
+    concept_cell: str,
+    row: list[str | None],
+    expected_items: list[str],
+) -> list[dict[str, Any]]:
+    """Parse a multi-line concept cell."""
+    concepts = concept_cell.split("\n")
+    value_columns = _build_value_columns(row)
+    return parse_multiline_row(concepts, value_columns, expected_items)
+
+
 def parse_cost_table(table: list[list[str | None]], expected_items: list[str]) -> list[dict[str, Any]]:
     """Parse a cost breakdown table."""
     parsed_rows = []
@@ -224,21 +247,12 @@ def parse_cost_table(table: list[list[str | None]], expected_items: list[str]) -
             continue
 
         concept_cell = str(row[0] or "").strip()
+        if not concept_cell:
+            continue
 
         if "\n" in concept_cell:
-            # Multi-line cell: split and process each concept
-            concepts = concept_cell.split("\n")
-            value_columns: list[list[str]] = []
-            for cell in row[1:]:
-                if cell:
-                    values = str(cell).strip().split("\n")
-                    value_columns.append(values)
-                else:
-                    value_columns.append([])
-
-            parsed_rows.extend(parse_multiline_row(concepts, value_columns, expected_items))
+            parsed_rows.extend(_parse_multiline_cell(concept_cell, row, expected_items))
         else:
-            # Single concept row
             result = parse_single_row(concept_cell, row, expected_items)
             if result:
                 parsed_rows.append(result)
@@ -271,6 +285,34 @@ def count_value_offset(labels: list[str], target_idx: int) -> int:
     return offset
 
 
+def _try_aligned_extraction(
+    labels: list[str],
+    values: list[str],
+    match_keywords: list[str],
+    min_threshold: int,
+) -> int | None:
+    """Try to extract value using aligned label position."""
+    ingresos_idx = find_label_index(labels, match_keywords)
+    if ingresos_idx is None:
+        return None
+
+    value_idx = count_value_offset(labels, ingresos_idx)
+    if value_idx >= len(values):
+        return None
+
+    value = parse_chilean_number(values[value_idx].strip())
+    return value if value is not None and value > min_threshold else None
+
+
+def _try_fallback_extraction(values: list[str], min_threshold: int) -> int | None:
+    """Try to extract any value above threshold as fallback."""
+    for val_str in values:
+        value = parse_chilean_number(val_str.strip())
+        if value is not None and value > min_threshold:
+            return value
+    return None
+
+
 def extract_value_from_row(row: list[Any], match_keywords: list[str], min_threshold: int) -> int | None:
     """Try to extract ingresos value from a table row."""
     first_col = str(row[0] or "").lower()
@@ -281,19 +323,8 @@ def extract_value_from_row(row: list[Any], match_keywords: list[str], min_thresh
     values_col = str(row[1] or "") if len(row) > 1 else ""
     values = values_col.split("\n")
 
-    # Try aligned extraction based on label position
-    ingresos_idx = find_label_index(labels, match_keywords)
-    if ingresos_idx is not None:
-        value_idx = count_value_offset(labels, ingresos_idx)
-        if value_idx < len(values):
-            value = parse_chilean_number(values[value_idx].strip())
-            if value is not None and value > min_threshold:
-                return value
+    aligned_value = _try_aligned_extraction(labels, values, match_keywords, min_threshold)
+    if aligned_value is not None:
+        return aligned_value
 
-    # Fallback: try any value above threshold
-    for val_str in values:
-        value = parse_chilean_number(val_str.strip())
-        if value is not None and value > min_threshold:
-            return value
-
-    return None
+    return _try_fallback_extraction(values, min_threshold)
