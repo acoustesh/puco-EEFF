@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import time
 import zipfile
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING
 
 from playwright.sync_api import Download, Page
@@ -49,16 +49,16 @@ class DownloadResult:
     error: str | None = None
     source: str = "cmf"  # Always "cmf" for this dataclass
 
-    def as_dict(self) -> dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
-        return {
-            "document_type": self.document_type,
-            "success": self.success,
-            "file_path": str(self.file_path) if self.file_path else None,
-            "file_size": self.file_size,
-            "error": self.error,
-            "source": self.source,
-        }
+        result = asdict(self)
+        # Convert Path to string for JSON compatibility
+        if result["file_path"] is not None:
+            result["file_path"] = str(result["file_path"])
+        return result
+
+    # Backward-compatible alias
+    as_dict = to_dict
 
 
 def download_all_documents(
@@ -87,7 +87,8 @@ def download_all_documents(
         tipo_norma: Accounting standard ("IFRS" for Estándar IFRS or "NCH" for Norma Chilena)
         fallback_to_pucobre: If True, try Pucobre.cl when CMF fails
 
-    Returns:
+    Returns
+    -------
         List of DownloadResult for each document type
 
     """
@@ -175,7 +176,8 @@ def _download_with_pucobre_fallback(
         pdf_dir: Output directory for PDFs
         headless: Run browser in headless mode
 
-    Returns:
+    Returns
+    -------
         Updated results list
 
     """
@@ -292,7 +294,8 @@ def download_single_document(
         tipo_norma: Accounting standard
         fallback_to_pucobre: If True, try Pucobre.cl when CMF fails (PDF only)
 
-    Returns:
+    Returns
+    -------
         DownloadResult with status and file path
 
     """
@@ -400,7 +403,8 @@ def _navigate_and_filter(
         tipo: Balance type
         tipo_norma: Accounting standard
 
-    Returns:
+    Returns
+    -------
         True if navigation and filtering succeeded
 
     """
@@ -542,7 +546,8 @@ def _extract_xbrl_zip(
         year: Year for naming
         quarter: Quarter for naming
 
-    Returns:
+    Returns
+    -------
         Path to the extracted XBRL file, or None if extraction failed
 
     """
@@ -596,16 +601,45 @@ def _extract_xbrl_zip(
 
 
 def _extract_cmf_periods_from_page(page: Page) -> list[dict]:
-    """Extract available periods from CMF page's year/month dropdown selectors."""
-    month_to_quarter = get_config()["sources"]["cmf_chile"]["filters"]["month_to_quarter"]
-    year_el, month_el = page.query_selector("select[name='aa']"), page.query_selector("select[name='mm']")
-    if not (year_el and month_el):
+    """Extract periods from CMF Chile page via HTML select dropdown elements.
+
+    CMF's SVSI portal uses standard HTML form selects for year (aa) and month (mm).
+    We query both dropdowns, extract their option values, and build a cartesian
+    product filtered by valid quarterly months (03, 06, 09, 12).
+
+    Args:
+        page: Playwright Page object navigated to CMF Chile SVSI portal.
+
+    Returns
+    -------
+        List of period dicts with year/month/quarter for each valid combination.
+        Empty list if required form elements not found.
+
+    """
+    config_filters = get_config()["sources"]["cmf_chile"]["filters"]
+    quarter_for_month = config_filters["month_to_quarter"]
+
+    # CMF uses HTML select elements named 'aa' (año) and 'mm' (mes)
+    year_select = page.query_selector("select[name='aa']")
+    month_select = page.query_selector("select[name='mm']")
+
+    if year_select is None or month_select is None:
+        logger.warning("CMF form selects not found on page")
         return []
-    years = [o.get_attribute("value") for o in year_el.query_selector_all("option") if o.get_attribute("value")]
-    months = [o.get_attribute("value") for o in month_el.query_selector_all("option") if o.get_attribute("value")]
+
+    # Extract all valid option values from both selects
+    year_options = year_select.query_selector_all("option")
+    month_options = month_select.query_selector_all("option")
+
+    years = [opt.get_attribute("value") for opt in year_options if opt.get_attribute("value")]
+    months = [opt.get_attribute("value") for opt in month_options if opt.get_attribute("value")]
+
+    # Build cartesian product, filtering to quarterly months only
     return [
-        {"year": int(y), "month": m, "quarter": month_to_quarter[m]}
-        for y in years for m in months if m in month_to_quarter
+        {"year": int(year), "month": month, "quarter": quarter_for_month[month]}
+        for year in years
+        for month in months
+        if month in quarter_for_month
     ]
 
 
@@ -618,7 +652,8 @@ def list_available_periods(headless: bool = True) -> list[dict]:
     Args:
         headless: Run browser in headless mode
 
-    Returns:
+    Returns
+    -------
         List of available periods with year, month, and quarter keys
 
     """

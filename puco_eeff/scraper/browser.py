@@ -30,7 +30,8 @@ def create_browser(playwright: Playwright, headless: bool = True) -> Browser:
         playwright: Playwright instance
         headless: Run browser in headless mode (default: True for server use)
 
-    Returns:
+    Returns
+    -------
         Browser instance
 
     """
@@ -50,7 +51,8 @@ def create_browser_context(browser: Browser) -> BrowserContext:
     Args:
         browser: Browser instance
 
-    Returns:
+    Returns
+    -------
         BrowserContext configured for scraping
 
     """
@@ -74,7 +76,8 @@ def browser_session(
     Args:
         headless: Run browser in headless mode
 
-    Yields:
+    Yields
+    ------
         Tuple of (Browser, BrowserContext, Page) for interaction
 
     """
@@ -98,7 +101,8 @@ def wait_for_download(page: Page, trigger_action: Any, download_path: str) -> st
         trigger_action: Callable that triggers the download
         download_path: Path to save the downloaded file
 
-    Returns:
+    Returns
+    -------
         Path to the downloaded file
 
     """
@@ -115,13 +119,14 @@ def list_periods_from_page(
     extractor: PeriodExtractor,
     headless: bool = True,
 ) -> list[dict]:
-    """Generic period listing using a configured extractor.
+    """List periods from a page using a configured extractor.
 
     Args:
         extractor: Configuration for how to extract periods from page
         headless: Run browser in headless mode
 
-    Returns:
+    Returns
+    -------
         List of period dicts extracted from the page
 
     """

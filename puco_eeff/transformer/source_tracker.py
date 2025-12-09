@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -78,7 +78,8 @@ class SourceTracker:
         Args:
             field_name: Name of the data field
 
-        Returns:
+        Returns
+        -------
             Primary SourceInfo or None if not found
 
         """
@@ -92,7 +93,8 @@ class SourceTracker:
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.
 
-        Returns:
+        Returns
+        -------
             Dictionary representation
 
         """
@@ -100,19 +102,7 @@ class SourceTracker:
             "period": self.period,
             "generated_at": datetime.now(UTC).isoformat(),
             "mappings": {
-                field: [
-                    {
-                        "source_type": s.source_type,
-                        "file_path": s.file_path,
-                        "location": s.location,
-                        "extraction_method": s.extraction_method,
-                        "confidence": s.confidence,
-                        "timestamp": s.timestamp,
-                        "raw_value": s.raw_value,
-                    }
-                    for s in sources
-                ]
-                for field, sources in self.mappings.items()
+                field: [asdict(s) for s in sources] for field, sources in self.mappings.items()
             },
         }
 
@@ -122,7 +112,8 @@ class SourceTracker:
         Args:
             output_dir: Directory to save to (defaults to AUDIT_DIR/period)
 
-        Returns:
+        Returns
+        -------
             Path to saved file
 
         """
@@ -143,7 +134,8 @@ class SourceTracker:
         Args:
             filepath: Path to source mapping JSON file
 
-        Returns:
+        Returns
+        -------
             SourceTracker instance
 
         """
@@ -191,7 +183,8 @@ def create_source_mapping(
         confidence: Confidence score
         raw_value: Raw extracted value
 
-    Returns:
+    Returns
+    -------
         Source mapping dictionary
 
     """

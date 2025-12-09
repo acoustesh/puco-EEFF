@@ -167,11 +167,13 @@ def get_extraction_labels(
     Args:
         config: Configuration dict (ignored, kept for backward compat)
 
-    Returns:
+    Returns
+    -------
         Tuple of (costo_venta_items, gasto_admin_items, field_labels)
         where costo_venta_items are from nota_21 and gasto_admin_items from nota_22
 
-    Raises:
+    Raises
+    ------
         ValueError: If config loading fails
 
     """

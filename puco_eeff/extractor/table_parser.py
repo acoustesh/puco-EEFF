@@ -120,7 +120,8 @@ def score_table_match(
         unique_items: Items that strongly indicate the correct table (+5 each)
         exclude_items: Items that indicate the wrong table (-5 each)
 
-    Returns:
+    Returns
+    -------
         Match score (higher is better)
 
     """

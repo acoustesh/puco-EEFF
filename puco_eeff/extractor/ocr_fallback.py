@@ -172,7 +172,8 @@ def _ocr_with_openrouter(
         prompt: Custom prompt for OCR extraction
         audit_dir: Directory to save audit files (None to skip)
 
-    Returns:
+    Returns
+    -------
         Dictionary with extracted content and metadata
 
     """
@@ -260,7 +261,8 @@ def _encode_image(image_path: Path) -> str:
     Args:
         image_path: Path to image file
 
-    Returns:
+    Returns
+    -------
         Base64 data URL string
 
     """

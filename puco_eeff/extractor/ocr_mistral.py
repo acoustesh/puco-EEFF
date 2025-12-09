@@ -37,7 +37,8 @@ def ocr_with_mistral(
         save_response: Whether to save the response for audit
         audit_dir: Directory to save audit files
 
-    Returns:
+    Returns
+    -------
         Dictionary with extracted content and metadata
 
     """
@@ -124,7 +125,8 @@ def _prepare_pdf_content(pdf_path: Path, page_number: int | None) -> dict[str, A
         pdf_path: Path to PDF file
         page_number: Optional specific page
 
-    Returns:
+    Returns
+    -------
         Content dictionary for API
 
     """
@@ -166,7 +168,8 @@ def _prepare_image_content(
         is_base64: If True, treat image_source as base64 string; if False, as file path
         default_mime: Default MIME type when not determinable (default: image/png)
 
-    Returns:
+    Returns
+    -------
         Content dictionary for API with {"type": "image_url", "image_url": {"url": ...}}
 
     """

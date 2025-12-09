@@ -50,7 +50,8 @@ def combine_sheet1_quarters(
         input_dir: Directory with sheet JSON files (defaults to DATA_DIR/processed)
         append_to_existing: If True, append new quarters to existing workbook
 
-    Returns:
+    Returns
+    -------
         Path to the created/updated Excel workbook
 
     """
@@ -156,7 +157,8 @@ def _load_existing_sheet1(filepath: Path) -> tuple[dict[str, dict[str, Any]], se
     Args:
         filepath: Path to existing Excel workbook
 
-    Returns:
+    Returns
+    -------
         Tuple of (data dict mapping period -> field values, set of existing periods)
 
     """
@@ -219,7 +221,8 @@ def append_quarter_to_workbook(
         output_dir: Directory for output Excel file
         input_dir: Directory with sheet JSON files
 
-    Returns:
+    Returns
+    -------
         Path to the updated workbook
 
     """
@@ -240,7 +243,8 @@ def _format_sheet_name(name: str) -> str:
     Args:
         name: Raw sheet name (e.g., "balance_general")
 
-    Returns:
+    Returns
+    -------
         Formatted name (e.g., "Balance General")
 
     """
@@ -269,7 +273,8 @@ def create_workbook_from_dataframes(
         sheets: Dictionary mapping sheet names to DataFrames
         output_path: Path for the output Excel file
 
-    Returns:
+    Returns
+    -------
         Path to the created workbook
 
     """
@@ -299,7 +304,8 @@ def list_workbook_quarters(
         year: Year to check
         output_dir: Directory with workbooks (defaults to DATA_DIR/output)
 
-    Returns:
+    Returns
+    -------
         List of period strings (e.g., ["2024_QI", "2024_QII"])
 
     """

@@ -45,6 +45,7 @@ pymupdf = ">=1.26.6"
 pyright = ">=1.1.407"
 voyageai = {version = ">=0.3.6", python = "<3.14"}
 
+
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.3"
 pytest-asyncio = ">=0.24"
@@ -58,6 +59,7 @@ lxml-stubs = ">=0.5"
 radon = ">=6.0"
 numpy = ">=2.0"
 complexipy = ">=5.0.0"
+pydocstyle = ">=6.3.0"
 
 [tool.black]
 line-length = 100
@@ -101,6 +103,10 @@ ignore = [
     "BLE001",    # Blind except (sometimes necessary for robustness)
 ]
 
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = [
     "ANN001",    # Missing type annotations in test functions
@@ -138,3 +144,8 @@ markers = [
     "codestral: marks tests that use Codestral embeddings via OpenRouter",
     "voyage: marks tests that use Voyage AI embeddings",
 ]
+
+[tool.pydocstyle]
+convention = "numpy"
+add-ignore = ["D100", "D104"]  # module/package docstrings
+match = "(?!test_).*\\.py"     # skip test files

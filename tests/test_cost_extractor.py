@@ -210,10 +210,11 @@ class TestValidationResult:
         """Status should show match."""
         result = ValidationResult(
             field_name="Test Field",
-            pdf_value=100,
-            xbrl_value=100,
+            value_a=100,  # PDF value
+            value_b=100,  # XBRL value
             match=True,
             source="both",
+            comparison_type="pdf_xbrl",
         )
         assert result.status == "✓ Match"
 
@@ -221,10 +222,11 @@ class TestValidationResult:
         """Status should indicate PDF only."""
         result = ValidationResult(
             field_name="Test Field",
-            pdf_value=100,
-            xbrl_value=None,
+            value_a=100,  # PDF value
+            value_b=None,  # XBRL value
             match=True,
             source="pdf_only",
+            comparison_type="pdf_xbrl",
         )
         assert result.status == "⚠ PDF only (no XBRL)"
 
@@ -232,10 +234,11 @@ class TestValidationResult:
         """Status should indicate XBRL only."""
         result = ValidationResult(
             field_name="Test Field",
-            pdf_value=None,
-            xbrl_value=100,
+            value_a=None,  # PDF value
+            value_b=100,  # XBRL value
             match=False,
             source="xbrl_only",
+            comparison_type="pdf_xbrl",
         )
         assert result.status == "⚠ XBRL only (PDF extraction failed)"
 
@@ -243,11 +246,12 @@ class TestValidationResult:
         """Status should show mismatch with difference."""
         result = ValidationResult(
             field_name="Test Field",
-            pdf_value=100,
-            xbrl_value=110,
+            value_a=100,  # PDF value
+            value_b=110,  # XBRL value
             match=False,
             source="both",
             difference=10,
+            comparison_type="pdf_xbrl",
         )
         assert "Mismatch" in result.status
         assert "10" in result.status
@@ -1187,27 +1191,27 @@ class TestValidationReport:
         )
         assert not report.has_failures()
 
-    def test_has_sum_failures(self) -> None:
-        """has_sum_failures detects sum validation failures."""
+    def test_has_failures_category_sum(self) -> None:
+        """has_failures('sum') detects sum validation failures."""
         report = ValidationReport(
             sum_validations=[
                 SumValidationResult("Test1", "f1", 100, 100, True, 0, 1),
                 SumValidationResult("Test2", "f2", 100, 200, False, 100, 1),
             ],
         )
-        assert report.has_sum_failures()
+        assert report.has_failures("sum")
 
-    def test_has_reference_failures(self) -> None:
-        """has_reference_failures detects reference validation failures."""
+    def test_has_failures_category_reference(self) -> None:
+        """has_failures('reference') detects reference validation failures."""
         report = ValidationReport(
             reference_issues=["Mismatch found"],
         )
-        assert report.has_reference_failures()
+        assert report.has_failures("reference")
 
-    def test_has_reference_failures_not_run(self) -> None:
-        """has_reference_failures False when not run."""
+    def test_has_failures_category_reference_not_run(self) -> None:
+        """has_failures('reference') returns False when not run."""
         report = ValidationReport(reference_issues=None)
-        assert not report.has_reference_failures()
+        assert not report.has_failures("reference")
 
 
 # =============================================================================
@@ -1464,11 +1468,12 @@ class TestFormatValidationReport:
             pdf_xbrl_validations=[
                 ValidationResult(
                     field_name="Total Costo de Venta",
-                    pdf_value=-126202,
-                    xbrl_value=-126202,
+                    value_a=-126202,  # PDF value
+                    value_b=-126202,  # XBRL value
                     match=True,
                     difference=0,
                     source="both",
+                    comparison_type="pdf_xbrl",
                 ),
             ],
         )
@@ -2114,10 +2119,11 @@ class TestExtractionResultValidationReport:
             pdf_xbrl_validations=[
                 ValidationResult(
                     field_name="Total Costo",
-                    pdf_value=-100,
-                    xbrl_value=-100,
+                    value_a=-100,  # PDF value
+                    value_b=-100,  # XBRL value
                     match=True,
                     source="both",
+                    comparison_type="pdf_xbrl",
                 ),
             ],
             sum_validations=[],

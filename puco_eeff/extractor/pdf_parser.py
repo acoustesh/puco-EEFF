@@ -24,7 +24,8 @@ def extract_text_from_pdf(
         file_path: Path to the PDF file
         pages: List of page numbers to extract (1-indexed). If None, extract all.
 
-    Returns:
+    Returns
+    -------
         Dictionary mapping page numbers to extracted text
 
     """
@@ -67,7 +68,8 @@ def extract_tables_from_pdf(
         pages: List of page numbers to extract (1-indexed). If None, extract all.
         table_settings: pdfplumber table extraction settings
 
-    Returns:
+    Returns
+    -------
         Dictionary mapping page numbers to list of tables (each table is a list of rows)
 
     """
@@ -116,7 +118,8 @@ def find_section_in_pdf(
         file_path: Path to the PDF file
         section_pattern: Section pattern (e.g., "note 20.b", "section 5")
 
-    Returns:
+    Returns
+    -------
         List of dictionaries with page number and context
 
     """
@@ -158,7 +161,8 @@ def get_pdf_info(file_path: Path) -> dict[str, Any]:
     Args:
         file_path: Path to the PDF file
 
-    Returns:
+    Returns
+    -------
         Dictionary with PDF metadata
 
     """

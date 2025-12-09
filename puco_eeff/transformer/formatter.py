@@ -9,48 +9,27 @@ This module provides functions to:
 
 from __future__ import annotations
 
-from typing import Any, NamedTuple, Protocol
+from typing import Any, Protocol
 
 from puco_eeff.config import get_config, setup_logging
+from puco_eeff.extractor.validation_core import ComparisonResult
 
 logger = setup_logging(__name__)
 
-
-class ReferenceValidationResult(NamedTuple):
-    """Result of a reference value validation check (immutable).
-
-    Used for validating extracted data against known reference values,
-    such as comparing extracted totals to previously verified amounts.
-    """
-
-    field: str
-    expected: int | None
-    actual: int | None
-    match: bool
-    difference: int | None = None
-
-    @property
-    def status(self) -> str:
-        """Return human-readable status."""
-        if self.expected is None:
-            return "⚠ No reference value"
-        if self.actual is None:
-            return "⚠ No actual value"
-        if self.match:
-            return "✓ Match"
-        return f"✗ Mismatch (diff: {self.difference:,})"
-
-
-# Backward compatibility alias
-ValidationResult = ReferenceValidationResult
+# Import unified validation result class - use ReferenceValidationResult alias
+# for backward compatibility with existing code that uses this name
+ReferenceValidationResult = ComparisonResult
+ValidationResult = ComparisonResult
 
 
 class ValidatorFunc(Protocol):
     """Protocol for validator functions with optional config parameter."""
 
     def __call__(
-        self, data: dict[str, Any], config: dict[str, Any] | None = None,
-    ) -> ValidationResult:
+        self,
+        data: dict[str, Any],
+        config: dict[str, Any] | None = None,
+    ) -> ReferenceValidationResult:
         """Call validator with data and optional config."""
         ...
 
@@ -64,7 +43,8 @@ def get_standard_structure(
         sheet_name: Name of the sheet (e.g., "sheet1")
         config: Configuration dict, or None to load from file
 
-    Returns:
+    Returns
+    -------
         List of row definitions with field, label, section
 
     """
@@ -110,7 +90,8 @@ def map_to_structure(
         sheet_name: Name of the sheet
         config: Configuration dict, or None to load from file
 
-    Returns:
+    Returns
+    -------
         List of row dictionaries with concepto and valor
 
     """
@@ -157,49 +138,56 @@ _GASTO_ADMIN_FIELDS = [
     "ga_otros",
 ]
 
+# Tuple versions for validator functions (immutable)
+_COSTO_VENTA_FIELDS_TUPLE = tuple(_COSTO_VENTA_FIELDS)
+_GASTO_ADMIN_FIELDS_TUPLE = tuple(_GASTO_ADMIN_FIELDS)
 
-def _make_total_validator(
-    item_fields: list[str],
-    total_field: str,
-    name: str,
-) -> ValidatorFunc:
-    """Factory to create total validation functions.
 
-    Creates a validator that checks if the sum of item_fields equals total_field.
-    Uses closure to capture field configuration.
+def _sum_fields(data: dict[str, Any], fields: tuple[str, ...]) -> int:
+    """Sum numeric values from dict for given field names, treating None as 0."""
+    return sum(data.get(f, 0) or 0 for f in fields)
+
+
+# Section configuration for validation
+_SECTION_CONFIG: dict[str, tuple[str, tuple[str, ...]]] = {
+    "costo_venta": ("total_costo_venta", _COSTO_VENTA_FIELDS_TUPLE),
+    "gasto_admin": ("total_gasto_admin", _GASTO_ADMIN_FIELDS_TUPLE),
+}
+
+
+def validate_section_total(
+    data: dict[str, Any],
+    section: str,
+    config: dict[str, Any] | None = None,
+) -> ValidationResult:
+    """Validate that a section's total equals the sum of its line items.
+
+    Args:
+        data: Dictionary containing field values
+        section: Section identifier - 'costo_venta' or 'gasto_admin'
+        config: Optional configuration (unused, for interface compatibility)
+
+    Returns
+    -------
+        ValidationResult comparing reported vs calculated totals
+
+    Raises
+    ------
+        KeyError: If section is not recognized
+
     """
-    fields_tuple = tuple(item_fields)  # Immutable for safety
-
-    def validate(data: dict[str, Any], config: dict[str, Any] | None = None) -> ValidationResult:
-        """Validate section total matches sum of line items."""
-        # Inline validation logic to avoid function similarity
-        calculated = sum(data.get(f, 0) or 0 for f in fields_tuple)
-        reported = data.get(total_field)
-        is_match = calculated == reported if reported is not None else False
-        diff = (reported - calculated) if reported is not None else None
-        return ValidationResult(
-            field=total_field,
-            expected=reported,
-            actual=calculated,
-            match=is_match,
-            difference=diff,
-        )
-
-    validate.__name__ = name
-    validate.__doc__ = f"Check {total_field} equals sum of {len(fields_tuple)} line items."
-    return validate
-
-
-validate_costo_venta_total = _make_total_validator(
-    _COSTO_VENTA_FIELDS,
-    "total_costo_venta",
-    "validate_costo_venta_total",
-)
-validate_gasto_admin_total = _make_total_validator(
-    _GASTO_ADMIN_FIELDS,
-    "total_gasto_admin",
-    "validate_gasto_admin_total",
-)
+    total_field, component_fields = _SECTION_CONFIG[section]
+    calculated = _sum_fields(data, component_fields)
+    reported = data.get(total_field)
+    is_match = calculated == reported if reported is not None else False
+    return ValidationResult(
+        field_name=total_field,
+        value_a=reported,
+        value_b=calculated,
+        match=is_match,
+        comparison_type="reference",
+        difference=(reported - calculated) if reported is not None else None,
+    )
 
 
 def validate_balance_sheet(
@@ -212,19 +200,15 @@ def validate_balance_sheet(
         data: Dictionary of field_name -> value
         config: Configuration dict, or None to load from file
 
-    Returns:
+    Returns
+    -------
         List of ValidationResults
 
     """
-    results = []
-
-    # Validate Costo de Venta total
-    results.append(validate_costo_venta_total(data, config))
-
-    # Validate Gasto Admin total
-    results.append(validate_gasto_admin_total(data, config))
-
-    return results
+    return [
+        validate_section_total(data, "costo_venta", config),
+        validate_section_total(data, "gasto_admin", config),
+    ]
 
 
 def validate_against_reference(
@@ -242,7 +226,8 @@ def validate_against_reference(
         period: Period label (e.g., "IIQ2024")
         config: Configuration dict, or None to load from file
 
-    Returns:
+    Returns
+    -------
         List of ValidationResults comparing each field
 
     """
@@ -273,10 +258,11 @@ def validate_against_reference(
         if extracted_value is None:
             results.append(
                 ValidationResult(
-                    field=field,
-                    expected=int(reference_value),
-                    actual=None,
+                    field_name=field,
+                    value_a=int(reference_value),  # expected
+                    value_b=None,  # actual
                     match=False,
+                    comparison_type="reference",
                     difference=None,
                 ),
             )
@@ -289,10 +275,11 @@ def validate_against_reference(
 
         results.append(
             ValidationResult(
-                field=field,
-                expected=expected,
-                actual=actual,
+                field_name=field,
+                value_a=expected,  # expected
+                value_b=actual,  # actual
                 match=match,
+                comparison_type="reference",
                 difference=difference,
             ),
         )
@@ -306,7 +293,8 @@ def format_validation_report(results: list[ValidationResult]) -> str:
     Args:
         results: List of ValidationResults
 
-    Returns:
+    Returns
+    -------
         Formatted string report
 
     """
@@ -322,7 +310,7 @@ def format_validation_report(results: list[ValidationResult]) -> str:
 
     for result in results:
         lines.append(f"{result.field}: {result.status}")
-        if not result.match and result.expected is not None and result.actual is not None:
-            lines.extend((f"  Expected: {result.expected:,}", f"  Actual:   {result.actual:,}"))
+        if not result.match and result.value_a is not None and result.value_b is not None:
+            lines.extend((f"  Expected: {result.value_a:,}", f"  Actual:   {result.value_b:,}"))
 
     return "\n".join(lines)

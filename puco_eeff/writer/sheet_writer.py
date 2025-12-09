@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
-from puco_eeff.config import DATA_DIR, quarter_to_roman, setup_logging
+from puco_eeff.config import DATA_DIR, format_period, setup_logging
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -37,18 +37,8 @@ def roman_to_quarter(roman: str) -> int:
     return q
 
 
-def format_period(year: int, quarter: int) -> str:
-    """Format year and quarter into period string.
-
-    Args:
-        year: Year (e.g., 2024)
-        quarter: Quarter number (1-4)
-
-    Returns:
-        Period string (e.g., "2024_QII")
-
-    """
-    return f"{year}_Q{quarter_to_roman(quarter)}"
+# Use centralized format_period from config (defaults to key style)
+# format_period(year, period, period_type, style) - use style="key" for file names
 
 
 def parse_period(period: str) -> tuple[int, int]:
@@ -57,7 +47,8 @@ def parse_period(period: str) -> tuple[int, int]:
     Args:
         period: Period string (e.g., "2024_QII" or "2024_Q2")
 
-    Returns:
+    Returns
+    -------
         Tuple of (year, quarter)
 
     """
@@ -94,7 +85,8 @@ def save_sheet_data(
         quarter: Quarter number (1-4)
         output_dir: Directory to save to (defaults to DATA_DIR/processed)
 
-    Returns:
+    Returns
+    -------
         Path to saved JSON file
 
     """
@@ -147,7 +139,8 @@ def load_sheet_data(
         quarter: Quarter number (1-4)
         input_dir: Directory to load from (defaults to DATA_DIR/processed)
 
-    Returns:
+    Returns
+    -------
         DataFrame with sheet data
 
     """
@@ -178,7 +171,8 @@ def load_sheet_json(filepath: Path) -> dict[str, Any]:
     Args:
         filepath: Path to the JSON file
 
-    Returns:
+    Returns
+    -------
         Dictionary with sheet data including metadata
 
     """
@@ -202,7 +196,8 @@ def write_sheet_to_csv(
         quarter: Quarter number (1-4)
         output_dir: Directory to save to (defaults to DATA_DIR/processed)
 
-    Returns:
+    Returns
+    -------
         Path to saved CSV file
 
     """
@@ -232,7 +227,8 @@ def list_available_sheets(
         year: Optional year filter (e.g., 2024)
         input_dir: Directory to search (defaults to DATA_DIR/processed)
 
-    Returns:
+    Returns
+    -------
         List of dicts with sheet_name, year, quarter, period, and filepath
 
     """

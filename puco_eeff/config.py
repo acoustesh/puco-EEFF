@@ -62,7 +62,8 @@ def get_period_paths(year: int, quarter: int) -> dict[str, Path]:
         year: The year (e.g., 2024)
         quarter: The quarter (1-4)
 
-    Returns:
+    Returns
+    -------
         Dictionary with paths for raw, processed, output, and audit directories.
 
     """
@@ -83,7 +84,8 @@ def setup_logging(name: str = "puco_eeff") -> logging.Logger:
     Args:
         name: Logger name
 
-    Returns:
+    Returns
+    -------
         Configured logger instance.
 
     """
@@ -113,7 +115,8 @@ def setup_logging(name: str = "puco_eeff") -> logging.Logger:
 def validate_api_keys() -> dict[str, bool]:
     """Check which API keys are configured.
 
-    Returns:
+    Returns
+    -------
         Dictionary mapping API name to whether it's configured.
 
     """
@@ -128,10 +131,12 @@ def validate_api_keys() -> dict[str, bool]:
 def get_mistral_client() -> Any:
     """Get Mistral AI client.
 
-    Returns:
+    Returns
+    -------
         Configured Mistral client.
 
-    Raises:
+    Raises
+    ------
         ValueError: If MISTRAL_API_KEY is not set.
 
     """
@@ -147,10 +152,12 @@ def get_mistral_client() -> Any:
 def get_openrouter_client() -> Any:
     """Get OpenRouter client (uses OpenAI SDK).
 
-    Returns:
+    Returns
+    -------
         Configured OpenAI client pointing to OpenRouter.
 
-    Raises:
+    Raises
+    ------
         ValueError: If OPENROUTER_API_KEY is not set.
 
     """
@@ -174,7 +181,8 @@ def get_openrouter_client() -> Any:
 def get_extraction_specs() -> dict[str, Any]:
     """Load extraction specifications from extraction_specs.json.
 
-    Returns:
+    Returns
+    -------
         Dictionary with general extraction settings (number_format, search_strategy, document_structure).
 
     """
@@ -195,7 +203,8 @@ def get_extraction_specs() -> dict[str, Any]:
 def get_xbrl_specs() -> dict[str, Any]:
     """Load XBRL specifications from xbrl_specs.json.
 
-    Returns:
+    Returns
+    -------
         Dictionary with general XBRL config (scaling_factor, namespaces, period_filter).
         Sheet-specific fact mappings are in config/<sheet_name>/xbrl_mappings.json.
 
@@ -212,7 +221,8 @@ def get_xbrl_specs() -> dict[str, Any]:
 def get_xbrl_scaling_factor() -> int:
     """Get XBRL scaling factor from config.
 
-    Returns:
+    Returns
+    -------
         Scaling factor (default 1000 for MUS$ conversion).
 
     """
@@ -223,7 +233,8 @@ def get_xbrl_scaling_factor() -> int:
 def get_xbrl_namespaces() -> dict[str, str]:
     """Get XBRL namespace definitions.
 
-    Returns:
+    Returns
+    -------
         Dictionary mapping namespace prefixes to URIs.
 
     """
@@ -242,7 +253,8 @@ def get_period_type_config(period_type: str = "quarterly") -> dict[str, Any]:
     Args:
         period_type: One of "quarterly", "monthly", "yearly"
 
-    Returns:
+    Returns
+    -------
         Period type configuration dictionary.
 
     """
@@ -251,30 +263,10 @@ def get_period_type_config(period_type: str = "quarterly") -> dict[str, Any]:
     return cast("dict[str, Any]", period_types.get(period_type, period_types.get("quarterly", {})))
 
 
-def format_period_key(
-    year: int,
-    period: int,
-    period_type: str = "quarterly",
-) -> str:
-    """Format a period key string (e.g., "2024_Q2", "2024_M06", "2024_FY").
-
-    Args:
-        year: Year
-        period: Period number (quarter 1-4, month 1-12, or 1 for yearly)
-        period_type: One of "quarterly", "monthly", "yearly"
-
-    Returns:
-        Formatted period key string.
-
-    """
-    if period_type == "quarterly":
-        return f"{year}_Q{period}"
-    if period_type == "monthly":
-        return f"{year}_M{period:02d}"
-    if period_type == "yearly":
-        return f"{year}_FY"
-    # Default to quarterly format
-    return f"{year}_Q{period}"
+def _get_roman_map(period_type: str = "quarterly") -> dict[str, str]:
+    """Get Roman numeral mapping from config."""
+    type_config = get_period_type_config(period_type)
+    return type_config.get("roman_numerals", {"1": "I", "2": "II", "3": "III", "4": "IV"})
 
 
 def quarter_to_roman(quarter: int) -> str:
@@ -287,54 +279,72 @@ def quarter_to_roman(quarter: int) -> str:
     Args:
         quarter: Quarter number (1-4)
 
-    Returns:
+    Returns
+    -------
         Roman numeral string (I, II, III, IV)
 
-    Raises:
+    Raises
+    ------
         ValueError: If quarter is not 1-4
 
     """
     if quarter not in {1, 2, 3, 4}:
         msg = f"Invalid quarter: {quarter}. Must be 1-4."
         raise ValueError(msg)
-
-    type_config = get_period_type_config("quarterly")
-    roman_map = type_config.get("roman_numerals", {"1": "I", "2": "II", "3": "III", "4": "IV"})
-    return cast("str", roman_map[str(quarter)])
+    return cast("str", _get_roman_map()[str(quarter)])
 
 
-def format_period_display(
+def format_period(
     year: int,
     period: int,
     period_type: str = "quarterly",
+    style: str = "key",
 ) -> str:
-    """Format a period for display (e.g., "IIQ2024", "06-2024", "FY2024").
+    """Format a period string in key or display format.
+
+    Supports quarterly, monthly, and yearly period types with two output styles:
+    - style="key": Machine-readable keys for file naming (e.g., "2024_QII", "2024_M06")
+    - style="display": Human-readable labels (e.g., "IIQ2024", "06-2024")
 
     Args:
         year: Year
-        period: Period number
+        period: Period number (quarter 1-4, month 1-12, or 1 for yearly)
         period_type: One of "quarterly", "monthly", "yearly"
+        style: "key" for machine keys, "display" for human-readable
 
-    Returns:
-        Formatted display string.
+    Returns
+    -------
+        Formatted period string.
+
+    Examples
+    --------
+        >>> format_period(2024, 2, "quarterly", "key")
+        '2024_QII'
+        >>> format_period(2024, 2, "quarterly", "display")
+        'IIQ2024'
+        >>> format_period(2024, 6, "monthly", "key")
+        '2024_M06'
 
     """
-    type_config = get_period_type_config(period_type)
+    use_key_style = style == "key"
 
     if period_type == "quarterly":
-        roman_map = type_config.get("roman_numerals", {"1": "I", "2": "II", "3": "III", "4": "IV"})
-        roman = roman_map.get(str(period), str(period))
-        return f"{roman}Q{year}"
+        roman_numeral = _get_roman_map()[str(period)]
+        return f"{year}_Q{roman_numeral}" if use_key_style else f"{roman_numeral}Q{year}"
+
     if period_type == "monthly":
-        return f"{period:02d}-{year}"
+        return f"{year}_M{period:02d}" if use_key_style else f"{period:02d}-{year}"
+
     if period_type == "yearly":
-        return f"FY{year}"
-    return f"{period}_{year}"
+        return f"{year}_FY" if use_key_style else f"FY{year}"
+
+    # Default fallback for unrecognized period types
+    return f"{year}_Q{period}" if use_key_style else f"{period}_{year}"
 
 
 def format_quarter_label(year: int, quarter: int) -> str:
-    """Format quarter label for display (e.g., "IIQ2024"). Shorthand for format_period_display."""
-    return format_period_display(year, quarter, "quarterly")
+    """Format quarter label for display (e.g., "IIQ2024")."""
+    return format_period(year, quarter, "quarterly", "display")
 
 
 def parse_period_key(period_key: str) -> tuple[int, int, str]:
@@ -343,10 +353,12 @@ def parse_period_key(period_key: str) -> tuple[int, int, str]:
     Args:
         period_key: Period key string (e.g., "2024_Q2", "2024_M06", "2024_FY")
 
-    Returns:
+    Returns
+    -------
         Tuple of (year, period, period_type)
 
-    Raises:
+    Raises
+    ------
         ValueError: If period key format is not recognized.
 
     """
@@ -381,7 +393,8 @@ def get_file_pattern(file_type: str) -> str:
         file_type: One of "analisis_razonado", "estados_financieros_pdf",
                    "estados_financieros_xbrl", "xbrl_zip", "pucobre_combined"
 
-    Returns:
+    Returns
+    -------
         File pattern string with placeholders.
 
     """
@@ -397,7 +410,8 @@ def get_file_pattern_alternatives(file_type: str) -> list[str]:
     Args:
         file_type: File type key
 
-    Returns:
+    Returns
+    -------
         List of alternative patterns (may be empty).
 
     """
@@ -423,7 +437,8 @@ def format_filename(
         period: Period number (alternative to quarter)
         period_type: Period type (for non-quarterly patterns)
 
-    Returns:
+    Returns
+    -------
         Formatted filename.
 
     """
@@ -453,7 +468,8 @@ def find_file_with_alternatives(
         year: Year
         quarter: Quarter number
 
-    Returns:
+    Returns
+    -------
         Path to found file, or None if not found.
 
     """
@@ -476,7 +492,8 @@ def find_file_with_alternatives(
 def get_total_row_markers() -> list[str]:
     """Get markers that identify total rows in tables.
 
-    Returns:
+    Returns
+    -------
         List of marker strings (e.g., ["Totales", "Total"]).
 
     """
@@ -493,7 +510,8 @@ def _deep_merge(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]
         base: Base dictionary
         overlay: Dictionary to overlay on base
 
-    Returns:
+    Returns
+    -------
         Merged dictionary
 
     """
@@ -526,10 +544,12 @@ def extract_pdf_page_to_temp(
         page_number: 1-indexed page number to extract
         prefix: Prefix for the temp file name
 
-    Returns:
+    Returns
+    -------
         Path to the temporary PDF file containing just that page
 
-    Raises:
+    Raises
+    ------
         ImportError: If pypdf is not installed
         ValueError: If page number is out of range
 
@@ -567,7 +587,8 @@ def cleanup_temp_files(prefix: str = "page_review_") -> int:
     Args:
         prefix: Prefix of files to clean up
 
-    Returns:
+    Returns
+    -------
         Number of files deleted
 
     """

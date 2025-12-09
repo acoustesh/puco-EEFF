@@ -74,7 +74,8 @@ def files_exist_for_period(year: int, quarter: int, require_xbrl: bool = False) 
         quarter: Quarter (1-4)
         require_xbrl: If True, also require XBRL file to exist
 
-    Returns:
+    Returns
+    -------
         True if all required files exist
 
     """
@@ -106,23 +107,34 @@ def ensure_files_downloaded(
     quarter: int,
     headless: bool = True,
     force: bool = False,
+    skip_download: bool = False,
 ) -> bool:
     """Ensure files are downloaded for a period.
 
-    Checks if files exist, downloads if missing.
+    Checks if files exist, downloads if missing (unless skip_download=True).
 
     Args:
         year: Year of the financial statement
         quarter: Quarter (1-4)
         headless: Run browser in headless mode
         force: If True, download even if files exist
+        skip_download: If True, only check existence without downloading
 
-    Returns:
+    Returns
+    -------
         True if files are available (existed or downloaded successfully)
 
     """
+    files_present = files_exist_for_period(year, quarter)
+
+    # Skip download mode: just check existence
+    if skip_download:
+        if not files_present:
+            logger.error("Files not found for %s Q%s and download skipped", year, quarter)
+        return files_present
+
     # Check if files already exist
-    if not force and files_exist_for_period(year, quarter):
+    if not force and files_present:
         logger.info("Files already exist for %s Q%s, skipping download", year, quarter)
         return True
 
@@ -157,6 +169,47 @@ def ensure_files_downloaded(
 # =============================================================================
 
 
+def _run_reference_validation(
+    data: Sheet1Data,
+    report: ValidationReport | None,
+    fail_on_mismatch: bool,
+) -> tuple[bool, list[str] | None]:
+    """Run reference validation and return (should_continue, issues).
+
+    Returns
+    -------
+        Tuple of (should_continue, ref_issues). should_continue is False
+        if fail_on_mismatch is True and issues were found.
+
+    """
+    ref_issues = validate_sheet1_against_reference(data)
+    if report:
+        report.reference_issues = ref_issues if ref_issues is not None else []
+
+    if ref_issues is None:
+        logger.info("Reference validation skipped: no verified data for %s", data.quarter)
+        return True, ref_issues
+
+    if len(ref_issues) == 0:
+        logger.info("✓ Reference validation passed: all values match %s", data.quarter)
+        return True, ref_issues
+
+    # Log prominent warning for reference mismatches
+    logger.warning("=" * 60)
+    logger.warning("⚠️  REFERENCE DATA MISMATCH - Values differ from known-good data!")
+    logger.warning("=" * 60)
+    for issue in ref_issues:
+        logger.warning("  • %s", issue)
+    logger.warning("Review extraction or update reference_data.json if values are correct.")
+    logger.warning("=" * 60)
+
+    if fail_on_mismatch:
+        logger.error("Reference mismatch and --fail-on-reference-mismatch is set")
+        return False, ref_issues
+
+    return True, ref_issues
+
+
 def process_sheet1(
     year: int,
     quarter: int,
@@ -170,12 +223,8 @@ def process_sheet1(
 ) -> tuple[Sheet1Data | None, ValidationReport | None]:
     """Process Sheet1: download if needed, extract, save, and report.
 
-    Main entry point for Sheet1 processing. Orchestrates:
-    1. Download files if they don't exist (unless skip_download=True)
-    2. Extract Sheet1 data from PDF/XBRL (includes sum and cross-validations)
-    3. Run reference validation (if validate_reference=True)
-    4. Save to JSON (if save=True)
-    5. Print report (if verbose=True)
+    Orchestrates the complete Sheet1 workflow: file acquisition, extraction,
+    validation, persistence, and reporting.
 
     Args:
         year: Year of the financial statement
@@ -188,19 +237,16 @@ def process_sheet1(
         fail_on_sum_mismatch: If True, return None on sum validation failure
         fail_on_reference_mismatch: If True, return None on reference mismatch
 
-    Returns:
+    Returns
+    -------
         Tuple of (Sheet1Data, ValidationReport) if successful, (None, None) otherwise
 
     """
     logger.info("Processing Sheet1 for %s Q%s", year, quarter)
 
     # Step 1: Ensure files are available
-    if not skip_download:
-        if not ensure_files_downloaded(year, quarter, headless=headless):
-            logger.error("Cannot proceed without required files")
-            return None, None
-    elif not files_exist_for_period(year, quarter):
-        logger.error("Files not found for %s Q%s and download skipped", year, quarter)
+    if not ensure_files_downloaded(year, quarter, headless=headless, skip_download=skip_download):
+        logger.error("Cannot proceed without required files")
         return None, None
 
     # Step 2: Extract Sheet1 data (includes sum and cross-validations)
@@ -210,33 +256,15 @@ def process_sheet1(
         return None, report
 
     # Step 3: Check sum validation failures (if strict mode)
-    if fail_on_sum_mismatch and report and report.has_sum_failures():
+    if fail_on_sum_mismatch and report and report.has_failures("sum"):
         logger.error("Sum validation failed and --fail-on-sum-mismatch is set")
         return None, report
 
     # Step 4: Reference validation (opt-in)
     if validate_reference or fail_on_reference_mismatch:
-        ref_issues = validate_sheet1_against_reference(data)
-        if report:
-            report.reference_issues = ref_issues if ref_issues is not None else []
-
-        if ref_issues is None:
-            logger.info(f"Reference validation skipped: no verified data for {data.quarter}")
-        elif len(ref_issues) == 0:
-            logger.info(f"✓ Reference validation passed: all values match {data.quarter}")
-        else:
-            # Prominent warning for reference mismatches
-            logger.warning("=" * 60)
-            logger.warning("⚠️  REFERENCE DATA MISMATCH - Values differ from known-good data!")
-            logger.warning("=" * 60)
-            for issue in ref_issues:
-                logger.warning("  • %s", issue)
-            logger.warning("Review extraction or update reference_data.json if values are correct.")
-            logger.warning("=" * 60)
-
-            if fail_on_reference_mismatch:
-                logger.error("Reference mismatch and --fail-on-reference-mismatch is set")
-                return None, report
+        should_continue, _ = _run_reference_validation(data, report, fail_on_reference_mismatch)
+        if not should_continue:
+            return None, report
 
     # Step 5: Save to JSON
     if save:
@@ -246,8 +274,6 @@ def process_sheet1(
     # Step 6: Print report
     if verbose:
         print_sheet1_report(data)
-        if report:
-            pass
 
     return data, report
 

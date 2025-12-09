@@ -25,7 +25,8 @@ def normalize_financial_data(
         date_columns: Columns to parse as dates
         numeric_columns: Columns to parse as numbers
 
-    Returns:
+    Returns
+    -------
         Normalized DataFrame
 
     """
@@ -61,7 +62,8 @@ def _normalize_column_name(name: str) -> str:
     Args:
         name: Original column name
 
-    Returns:
+    Returns
+    -------
         Normalized column name
 
     """
@@ -96,7 +98,8 @@ def _parse_number(value: Any) -> float | None:
     Args:
         value: Value to parse
 
-    Returns:
+    Returns
+    -------
         Parsed float or None if unparseable
 
     """
@@ -152,7 +155,8 @@ def clean_text(text: str) -> str:
     Args:
         text: Raw text
 
-    Returns:
+    Returns
+    -------
         Cleaned text
 
     """
@@ -169,7 +173,8 @@ def extract_tables_from_ocr_markdown(ocr_content: str) -> list[pd.DataFrame]:
     Args:
         ocr_content: OCR-extracted content with markdown tables
 
-    Returns:
+    Returns
+    -------
         List of DataFrames extracted from markdown tables
 
     """

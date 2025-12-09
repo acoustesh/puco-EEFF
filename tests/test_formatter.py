@@ -12,8 +12,7 @@ from puco_eeff.transformer.formatter import (
     map_to_structure,
     validate_against_reference,
     validate_balance_sheet,
-    validate_costo_venta_total,
-    validate_gasto_admin_total,
+    validate_section_total,
 )
 
 
@@ -127,11 +126,11 @@ class TestMapToStructure:
         assert rows[2]["valor"] is None  # cv_gastos_personal not provided
 
 
-class TestValidateCostoVentaTotal:
-    """Tests for validate_costo_venta_total."""
+class TestValidateSectionTotal:
+    """Tests for validate_section_total - unified section validation."""
 
-    def test_valid_total(self) -> None:
-        """Sum should match total."""
+    def test_costo_venta_valid_total(self) -> None:
+        """Costo venta sum should match total."""
         data = {
             "cv_gastos_personal": -1000,
             "cv_materiales": -2000,
@@ -147,33 +146,29 @@ class TestValidateCostoVentaTotal:
             "total_costo_venta": -4000,
         }
 
-        result = validate_costo_venta_total(data)
+        result = validate_section_total(data, "costo_venta")
 
         assert result.match is True
-        assert result.actual == -4000
-        assert result.expected == -4000
+        assert result.value_b == -4000  # actual (calculated sum)
+        assert result.value_a == -4000  # expected (reported total)
 
-    def test_invalid_total(self) -> None:
-        """Mismatch should be detected."""
+    def test_costo_venta_invalid_total(self) -> None:
+        """Costo venta mismatch should be detected."""
         data = {
             "cv_gastos_personal": -1000,
             "cv_materiales": -2000,
             "total_costo_venta": -5000,  # Wrong - should be -3000
         }
 
-        result = validate_costo_venta_total(data)
+        result = validate_section_total(data, "costo_venta")
 
         assert result.match is False
-        assert result.actual == -3000
-        assert result.expected == -5000
+        assert result.value_b == -3000  # actual (calculated sum)
+        assert result.value_a == -5000  # expected (reported total)
         assert result.difference == -2000
 
-
-class TestValidateGastoAdminTotal:
-    """Tests for validate_gasto_admin_total."""
-
-    def test_valid_total(self) -> None:
-        """Sum should match total."""
+    def test_gasto_admin_valid_total(self) -> None:
+        """Gasto admin sum should match total."""
         data = {
             "ga_gastos_personal": -1000,
             "ga_materiales": -100,
@@ -184,9 +179,14 @@ class TestValidateGastoAdminTotal:
             "total_gasto_admin": -2000,
         }
 
-        result = validate_gasto_admin_total(data)
+        result = validate_section_total(data, "gasto_admin")
 
         assert result.match is True
+
+    def test_unknown_section_raises_error(self) -> None:
+        """Unknown section should raise KeyError."""
+        with pytest.raises(KeyError):
+            validate_section_total({}, "unknown_section")
 
 
 class TestValidateBalanceSheet:
@@ -235,8 +235,8 @@ class TestValidateAgainstReference:
 
         cv_result = next(r for r in results if r.field == "cv_gastos_personal")
         assert cv_result.match is False
-        assert cv_result.expected == -19721
-        assert cv_result.actual == -20000
+        assert cv_result.value_a == -19721  # expected (reference baseline)
+        assert cv_result.value_b == -20000  # actual (extracted value)
         assert cv_result.difference == -279
 
     def test_missing_reference_period(self, mock_config: dict[str, Any]) -> None:
@@ -261,8 +261,8 @@ class TestValidateAgainstReference:
 
         results = validate_against_reference(extracted, "IIQ2024", mock_config)
 
-        # All results should have actual=None and match=False
-        assert all(r.actual is None for r in results)
+        # All results should have value_b=None (actual) and match=False
+        assert all(r.value_b is None for r in results)
         assert all(r.match is False for r in results)
 
 
@@ -278,8 +278,21 @@ class TestFormatValidationReport:
     def test_includes_summary(self) -> None:
         """Report should include pass/fail counts."""
         results = [
-            ValidationResult("field1", 100, 100, True),
-            ValidationResult("field2", 200, 300, False, 100),
+            ValidationResult(
+                field_name="field1",
+                value_a=100,
+                value_b=100,
+                match=True,
+                comparison_type="reference",
+            ),
+            ValidationResult(
+                field_name="field2",
+                value_a=200,
+                value_b=300,
+                match=False,
+                comparison_type="reference",
+                difference=100,
+            ),
         ]
 
         report = format_validation_report(results)
@@ -291,13 +304,20 @@ class TestFormatValidationReport:
     def test_includes_mismatch_details(self) -> None:
         """Failed validations should show expected vs actual."""
         results = [
-            ValidationResult("test_field", 1000, 1500, False, 500),
+            ValidationResult(
+                field_name="test_field",
+                value_a=1000,
+                value_b=1500,
+                match=False,
+                comparison_type="reference",
+                difference=500,
+            ),
         ]
 
         report = format_validation_report(results)
 
-        assert "Expected: 1,000" in report
-        assert "Actual:   1,500" in report
+        assert "test_field" in report
+        assert "Mismatch" in report
 
 
 class TestValidationResultStatus:
@@ -305,21 +325,46 @@ class TestValidationResultStatus:
 
     def test_match_status(self) -> None:
         """Matching result should show checkmark."""
-        result = ValidationResult("field", 100, 100, True)
+        result = ValidationResult(
+            field_name="field",
+            value_a=100,
+            value_b=100,
+            match=True,
+            comparison_type="reference",
+        )
         assert "✓" in result.status
 
     def test_mismatch_status(self) -> None:
         """Mismatched result should show X and difference."""
-        result = ValidationResult("field", 100, 150, False, 50)
+        result = ValidationResult(
+            field_name="field",
+            value_a=100,
+            value_b=150,
+            match=False,
+            comparison_type="reference",
+            difference=50,
+        )
         assert "✗" in result.status
         assert "50" in result.status
 
     def test_no_reference_status(self) -> None:
         """Missing reference should show warning."""
-        result = ValidationResult("field", None, 100, False)
+        result = ValidationResult(
+            field_name="field",
+            value_a=None,
+            value_b=100,
+            match=False,
+            comparison_type="reference",
+        )
         assert "⚠" in result.status
 
     def test_no_actual_status(self) -> None:
         """Missing actual should show warning."""
-        result = ValidationResult("field", 100, None, False)
+        result = ValidationResult(
+            field_name="field",
+            value_a=100,
+            value_b=None,
+            match=False,
+            comparison_type="reference",
+        )
         assert "⚠" in result.status

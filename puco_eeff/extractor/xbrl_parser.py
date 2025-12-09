@@ -21,7 +21,8 @@ def _get_xbrl_config(config: dict | None = None) -> tuple[dict[str, str], list[s
     Args:
         config: Configuration dict, or None to load from file
 
-    Returns:
+    Returns
+    -------
         Tuple of (namespaces dict, aggregate_facts list)
 
     """
@@ -74,7 +75,8 @@ def parse_xbrl_file(file_path: Path) -> dict[str, Any]:
     Args:
         file_path: Path to the XBRL/XML file
 
-    Returns:
+    Returns
+    -------
         Dictionary containing extracted financial data
 
     """
@@ -123,7 +125,8 @@ def _detect_namespaces(root: etree._Element) -> dict[str, str]:
     Args:
         root: Root element of the XML tree
 
-    Returns:
+    Returns
+    -------
         Dictionary of namespace prefixes to URIs
 
     """
@@ -142,7 +145,8 @@ def _extract_facts(root: etree._Element, namespaces: dict[str, str]) -> list[dic
         root: Root element of the XML tree
         namespaces: Namespace mapping
 
-    Returns:
+    Returns
+    -------
         List of fact dictionaries
 
     """
@@ -174,7 +178,8 @@ def _extract_contexts(
         root: Root element of the XML tree
         namespaces: Namespace mapping
 
-    Returns:
+    Returns
+    -------
         Dictionary mapping context IDs to context information
 
     """
@@ -222,7 +227,8 @@ def _get_local_name(element: etree._Element) -> str:
     Args:
         element: XML element
 
-    Returns:
+    Returns
+    -------
         Local name string
 
     """
@@ -238,7 +244,8 @@ def extract_by_xpath(file_path: Path, xpath_expr: str) -> list[str]:
         file_path: Path to the XML file
         xpath_expr: XPath expression to evaluate
 
-    Returns:
+    Returns
+    -------
         List of extracted values as strings
 
     """
@@ -281,7 +288,8 @@ def get_facts_by_name(
         name_pattern: Fact name or pattern to search for
         exact: If True, match exactly; if False, match substring (case-insensitive)
 
-    Returns:
+    Returns
+    -------
         List of matching facts with context information
 
     """
@@ -310,7 +318,8 @@ def get_units(data: dict[str, Any]) -> dict[str, str]:
     Args:
         data: Parsed XBRL data
 
-    Returns:
+    Returns
+    -------
         Dictionary mapping unit IDs to their descriptions
 
     """
@@ -335,7 +344,8 @@ def summarize_facts(data: dict[str, Any]) -> dict[str, int]:
     Args:
         data: Parsed XBRL data
 
-    Returns:
+    Returns
+    -------
         Dictionary mapping category/prefix to count
 
     """
@@ -366,7 +376,8 @@ def extract_xbrl_aggregates(
         xml_path: Path to the XBRL/XML file
         config: Configuration dict, or None to load from file
 
-    Returns:
+    Returns
+    -------
         Dictionary with aggregate values:
         {
             "source_file": str,
@@ -445,7 +456,8 @@ def save_xbrl_aggregates(
         output_path: Path to save JSON file
         config: Configuration dict (unused, for API consistency)
 
-    Returns:
+    Returns
+    -------
         Path to saved file
 
     """

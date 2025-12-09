@@ -62,51 +62,85 @@ __all__ = [
 
 
 @dataclass
-class PDFXBRLComparisonResult:
-    """Result of cross-validation between PDF and XBRL data sources.
+class ComparisonResult:
+    """Unified validation result for comparing two values from different sources.
 
-    This class tracks the comparison of a single field between two sources,
-    recording which sources were available and whether values matched.
+    This class handles both PDF/XBRL cross-validation and reference baseline
+    validation through a single interface. The `comparison_type` field indicates
+    which kind of validation was performed.
 
-    Attributes:
+    Comparison Types:
+        - "pdf_xbrl": Cross-validation between PDF extraction and XBRL data
+        - "reference": Validation against ground-truth reference baseline
+
+    Attributes
+    ----------
         field_name: Name of the validated field (e.g., "total_costo_venta")
-        pdf_value: Value extracted from PDF (None if unavailable)
-        xbrl_value: Value from XBRL file (None if unavailable)
-        match: True if both sources agree (or one missing)
-        source: Origin indicator ("pdf_only", "xbrl_only", or "both")
+        value_a: First value (PDF value or expected reference)
+        value_b: Second value (XBRL value or actual extracted)
+        match: True if values agree within tolerance
+        comparison_type: Type of comparison ("pdf_xbrl" or "reference")
+        source: For pdf_xbrl: origin indicator ("pdf_only", "xbrl_only", "both")
+                For reference: None (not applicable)
         difference: Absolute difference when mismatch (None if match/missing)
 
     """
 
     field_name: str
-    pdf_value: int | None
-    xbrl_value: int | None
+    value_a: int | None  # PDF value or expected reference
+    value_b: int | None  # XBRL value or actual extracted
     match: bool
-    source: str
+    comparison_type: str = "pdf_xbrl"  # "pdf_xbrl" or "reference"
+    source: str | None = None  # Only used for pdf_xbrl comparison
     difference: int | None = None
 
     @property
     def status(self) -> str:
-        """Format PDF/XBRL validation status with source-specific warnings."""
-        # Use dictionary-based dispatch for source-specific messages
-        messages = {
-            "pdf_only": "⚠ PDF only (no XBRL)",
-            "xbrl_only": "⚠ XBRL only (PDF extraction failed)",
-        }
-        if msg := messages.get(self.source):
-            return msg
-        # Standard match/mismatch formatting
-        return (
-            "✓ Match"
-            if self.match
-            else f"✗ Mismatch (diff: {self.difference:,})"
+        """Format validation status with context-appropriate messaging.
+
+        For pdf_xbrl comparisons: Shows source availability warnings and match status.
+        For reference comparisons: Shows baseline availability and extraction status.
+        """
+        # Handle pdf_xbrl source-specific messages
+        if self.comparison_type == "pdf_xbrl":
+            source_warnings = {
+                "pdf_only": "⚠ PDF only (no XBRL)",
+                "xbrl_only": "⚠ XBRL only (PDF extraction failed)",
+            }
+            if warning := source_warnings.get(self.source or ""):
+                return warning
+
+        # Handle reference baseline availability
+        if self.comparison_type == "reference":
+            if self.value_a is None:
+                return "⚠ Reference baseline unavailable"
+            if self.value_b is None:
+                return "⚠ Extraction returned empty"
+
+        # Common match/mismatch formatting
+        if self.match:
+            return "✓ Match"
+        diff_display = (
+            f" (diff: {self.difference:,})"
             if self.difference
-            else "✗ Mismatch (diff: n/a)"
+            else (" (diff: n/a)" if self.comparison_type == "pdf_xbrl" else "")
         )
+        return f"✗ Mismatch{diff_display}"
+
+    @property
+    def field(self) -> str:
+        """Field name alias for backward compatibility."""
+        return self.field_name
+
+    # Note: Use value_a/value_b directly instead of semantic aliases.
+    # For pdf_xbrl comparison: value_a=PDF data, value_b=XBRL data
+    # For reference comparison: value_a=expected baseline, value_b=actual extracted
 
 
-# Backward-compatible alias
-ValidationResult = PDFXBRLComparisonResult
+# Backward-compatible aliases
+PDFXBRLComparisonResult = ComparisonResult
+ValidationResult = ComparisonResult
+ReferenceValidationResult = ComparisonResult
 
 
 @dataclass
@@ -154,7 +188,8 @@ def format_sum_validation_status(result: SumValidationResult) -> str:
     Args:
         result: The sum validation result to format
 
-    Returns:
+    Returns
+    -------
         Formatted status string with appropriate icon
 
     """
@@ -202,27 +237,42 @@ class ValidationReport:
     pdf_xbrl_validations: list[ValidationResult] = field(default_factory=list)
     reference_issues: list[str] | None = None
 
-    def _has_validation_failures(self, validations: list) -> bool:
-        """Check if any validation in the given list failed."""
-        return any(not v.match for v in validations)
+    def has_failures(self, category: str | None = None) -> bool:
+        """Check for validation failures, optionally filtered by category.
 
-    def has_failures(self) -> bool:
-        """Check if any validation failed."""
+        Args:
+            category: Optional filter. Valid values:
+                - None: Check ALL categories (sum + cross + pdf_xbrl + reference)
+                - "sum": Check only sum_validations
+                - "cross": Check only cross_validations
+                - "pdf_xbrl": Check only pdf_xbrl_validations
+                - "reference": Check only reference_issues
+
+        Returns
+        -------
+            True if any validation in the specified category/ies failed.
+
+        """
+        if category == "reference":
+            return bool(self.reference_issues)
+
+        checks_by_category = {
+            "sum": self.sum_validations,
+            "cross": self.cross_validations,
+            "pdf_xbrl": self.pdf_xbrl_validations,
+        }
+
+        if category is not None:
+            validations = checks_by_category.get(category, [])
+            return any(not v.match for v in validations)
+
+        # Check all categories when no filter specified
         return (
-            self._has_validation_failures(self.sum_validations)
-            or self._has_validation_failures(self.cross_validations)
-            or self._has_validation_failures(self.pdf_xbrl_validations)
-            or self.has_reference_failures()
+            any(not v.match for v in self.sum_validations)
+            or any(not v.match for v in self.cross_validations)
+            or any(not v.match for v in self.pdf_xbrl_validations)
+            or bool(self.reference_issues)
         )
-
-    def has_sum_failures(self) -> bool:
-        """Check if any sum validation failed (convenience wrapper)."""
-        # Delegates to has_failures logic to avoid duplication
-        return self._has_validation_failures(self.sum_validations)
-
-    def has_reference_failures(self) -> bool:
-        """Check if reference validation failed."""
-        return self.reference_issues is not None and len(self.reference_issues) > 0
 
 
 # =============================================================================
@@ -236,7 +286,7 @@ def _format_section(
     formatter: callable,
     empty_line: str,
 ) -> list[str]:
-    """Generic formatter for validation sections."""
+    """Format validation sections generically."""
     if not items:
         return [empty_line]
     lines = [header]
@@ -250,11 +300,11 @@ def _format_pdf_xbrl_validation_item(v: ValidationResult) -> str:
         symbol = "✓" if v.match else "✗"
         diff_display = f"{v.difference:,}" if v.difference is not None else "n/a"
         if v.match:
-            return f"  {symbol} {v.field_name}: {v.pdf_value:,} (PDF) = {v.xbrl_value:,} (XBRL)"
-        return f"  {symbol} {v.field_name}: {v.pdf_value:,} (PDF) ≠ {v.xbrl_value:,} (XBRL) [diff: {diff_display}]"
+            return f"  {symbol} {v.field_name}: {v.value_a:,} (PDF) = {v.value_b:,} (XBRL)"
+        return f"  {symbol} {v.field_name}: {v.value_a:,} (PDF) ≠ {v.value_b:,} (XBRL) [diff: {diff_display}]"
     if v.source == "xbrl_only":
-        return f"  ⚠ {v.field_name}: {v.xbrl_value:,} (XBRL only, used as source)"
-    return f"  ⚠ {v.field_name}: {v.pdf_value:,} (PDF only, no XBRL)"
+        return f"  ⚠ {v.field_name}: {v.value_b:,} (XBRL only, used as source)"
+    return f"  ⚠ {v.field_name}: {v.value_a:,} (PDF only, no XBRL)"
 
 
 def _format_reference_validations(report: ValidationReport) -> list[str]:
@@ -436,8 +486,13 @@ def _resolve_single_pdf_xbrl_validation(
         else:
             logger.warning(f"✗ {display_name} mismatch - PDF: {pdf_value:,}, XBRL: {xbrl_value:,} (diff: {diff})")
         return ValidationResult(
-            field_name=display_name, pdf_value=pdf_value, xbrl_value=xbrl_value,
-            match=match, source="both", difference=diff if not match else None,
+            field_name=display_name,
+            value_a=pdf_value,
+            value_b=xbrl_value,
+            match=match,
+            comparison_type="pdf_xbrl",
+            source="both",
+            difference=diff if not match else None,
         )
     # Single source - apply XBRL fallback if needed
     is_xbrl = xbrl_value is not None
@@ -446,9 +501,11 @@ def _resolve_single_pdf_xbrl_validation(
         data.set_value(field_name, xbrl_value)
     return ValidationResult(
         field_name=display_name,
-        pdf_value=None if is_xbrl else pdf_value,
-        xbrl_value=xbrl_value if is_xbrl else None,
-        match=True, source="xbrl_only" if is_xbrl else "pdf_only",
+        value_a=None if is_xbrl else pdf_value,
+        value_b=xbrl_value if is_xbrl else None,
+        match=True,
+        comparison_type="pdf_xbrl",
+        source="xbrl_only" if is_xbrl else "pdf_only",
     )
 
 

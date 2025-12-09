@@ -25,10 +25,12 @@ async def download_file(url: str, destination: Path, request_timeout: float = 60
         destination: Path to save the file
         request_timeout: Request timeout in seconds
 
-    Returns:
+    Returns
+    -------
         Path to the downloaded file
 
-    Raises:
+    Raises
+    ------
         httpx.HTTPError: If download fails
 
     """
@@ -50,7 +52,7 @@ async def download_file(url: str, destination: Path, request_timeout: float = 60
 
 
 def download_file_sync(url: str, destination: Path, timeout: float = 60.0) -> Path:
-    """Synchronous file download using blocking I/O.
+    """Download file synchronously using blocking I/O.
 
     Uses httpx.Client for blocking requests. Use this when running in
     synchronous code without an event loop, such as in CLI scripts.
@@ -60,10 +62,12 @@ def download_file_sync(url: str, destination: Path, timeout: float = 60.0) -> Pa
         destination: Path to save the file
         timeout: Request timeout in seconds
 
-    Returns:
+    Returns
+    -------
         Path to the downloaded file
 
-    Raises:
+    Raises
+    ------
         httpx.HTTPError: If download fails
 
     """

@@ -30,8 +30,10 @@ from puco_eeff.extractor.ocr_fallback import ocr_with_fallback
 from puco_eeff.extractor.ocr_mistral import ocr_with_mistral
 from puco_eeff.extractor.pdf_parser import extract_tables_from_pdf, extract_text_from_pdf
 from puco_eeff.extractor.validation_core import (
+    ComparisonResult,
     CrossValidationResult,
     ExtractionResult,
+    ReferenceValidationResult,
     SumValidationResult,
     ValidationReport,
     ValidationResult,
@@ -42,9 +44,11 @@ from puco_eeff.extractor.xbrl_parser import get_facts_by_name, parse_xbrl_file
 from puco_eeff.sheets.sheet1 import Sheet1Data, print_sheet1_report, save_sheet1_data
 
 __all__ = [
+    "ComparisonResult",
     "CrossValidationResult",
     "ExtractionResult",
     "LineItem",
+    "ReferenceValidationResult",
     # Dataclasses
     "SectionBreakdown",
     "Sheet1Data",

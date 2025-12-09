@@ -35,7 +35,8 @@ def _get_pucobre_config(config: dict | None = None) -> tuple[str, dict[int, str]
     Args:
         config: Configuration dict, or None to load from file
 
-    Returns:
+    Returns
+    -------
         Tuple of (base_url, quarter_to_date_mapping)
 
     """
@@ -102,7 +103,8 @@ def _find_analisis_razonado_page(pdf_path: Path) -> int | None:
     Args:
         pdf_path: Path to the combined PDF file
 
-    Returns:
+    Returns
+    -------
         0-based page index where Análisis Razonado starts, or None if not found
 
     """
@@ -149,7 +151,8 @@ def _split_combined_pdf(
         analisis_razonado_path: Output path for Análisis Razonado (pages split_page to end)
         split_page: 0-based page index where Análisis Razonado starts
 
-    Returns:
+    Returns
+    -------
         Tuple of (success, error_message)
 
     """
@@ -205,7 +208,8 @@ def download_from_pucobre(
         split_pdf: If True, split combined PDF into separate files
         config: Configuration dict, or None to load from file
 
-    Returns:
+    Returns
+    -------
         PucobreDownloadResult with status and file paths
 
     """
@@ -392,7 +396,8 @@ def _find_period_link(
         quarter: Target quarter (1-4)
         quarter_to_date: Mapping from quarter number to date string
 
-    Returns:
+    Returns
+    -------
         Locator for the link, or None if not found
 
     """
@@ -419,17 +424,50 @@ def _find_period_link(
 
 
 def _extract_pucobre_periods_from_page(page: Page) -> list[dict]:
-    """Scrape periods from Pucobre page links matching 'Estados Financieros DD-MM-YYYY'."""
-    time.sleep(2)  # Allow page to settle
-    month_map = {"03": 1, "06": 2, "09": 3, "12": 4}
-    links = page.locator("a:has-text('Estados Financieros')")
-    periods = []
-    for i in range(links.count()):
-        text = links.nth(i).inner_text()
-        match = re.search(r"(\d{2})-(\d{2})-(\d{4})", text)
-        if match and (q := month_map.get(match.group(2))):
-            periods.append({"year": int(match.group(3)), "quarter": q, "link_text": text, "source": "pucobre.cl"})
-    return periods
+    """Parse periods from Pucobre.cl by matching hyperlink text patterns.
+
+    Unlike CMF (which uses form selects), Pucobre publishes documents as a list
+    of hyperlinks with titles like "Estados Financieros 31-03-2024". We locate
+    all matching links and parse the embedded date (DD-MM-YYYY) to extract periods.
+
+    Args:
+        page: Playwright Page navigated to Pucobre.cl investors section.
+
+    Returns
+    -------
+        List of period dicts with year/quarter/link_text/source for each found document.
+
+    """
+    time.sleep(2)  # Allow dynamic content to load
+
+    # Map month to quarter number for quarterly report detection
+    quarterly_months = {"03": 1, "06": 2, "09": 3, "12": 4}
+    date_pattern = re.compile(r"(\d{2})-(\d{2})-(\d{4})")
+
+    # Locate all hyperlinks containing "Estados Financieros"
+    document_links = page.locator("a:has-text('Estados Financieros')")
+    link_count = document_links.count()
+
+    extracted_periods = []
+    for idx in range(link_count):
+        link_text = document_links.nth(idx).inner_text()
+        date_match = date_pattern.search(link_text)
+
+        if date_match is None:
+            continue
+
+        day, month, year = date_match.groups()
+        quarter = quarterly_months.get(month)
+
+        if quarter is not None:
+            extracted_periods.append({
+                "year": int(year),
+                "quarter": quarter,
+                "link_text": link_text,
+                "source": "pucobre.cl",
+            })
+
+    return extracted_periods
 
 
 def list_pucobre_periods(headless: bool = True, config: dict | None = None) -> list[dict]:
@@ -442,7 +480,8 @@ def list_pucobre_periods(headless: bool = True, config: dict | None = None) -> l
         headless: Run browser in headless mode
         config: Configuration dict, or None to load from file
 
-    Returns:
+    Returns
+    -------
         List of available periods with year, quarter, link_text, and source
 
     """
@@ -471,7 +510,8 @@ def check_pucobre_availability(
         headless: Run browser in headless mode
         config: Configuration dict, or None to load from file
 
-    Returns:
+    Returns
+    -------
         True if the period is available
 
     """
