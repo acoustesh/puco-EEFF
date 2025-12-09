@@ -39,6 +39,7 @@ class DownloadResult:
 
     Represents a single document download from CMF Chile regulatory portal.
     Used for analisis razonado, estados financieros PDF, and XBRL downloads.
+    Designed for simple single-file downloads without post-processing.
     """
 
     document_type: str  # "analisis_razonado", "estados_financieros_pdf", "estados_financieros_xbrl"
@@ -47,6 +48,17 @@ class DownloadResult:
     file_size: int | None
     error: str | None = None
     source: str = "cmf"  # Always "cmf" for this dataclass
+    
+    def as_dict(self) -> dict:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "document_type": self.document_type,
+            "success": self.success,
+            "file_path": str(self.file_path) if self.file_path else None,
+            "file_size": self.file_size,
+            "error": self.error,
+            "source": self.source,
+        }
 
 
 def download_all_documents(
@@ -105,7 +117,7 @@ def download_all_documents(
             for doc_type, doc_config in cmf_config["downloads"].items():
                 # XBRL goes to xbrl directory, PDFs go to pdf directory
                 output_dir = xbrl_dir if doc_type == "estados_financieros_xbrl" else pdf_dir
-                result = _download_single_document(
+                result = _click_and_save_download(
                     page=page,
                     doc_type=doc_type,
                     doc_config=doc_config,
@@ -314,7 +326,7 @@ def download_single_document(
             logger.warning("Failed to navigate and apply CMF Chile filters")
         else:
             doc_config = cmf_config["downloads"][document_type]
-            result = _download_single_document(
+            result = _click_and_save_download(
                 page=page,
                 doc_type=document_type,
                 doc_config=doc_config,
@@ -434,7 +446,7 @@ def _navigate_and_filter(
         return False
 
 
-def _download_single_document(
+def _click_and_save_download(
     page: Page,
     doc_type: str,
     doc_config: dict,
@@ -442,19 +454,10 @@ def _download_single_document(
     year: int,
     quarter: int,
 ) -> DownloadResult:
-    """Download a single document from the filtered results page.
+    """Click download link and save file from Playwright browser.
 
-    Args:
-        page: Playwright page instance (already filtered)
-        doc_type: Document type key
-        doc_config: Document configuration with link_text and filename_pattern
-        output_dir: Directory to save the file
-        year: Year for filename
-        quarter: Quarter for filename
-
-    Returns:
-        DownloadResult with status
-
+    Low-level function that finds the download link by text,
+    triggers the download, and saves to the output directory.
     """
     link_text = doc_config["link_text"]
     filename = doc_config["filename_pattern"].format(year=year, quarter=quarter)
@@ -593,35 +596,17 @@ def _extract_xbrl_zip(
 
 
 def _extract_cmf_periods_from_page(page: Page) -> list[dict]:
-    """Extract available periods from CMF page selectors."""
-    config = get_config()
-    month_to_quarter = config["sources"]["cmf_chile"]["filters"]["month_to_quarter"]
-    periods: list[dict] = []
-
-    year_select = page.query_selector("select[name='aa']")
-    month_select = page.query_selector("select[name='mm']")
-
-    if not year_select or not month_select:
-        return periods
-
-    years = [
-        opt.get_attribute("value")
-        for opt in year_select.query_selector_all("option")
-        if opt.get_attribute("value")
+    """Extract available periods from CMF page's year/month dropdown selectors."""
+    month_to_quarter = get_config()["sources"]["cmf_chile"]["filters"]["month_to_quarter"]
+    year_el, month_el = page.query_selector("select[name='aa']"), page.query_selector("select[name='mm']")
+    if not (year_el and month_el):
+        return []
+    years = [o.get_attribute("value") for o in year_el.query_selector_all("option") if o.get_attribute("value")]
+    months = [o.get_attribute("value") for o in month_el.query_selector_all("option") if o.get_attribute("value")]
+    return [
+        {"year": int(y), "month": m, "quarter": month_to_quarter[m]}
+        for y in years for m in months if m in month_to_quarter
     ]
-    months = [
-        opt.get_attribute("value")
-        for opt in month_select.query_selector_all("option")
-        if opt.get_attribute("value")
-    ]
-
-    for year in years:
-        for month in months:
-            quarter = month_to_quarter.get(month) if year and month else None
-            if quarter:
-                periods.append({"year": int(year), "month": month, "quarter": quarter})
-
-    return periods
 
 
 def list_available_periods(headless: bool = True) -> list[dict]:

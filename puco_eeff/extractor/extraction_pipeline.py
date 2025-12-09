@@ -4,9 +4,7 @@ This module provides the main entry points for extracting Sheet1 data from
 PDF and XBRL files.
 
 Key Functions:
-    extract_sheet1(): Main entry point for Sheet1 extraction.
-    extract_sheet1_from_xbrl(): Extract Sheet1 totals directly from XBRL.
-    extract_sheet1_from_analisis_razonado(): Extract Sheet1 from PDF.
+    extract_sheet1(): Unified entry point for Sheet1 extraction (PDF/XBRL/both).
     extract_detailed_costs(): Extract detailed cost breakdowns.
     save_extraction_result(): Save extraction result to JSON file.
     print_extraction_report(): Print extraction report to console.
@@ -54,15 +52,12 @@ logger = setup_logging(__name__)
 __all__ = [
     "extract_detailed_costs",
     "extract_sheet1",
-    "extract_sheet1_from_analisis_razonado",
-    "extract_sheet1_from_xbrl",
     "print_extraction_report",
     "print_sheet1_report",
     "save_extraction_result",
     # Re-exports
     "save_sheet1_data",
 ]
-
 
 # =============================================================================
 # High-Level Extraction Functions
@@ -185,15 +180,6 @@ def _extract_ingresos_fallback(data: Sheet1Data, ef_path: Path) -> ValidationRep
     return ValidationReport(sum_validations=sum_results)
 
 
-def _wrap_result(
-    data: Sheet1Data | None,
-    report: ValidationReport | None,
-    return_report: bool,
-) -> Sheet1Data | None | tuple[Sheet1Data | None, ValidationReport | None]:
-    """Wrap extraction result based on return_report flag."""
-    return (data, report) if return_report else data
-
-
 def _extract_and_populate_notas(data: Sheet1Data, ef_path: Path) -> bool:
     """Extract Nota 21 and 22 from PDF and populate Sheet1Data.
 
@@ -228,44 +214,28 @@ def _create_sheet1_data(year: int, quarter: int, source: str, xbrl_available: bo
     )
 
 
-def extract_sheet1_from_analisis_razonado(
-    year: int,
-    quarter: int,
-    validate_with_xbrl: bool = True,
-    return_report: bool = False,
-) -> Sheet1Data | None | tuple[Sheet1Data | None, ValidationReport | None]:
-    """Extract Sheet1 data from Estados Financieros PDF.
-
-    This function extracts cost breakdown data from Nota 21 and Nota 22
-    sections of the Estados Financieros PDF, optionally validating against
-    XBRL data if available.
-    """
-    period_paths = get_period_paths(year, quarter)
-    raw_pdf_dir = period_paths["raw_pdf"]
-
-    ef_pdf_path = _resolve_pdf_path(raw_pdf_dir, year, quarter)
-    if ef_pdf_path is None:
-        logger.warning("Estados Financieros PDF not found in %s", raw_pdf_dir)
-        return _wrap_result(None, None, return_report)
-
-    extraction_source = _determine_source(raw_pdf_dir, year, quarter)
-    xbrl_file_path, has_xbrl = _resolve_xbrl_path(period_paths["raw_xbrl"], year, quarter)
-
-    sheet1_data = _create_sheet1_data(year, quarter, extraction_source, has_xbrl)
-
-    notas_extracted = _extract_and_populate_notas(sheet1_data, ef_pdf_path)
-    if not notas_extracted:
-        logger.error("Could not extract Nota 21 or 22 from %s", ef_pdf_path)
-        return _wrap_result(None, None, return_report)
-
-    can_validate_with_xbrl = has_xbrl and validate_with_xbrl and xbrl_file_path is not None
-    if can_validate_with_xbrl:
-        xbrl_fact_totals = extract_xbrl_totals(xbrl_file_path)  # type: ignore[arg-type]
-        validation_report = run_sheet1_validations(sheet1_data, xbrl_fact_totals)
+def _extract_from_pdf(
+    year: int, quarter: int, validate_with_xbrl: bool
+) -> tuple[Sheet1Data | None, ValidationReport | None]:
+    """PDF extraction implementation - extracts from Nota 21/22 sections."""
+    paths = get_period_paths(year, quarter)
+    ef_pdf = _resolve_pdf_path(paths["raw_pdf"], year, quarter)
+    if not ef_pdf:
+        logger.warning("PDF not found in %s", paths["raw_pdf"])
+        return None, None
+    
+    xbrl_path, has_xbrl = _resolve_xbrl_path(paths["raw_xbrl"], year, quarter)
+    data = _create_sheet1_data(year, quarter, _determine_source(paths["raw_pdf"], year, quarter), has_xbrl)
+    
+    if not _extract_and_populate_notas(data, ef_pdf):
+        logger.error("Nota extraction failed from %s", ef_pdf)
+        return None, None
+    
+    if has_xbrl and validate_with_xbrl and xbrl_path:
+        report = run_sheet1_validations(data, extract_xbrl_totals(xbrl_path))
     else:
-        validation_report = _extract_ingresos_fallback(sheet1_data, ef_pdf_path)
-
-    return _wrap_result(sheet1_data, validation_report, return_report)
+        report = _extract_ingresos_fallback(data, ef_pdf)
+    return data, report
 
 
 def _map_nota_item_to_sheet1(item: LineItem, data: Sheet1Data, section_name: str) -> None:
@@ -287,87 +257,24 @@ _XBRL_TO_SHEET1_FIELDS = {
 }
 
 
-def extract_sheet1_from_xbrl(
-    year: int,
-    quarter: int,
-    return_report: bool = False,
-) -> Sheet1Data | None | tuple[Sheet1Data | None, ValidationReport | None]:
-    """Extract Sheet1 data directly from XBRL file only (no PDF extraction).
-
-    Bypasses PDF processing, extracting high-level totals from structured XBRL.
-    Use when PDF is unavailable or only summary totals are needed.
-    """
+def _extract_from_xbrl_only(year: int, quarter: int) -> tuple[Sheet1Data | None, ValidationReport | None]:
+    """XBRL-only extraction - extracts high-level totals without PDF."""
     paths = get_period_paths(year, quarter)
     xbrl_path = find_file_with_alternatives(paths["raw_xbrl"], "estados_financieros_xbrl", year, quarter)
     if not xbrl_path:
         xbrl_path = paths["raw_xbrl"] / format_filename("estados_financieros_xbrl", year, quarter)
-
     if not xbrl_path.exists():
         logger.warning("XBRL file not found for %dQ%d", year, quarter)
-        return (None, None) if return_report else None
-
+        return None, None
     xbrl_totals = extract_xbrl_totals(xbrl_path)
     if not xbrl_totals:
         logger.error("Could not extract totals from XBRL: %s", xbrl_path)
-        return (None, None) if return_report else None
-
+        return None, None
     data = _create_sheet1_data(year, quarter, "xbrl", xbrl_available=True)
-    for xbrl_field, sheet1_field in _XBRL_TO_SHEET1_FIELDS.items():
-        if (value := xbrl_totals.get(xbrl_field)) is not None:
-            data.set_value(sheet1_field, value)
-            logger.debug("XBRL: %s = %s", sheet1_field, value)
-
-    if not return_report:
-        return data
+    for xbrl_fld, sheet1_fld in _XBRL_TO_SHEET1_FIELDS.items():
+        if (v := xbrl_totals.get(xbrl_fld)) is not None:
+            data.set_value(sheet1_fld, v)
     return data, ValidationReport(sum_validations=_run_sum_validations(data))
-
-
-def _unpack_extraction_result(
-    result: Sheet1Data | None | tuple[Sheet1Data | None, ValidationReport | None],
-) -> tuple[Sheet1Data | None, ValidationReport | None]:
-    """Unpack extraction result into (data, report) tuple."""
-    if isinstance(result, tuple):
-        return result
-    return result, None
-
-
-def _orchestrate_extraction(
-    year: int,
-    quarter: int,
-    prefer_source: str,
-    merge_sources: bool,
-) -> tuple[Sheet1Data | None, ValidationReport | None]:
-    """Internal orchestration of multi-source extraction with fallback and optional merge."""
-    extractors = {
-        "pdf": lambda: extract_sheet1_from_analisis_razonado(year, quarter, validate_with_xbrl=True, return_report=True),
-        "xbrl": lambda: extract_sheet1_from_xbrl(year, quarter, return_report=True),
-    }
-    primary, secondary = (prefer_source, "xbrl" if prefer_source == "pdf" else "pdf")
-    data, report = _unpack_extraction_result(extractors[primary]())
-
-    if data is None:
-        logger.info("%s extraction failed, trying %s extraction", primary.upper(), secondary.upper())
-        fallback = (
-            lambda: extract_sheet1_from_xbrl(year, quarter, return_report=True)
-            if secondary == "xbrl"
-            else extract_sheet1_from_analisis_razonado(year, quarter, validate_with_xbrl=False, return_report=True)
-        )
-        return _unpack_extraction_result(fallback())
-
-    if primary == "xbrl" and merge_sources:
-        pdf_data, _ = _unpack_extraction_result(
-            extract_sheet1_from_analisis_razonado(
-                year,
-                quarter,
-                validate_with_xbrl=False,
-                return_report=True,
-            ),
-        )
-        if pdf_data is not None:
-            data = _merge_pdf_into_xbrl_data(data, pdf_data)
-            report = ValidationReport(sum_validations=_run_sum_validations(data))
-
-    return data, report
 
 
 def extract_sheet1(
@@ -376,10 +283,38 @@ def extract_sheet1(
     prefer_source: str = "pdf",
     merge_sources: bool = True,
     return_report: bool = False,
+    validate_with_xbrl: bool = True,
 ) -> Sheet1Data | None | tuple[Sheet1Data | None, ValidationReport | None]:
-    """High-level API: extract Sheet1 data from available sources with optional merge and fallback."""
-    result = _orchestrate_extraction(year, quarter, prefer_source, merge_sources)
-    return result if return_report else result[0]
+    """Unified API: extract Sheet1 data from PDF, XBRL, or both with fallback.
+    
+    This is the main extraction entry point. Source-specific behavior:
+    - prefer_source="pdf": Extract from Nota 21/22 in PDF, validate against XBRL
+    - prefer_source="xbrl": Extract totals from XBRL only
+    - merge_sources=True (with xbrl): Merge PDF details into XBRL base
+    """
+    # Primary extraction based on preferred source
+    if prefer_source == "pdf":
+        data, report = _extract_from_pdf(year, quarter, validate_with_xbrl)
+    else:
+        data, report = _extract_from_xbrl_only(year, quarter)
+
+    # Fallback on failure
+    if data is None:
+        logger.info("%s extraction failed, trying fallback", prefer_source.upper())
+        if prefer_source == "pdf":
+            data, report = _extract_from_xbrl_only(year, quarter)
+        else:
+            data, report = _extract_from_pdf(year, quarter, validate_with_xbrl=False)
+        return (data, report) if return_report else data
+
+    # Merge PDF details into XBRL if requested
+    if prefer_source == "xbrl" and merge_sources:
+        pdf_data, _ = _extract_from_pdf(year, quarter, validate_with_xbrl=False)
+        if pdf_data is not None:
+            data = _merge_pdf_into_xbrl_data(data, pdf_data)
+            report = ValidationReport(sum_validations=_run_sum_validations(data))
+
+    return (data, report) if return_report else data
 
 
 def _merge_pdf_into_xbrl_data(xbrl_data: Sheet1Data, pdf_data: Sheet1Data) -> Sheet1Data:

@@ -93,23 +93,9 @@ def get_standard_structure(
 def get_field_labels(
     sheet_name: str = "sheet1", config: dict[str, Any] | None = None,
 ) -> dict[str, str]:
-    """Get field to label mapping for a sheet.
-
-    Args:
-        sheet_name: Name of the sheet
-        config: Configuration dict, or None to load from file
-
-    Returns:
-        Dictionary mapping field names to display labels
-
-    """
-    if config is None:
-        config = get_config()
-
-    sheet_config = config.get("sheets", {}).get(sheet_name, {})
-    extraction_labels = sheet_config.get("extraction_labels", {})
-
-    return extraction_labels.get("field_labels", {})
+    """Load field→label mapping from config's extraction_labels section."""
+    cfg = config if config is not None else get_config()
+    return cfg.get("sheets", {}).get(sheet_name, {}).get("extraction_labels", {}).get("field_labels", {})
 
 
 def map_to_structure(

@@ -115,24 +115,20 @@ class SectionBreakdown:
 
 
 def get_all_field_labels(sheet_name: str = "sheet1") -> dict[str, str]:
-    """Get all field labels from all sections in config.
-
-    Iterates through extraction sections and builds a mapping of field names
-    to their primary PDF label (first label in pdf_labels list).
+    """Aggregate field-to-label mappings from extraction section configs.
+    
+    Walks through all configured extraction sections and collects the first
+    PDF label for each field. Used for PDF parsing label matching.
     """
     if sheet_name != "sheet1":
         msg = f"Sheet '{sheet_name}' not yet implemented."
         raise ValueError(msg)
-
-    aggregated_labels: dict[str, str] = {}
-    configured_sections = get_sheet1_extraction_sections()
-    for section_id in configured_sections:
-        section_fields = get_sheet1_section_field_mappings(section_id)
-        for field_id, field_definition in section_fields.items():
-            pdf_label_list = field_definition.get("pdf_labels", [])
-            if pdf_label_list:
-                aggregated_labels[field_id] = pdf_label_list[0]
-    return aggregated_labels
+    return {
+        field_id: defn["pdf_labels"][0]
+        for section_id in get_sheet1_extraction_sections()
+        for field_id, defn in get_sheet1_section_field_mappings(section_id).items()
+        if defn.get("pdf_labels")
+    }
 
 
 def _extract_labels_for_section(

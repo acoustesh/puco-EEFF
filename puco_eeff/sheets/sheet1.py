@@ -628,28 +628,9 @@ from puco_eeff.config import format_quarter_label as format_quarter_label  # noq
 
 
 def save_sheet1_data(data: Sheet1Data, output_dir: Path | None = None) -> Path:
-    """Save Sheet1 data to JSON file.
-
-    Args:
-        data: Sheet1Data to save
-        output_dir: Output directory (defaults to processed dir)
-
-    Returns:
-        Path to saved file
-
-    """
-    if output_dir is None:
-        paths = get_period_paths(data.year, data.quarter_num)
-        output_dir = paths["processed"]
-
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / f"sheet1_{data.quarter}.json"
-
-    with output_path.open("w", encoding="utf-8") as f:
-        json.dump(data.to_dict(), f, indent=2, ensure_ascii=False)
-
-    logger.info("Saved Sheet1 data to: %s", output_path)
-    return output_path
+    """Save Sheet1Data to JSON. Wrapper for sheet_writer.save_sheet_data."""
+    from puco_eeff.writer.sheet_writer import save_sheet_data
+    return save_sheet_data("sheet1", data.to_dict(), data.year, data.quarter_num, output_dir)
 
 
 def print_sheet1_report(data: Sheet1Data) -> None:

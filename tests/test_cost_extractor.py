@@ -746,17 +746,17 @@ class TestSaveSheet1Data:
         output_path = save_sheet1_data(data, tmp_path)
 
         assert output_path.exists()
-        assert output_path.name == "sheet1_IIQ2024.json"
+        assert output_path.name == "sheet1_2024_QII.json"
 
         import json
 
         with Path(output_path).open(encoding="utf-8") as f:
             saved = json.load(f)
 
-        assert saved["quarter"] == "IIQ2024"
-        assert saved["ingresos_ordinarios"] == 179165
-        assert saved["total_costo_venta"] == -126202
-        assert saved["total_gasto_admin"] == -11632
+        assert saved["content"]["quarter"] == "IIQ2024"
+        assert saved["content"]["ingresos_ordinarios"] == 179165
+        assert saved["content"]["total_costo_venta"] == -126202
+        assert saved["content"]["total_gasto_admin"] == -11632
 
 
 class TestXBRLExtraction:
@@ -869,7 +869,7 @@ class TestExtractSheet1MainEntry:
             ingresos_ordinarios=179165,
         )
 
-        with patch("puco_eeff.extractor.extraction_pipeline.extract_sheet1_from_analisis_razonado") as mock_pdf:
+        with patch("puco_eeff.extractor.extraction_pipeline._extract_from_pdf") as mock_pdf:
             mock_pdf.return_value = (
                 expected_data,
                 None,
@@ -894,10 +894,10 @@ class TestExtractSheet1MainEntry:
             total_costo_venta=-126202,
         )
 
-        with patch("puco_eeff.extractor.extraction_pipeline.extract_sheet1_from_analisis_razonado") as mock_pdf:
+        with patch("puco_eeff.extractor.extraction_pipeline._extract_from_pdf") as mock_pdf:
             mock_pdf.return_value = (None, None)  # PDF failed - return tuple
 
-            with patch("puco_eeff.extractor.extraction_pipeline.extract_sheet1_from_xbrl") as mock_xbrl:
+            with patch("puco_eeff.extractor.extraction_pipeline._extract_from_xbrl_only") as mock_xbrl:
                 mock_xbrl.return_value = (xbrl_data, None)  # Return tuple as expected
 
                 result = extract_sheet1(2024, 2, prefer_source="pdf")
@@ -961,8 +961,8 @@ class TestIngresosPDFFallback:
             assert result is None
 
     def test_sheet1_uses_pdf_ingresos_when_no_xbrl(self) -> None:
-        """extract_sheet1_from_analisis_razonado should extract Ingresos from PDF when no XBRL."""
-        from puco_eeff.extractor.extraction_pipeline import extract_sheet1_from_analisis_razonado
+        """extract_sheet1 with prefer_source='pdf' should extract Ingresos from PDF when no XBRL."""
+        from puco_eeff.extractor.extraction_pipeline import extract_sheet1
 
         with patch("puco_eeff.extractor.extraction_pipeline.get_period_paths") as mock_paths:
             mock_paths.return_value = {
@@ -1010,7 +1010,7 @@ class TestIngresosPDFFallback:
                     with patch("puco_eeff.extractor.extraction_pipeline.extract_ingresos_from_pdf") as mock_ingresos:
                         mock_ingresos.return_value = 80767
 
-                        result = extract_sheet1_from_analisis_razonado(2024, 1)
+                        result = extract_sheet1(2024, 1, prefer_source="pdf", merge_sources=False)
 
                         assert result is not None
                         from puco_eeff.sheets.sheet1 import Sheet1Data
@@ -1091,8 +1091,10 @@ class TestCrossValidationResult:
             difference=0,
             tolerance=1,
         )
-        assert "✓" in result.status
-        assert "52,963" in result.status
+        from puco_eeff.extractor.validation_core import format_cross_validation_status
+        status = format_cross_validation_status(result)
+        assert "✓" in status
+        assert "52,963" in status
 
     def test_mismatch_status_message(self) -> None:
         """Mismatch should show error."""
@@ -1105,8 +1107,10 @@ class TestCrossValidationResult:
             difference=37,
             tolerance=1,
         )
-        assert "✗" in result.status
-        assert "diff: 37" in result.status
+        from puco_eeff.extractor.validation_core import format_cross_validation_status
+        status = format_cross_validation_status(result)
+        assert "✗" in status
+        assert "diff: 37" in status
 
     def test_missing_facts_status_message(self) -> None:
         """Missing facts should show skipped message."""
@@ -1120,9 +1124,11 @@ class TestCrossValidationResult:
             tolerance=1,
             missing_facts=["gross_profit"],
         )
-        assert "⚠" in result.status
-        assert "Skipped" in result.status
-        assert "gross_profit" in result.status
+        from puco_eeff.extractor.validation_core import format_cross_validation_status
+        status = format_cross_validation_status(result)
+        assert "⚠" in status
+        assert "Skipped" in status
+        assert "gross_profit" in status
 
 
 # =============================================================================

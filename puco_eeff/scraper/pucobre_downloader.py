@@ -72,6 +72,8 @@ class PucobreDownloadResult:
     This dataclass handles the combined PDF download from Pucobre's website,
     which bundles Estados Financieros and Análisis Razonado into a single file
     that gets split into separate documents after download.
+    
+    Unlike DownloadResult, this tracks multiple output files from PDF splitting.
     """
 
     success: bool
@@ -83,6 +85,11 @@ class PucobreDownloadResult:
     analisis_razonado_path: Path | None = None
     analisis_razonado_size: int | None = None
     combined_pdf_path: Path | None = None  # Retained original for debugging
+    
+    @property
+    def has_analisis_razonado(self) -> bool:
+        """Check if analisis razonado was successfully extracted."""
+        return self.analisis_razonado_path is not None and self.analisis_razonado_path.exists()
 
 
 def _find_analisis_razonado_page(pdf_path: Path) -> int | None:
@@ -412,32 +419,16 @@ def _find_period_link(
 
 
 def _extract_pucobre_periods_from_page(page: Page) -> list[dict]:
-    """Extract available periods from Pucobre page links."""
+    """Scrape periods from Pucobre page links matching 'Estados Financieros DD-MM-YYYY'."""
     time.sleep(2)  # Allow page to settle
-
-    periods: list[dict] = []
+    month_map = {"03": 1, "06": 2, "09": 3, "12": 4}
     links = page.locator("a:has-text('Estados Financieros')")
-    count = links.count()
-
-    for i in range(count):
-        link_text = links.nth(i).inner_text()
-        match = re.search(r"(\d{2})-(\d{2})-(\d{4})", link_text)
-        if not match:
-            continue
-
-        _day, month, year = match.groups()
-        month_to_quarter = {"03": 1, "06": 2, "09": 3, "12": 4}
-        quarter = month_to_quarter.get(month)
-        if quarter:
-            periods.append(
-                {
-                    "year": int(year),
-                    "quarter": quarter,
-                    "link_text": link_text,
-                    "source": "pucobre.cl",
-                },
-            )
-
+    periods = []
+    for i in range(links.count()):
+        text = links.nth(i).inner_text()
+        match = re.search(r"(\d{2})-(\d{2})-(\d{4})", text)
+        if match and (q := month_map.get(match.group(2))):
+            periods.append({"year": int(match.group(3)), "quarter": q, "link_text": text, "source": "pucobre.cl"})
     return periods
 
 

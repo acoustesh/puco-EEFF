@@ -29,20 +29,12 @@ ROMAN_TO_QUARTER = {"I": 1, "II": 2, "III": 3, "IV": 4}
 
 
 def roman_to_quarter(roman: str) -> int:
-    """Convert Roman numeral to quarter number.
-
-    Args:
-        roman: Roman numeral string (I, II, III, IV)
-
-    Returns:
-        Quarter number (1-4)
-
-    """
-    roman = roman.upper()
-    if roman not in ROMAN_TO_QUARTER:
+    """Parse Roman numeral quarter string to integer (inverse of config.quarter_to_roman)."""
+    q = ROMAN_TO_QUARTER.get(roman.upper())
+    if q is None:
         msg = f"Invalid Roman numeral: {roman}. Must be I, II, III, or IV."
         raise ValueError(msg)
-    return ROMAN_TO_QUARTER[roman]
+    return q
 
 
 def format_period(year: int, quarter: int) -> str:

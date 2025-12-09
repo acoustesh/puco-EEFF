@@ -181,18 +181,16 @@ class CrossValidationResult:
     tolerance: int
     missing_facts: list[str] = field(default_factory=list)
 
-    @property
-    def status(self) -> str:
-        """Format cross-validation status with formula check results."""
-        if self.missing_facts:
-            missing_list = ", ".join(self.missing_facts)
-            return f"⚠ Skipped - missing: {missing_list}"
-        desc, exp, calc = self.description, self.expected_value, self.calculated_value
-        return (
-            f"✓ {desc}: {exp:,}"
-            if self.match
-            else f"✗ {desc}: expected={exp}, calculated={calc} (diff: {self.difference})"
-        )
+
+def format_cross_validation_status(r: CrossValidationResult) -> str:
+    """Format cross-validation status with formula check results."""
+    if r.missing_facts:
+        return f"⚠ Skipped - missing: {', '.join(r.missing_facts)}"
+    return (
+        f"✓ {r.description}: {r.expected_value:,}"
+        if r.match
+        else f"✗ {r.description}: expected={r.expected_value}, calculated={r.calculated_value} (diff: {r.difference})"
+    )
 
 
 @dataclass
@@ -293,7 +291,7 @@ def format_validation_report(report: ValidationReport, verbose: bool = True) -> 
         (
             "Cross-Validations:",
             report.cross_validations,
-            lambda v: f"  {v.status}",
+            lambda v: f"  {format_cross_validation_status(v)}",
             "Cross-Validations: (none configured)",
         ),
     ]
@@ -383,52 +381,6 @@ def _run_sum_validations(data: Sheet1Data) -> list[SumValidationResult]:
     return results
 
 
-def _create_both_sources_result(
-    display_name: str,
-    pdf_value: int,
-    xbrl_value: int,
-    tolerance: int,
-) -> ValidationResult:
-    """Create validation result when both PDF and XBRL values exist."""
-    match, diff = _compare_with_tolerance(pdf_value, xbrl_value, tolerance)
-    if match:
-        logger.info(f"✓ {display_name} matches XBRL: {pdf_value:,}")
-    else:
-        logger.warning(
-            f"✗ {display_name} mismatch - PDF: {pdf_value:,}, XBRL: {xbrl_value:,} (diff: {diff})",
-        )
-    return ValidationResult(
-        field_name=display_name,
-        pdf_value=pdf_value,
-        xbrl_value=xbrl_value,
-        match=match,
-        source="both",
-        difference=diff if not match else None,
-    )
-
-
-def _create_single_source_result(
-    display_name: str,
-    pdf_value: int | None,
-    xbrl_value: int | None,
-    data: Sheet1Data | None = None,
-    field_name: str | None = None,
-    use_fallback: bool = False,
-) -> ValidationResult:
-    """Create ValidationResult when only one source (PDF or XBRL) has a value."""
-    is_xbrl_only = xbrl_value is not None and pdf_value is None
-    if is_xbrl_only and use_fallback and data is not None and field_name is not None:
-        logger.info(f"Using XBRL value for {display_name}: {xbrl_value:,}")
-        data.set_value(field_name, xbrl_value)
-    return ValidationResult(
-        field_name=display_name,
-        pdf_value=pdf_value if not is_xbrl_only else None,
-        xbrl_value=xbrl_value if is_xbrl_only else None,
-        match=True,
-        source="xbrl_only" if is_xbrl_only else "pdf_only",
-    )
-
-
 def _run_pdf_xbrl_validations(
     sheet1_data: Sheet1Data,
     xbrl_total_values: Mapping[str, int | None] | None,
@@ -474,18 +426,30 @@ def _resolve_single_pdf_xbrl_validation(
     use_fallback: bool,
 ) -> ValidationResult | None:
     """Resolve a single PDF-XBRL validation based on available values."""
-    if xbrl_value is not None and pdf_value is not None:
-        return _create_both_sources_result(display_name, pdf_value, xbrl_value, tolerance)
-    if xbrl_value is not None or pdf_value is not None:
-        return _create_single_source_result(
-            display_name,
-            pdf_value,
-            xbrl_value,
-            data,
-            field_name,
-            use_fallback,
+    if pdf_value is None and xbrl_value is None:
+        return None
+    # Both sources present - compare with tolerance
+    if pdf_value is not None and xbrl_value is not None:
+        match, diff = _compare_with_tolerance(pdf_value, xbrl_value, tolerance)
+        if match:
+            logger.info(f"✓ {display_name} matches XBRL: {pdf_value:,}")
+        else:
+            logger.warning(f"✗ {display_name} mismatch - PDF: {pdf_value:,}, XBRL: {xbrl_value:,} (diff: {diff})")
+        return ValidationResult(
+            field_name=display_name, pdf_value=pdf_value, xbrl_value=xbrl_value,
+            match=match, source="both", difference=diff if not match else None,
         )
-    return None
+    # Single source - apply XBRL fallback if needed
+    is_xbrl = xbrl_value is not None
+    if is_xbrl and use_fallback:
+        logger.info(f"Using XBRL value for {display_name}: {xbrl_value:,}")
+        data.set_value(field_name, xbrl_value)
+    return ValidationResult(
+        field_name=display_name,
+        pdf_value=None if is_xbrl else pdf_value,
+        xbrl_value=xbrl_value if is_xbrl else None,
+        match=True, source="xbrl_only" if is_xbrl else "pdf_only",
+    )
 
 
 def _run_cross_validations(
@@ -628,42 +592,20 @@ def _evaluate_cross_validation(
         return None, None, True, None
 
 
-def _eval_constant(node: ast.Constant, values: dict[str, int]) -> int | None:
-    """Evaluate a constant node."""
-    return node.value if isinstance(node.value, int) else None
-
-
 def _eval_arithmetic_op(node: ast.UnaryOp | ast.BinOp, values: dict[str, int]) -> int | None:
-    """Evaluate unary or binary arithmetic nodes using dispatch tables.
-
-    Unary: +x, -x
-    Binary: x+y, x-y, x*y
-    """
+    """Evaluate unary or binary arithmetic nodes using dispatch tables."""
     if isinstance(node, ast.UnaryOp):
         operand = _eval_ast_node(node.operand, values)
         if operand is None:
             return None
         unary_ops = {ast.USub: lambda x: -x, ast.UAdd: lambda x: x}
-        op_func = unary_ops.get(type(node.op))
-        return op_func(operand) if op_func else None
-
-    # BinOp case
-    left = _eval_ast_node(node.left, values)
-    right = _eval_ast_node(node.right, values)
+        return unary_ops.get(type(node.op), lambda x: None)(operand)
+    # BinOp
+    left, right = _eval_ast_node(node.left, values), _eval_ast_node(node.right, values)
     if left is None or right is None:
         return None
-    binary_ops = {
-        ast.Add: lambda a, b: a + b,
-        ast.Sub: lambda a, b: a - b,
-        ast.Mult: lambda a, b: a * b,
-    }
-    op_func = binary_ops.get(type(node.op))
-    return op_func(left, right) if op_func else None
-
-
-def _eval_name(node: ast.Name, values: dict[str, int]) -> int | None:
-    """Evaluate a variable name node."""
-    return values.get(node.id)
+    binary_ops = {ast.Add: lambda a, b: a + b, ast.Sub: lambda a, b: a - b, ast.Mult: lambda a, b: a * b}
+    return binary_ops.get(type(node.op), lambda a, b: None)(left, right)
 
 
 def _eval_call(node: ast.Call, values: dict[str, int]) -> int | None:
@@ -676,12 +618,12 @@ def _eval_call(node: ast.Call, values: dict[str, int]) -> int | None:
     return abs(arg_val) if arg_val is not None else None
 
 
-# Dispatch table for AST node evaluation
+# Dispatch table for AST node evaluation - simple cases are inlined as lambdas
 _AST_EVALUATORS: dict[type, callable] = {
-    ast.Constant: _eval_constant,
+    ast.Constant: lambda n, _: n.value if isinstance(n.value, int) else None,
+    ast.Name: lambda n, vals: vals.get(n.id),
     ast.UnaryOp: _eval_arithmetic_op,
     ast.BinOp: _eval_arithmetic_op,
-    ast.Name: _eval_name,
     ast.Call: _eval_call,
 }
 
