@@ -89,3 +89,5 @@ test-results/
 .DS_Store
 Thumbs.db
 logs/
+tests/baselines/embeddings_cache.json.zlib
+tests/baselines/embeddings_cache.json.zlib
