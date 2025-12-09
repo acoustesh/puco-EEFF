@@ -91,3 +91,4 @@ Thumbs.db
 logs/
 tests/baselines/embeddings_cache.json.zlib
 src/
+tests/baselines/voyage_embeddings_cache.json.zlib

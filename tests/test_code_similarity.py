@@ -52,10 +52,16 @@ EMBEDDINGS_FILE = Path(__file__).parent / "baselines" / "embeddings_cache.json.z
 CODESTRAL_EMBEDDINGS_FILE = (
     Path(__file__).parent / "baselines" / "codestral_embeddings_cache.json.zlib"
 )
+VOYAGE_EMBEDDINGS_FILE = (
+    Path(__file__).parent / "baselines" / "voyage_embeddings_cache.json.zlib"
+)
 
 # OpenRouter config
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/embeddings"
 CODESTRAL_EMBED_MODEL = "mistralai/codestral-embed-2505"
+
+# Voyage AI config
+VOYAGE_CODE_MODEL = "voyage-code-3"
 
 # Refactor index defaults (can be overridden in config)
 DEFAULT_REFACTOR_INDEX_THRESHOLD = 15.0
@@ -169,6 +175,42 @@ def _save_codestral_embeddings(embeddings: dict[str, list[float]]) -> None:
 
 
 # =============================================================================
+# Voyage AI Embeddings Storage Management
+# =============================================================================
+
+
+def _load_voyage_embeddings() -> dict[str, list[float]]:
+    """Load and decompress Voyage embeddings from the compressed cache file."""
+    if not VOYAGE_EMBEDDINGS_FILE.exists():
+        return {}
+    with Path(VOYAGE_EMBEDDINGS_FILE).open(encoding="utf-8") as f:
+        compressed = json.load(f)
+    return {h: _decompress_embedding(b64) for h, b64 in compressed.items()}
+
+
+def _save_voyage_embeddings(embeddings: dict[str, list[float]]) -> None:
+    """Save Voyage embeddings to compressed cache file atomically."""
+    VOYAGE_EMBEDDINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+    compressed = {h: _compress_embedding(vec) for h, vec in embeddings.items()}
+
+    fd, temp_path = tempfile.mkstemp(
+        suffix=".json.zlib",
+        prefix="voyage_embeddings_",
+        dir=VOYAGE_EMBEDDINGS_FILE.parent,
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(compressed, f, indent=2, sort_keys=True)
+            f.write("\n")
+        Path(temp_path).replace(VOYAGE_EMBEDDINGS_FILE)
+    except Exception:
+        if Path(temp_path).exists():
+            Path(temp_path).unlink()
+        raise
+
+
+# =============================================================================
 # Baseline Management
 # =============================================================================
 
@@ -199,6 +241,7 @@ def load_baselines() -> dict:
     # Load embeddings from separate compressed files
     baselines["embeddings"] = _load_embeddings()
     baselines["codestral_embeddings"] = _load_codestral_embeddings()
+    baselines["voyage_embeddings"] = _load_voyage_embeddings()
 
     return baselines
 
@@ -213,6 +256,7 @@ def save_baselines(baselines: dict) -> None:
     # Extract embeddings and function_hashes to save separately
     embeddings = baselines.pop("embeddings", {})
     codestral_embeddings = baselines.pop("codestral_embeddings", {})
+    voyage_embeddings = baselines.pop("voyage_embeddings", {})
     function_hashes = baselines.pop("function_hashes", {})
 
     # Save main baselines (without embeddings and function_hashes)
@@ -230,6 +274,7 @@ def save_baselines(baselines: dict) -> None:
         # Restore embeddings and function_hashes to dict (in case caller continues to use it)
         baselines["embeddings"] = embeddings
         baselines["codestral_embeddings"] = codestral_embeddings
+        baselines["voyage_embeddings"] = voyage_embeddings
         baselines["function_hashes"] = function_hashes
 
     # Save function_hashes to separate file
@@ -256,6 +301,10 @@ def save_baselines(baselines: dict) -> None:
     # Save Codestral embeddings to compressed file
     if codestral_embeddings:
         _save_codestral_embeddings(codestral_embeddings)
+
+    # Save Voyage embeddings to compressed file
+    if voyage_embeddings:
+        _save_voyage_embeddings(voyage_embeddings)
 
 
 # =============================================================================
@@ -777,6 +826,78 @@ def get_embeddings_batch_codestral(
             return [item["embedding"] for item in data["data"]]
 
         except requests.exceptions.Timeout:
+            if attempt < max_retries - 1:
+                time.sleep(delays[attempt])
+            else:
+                raise
+
+    return []
+
+
+def get_cached_voyage_embedding(baselines: dict, content_hash: str) -> list[float] | None:
+    """Return cached Voyage embedding vector if hash exists, else None."""
+    return baselines.get("voyage_embeddings", {}).get(content_hash)
+
+
+def _load_voyage_api_key() -> str | None:
+    """Load Voyage API key from .env file or environment."""
+    # First check environment
+    api_key = os.environ.get("VOYAGE_API_KEY")
+    if api_key:
+        return api_key
+
+    # Try loading from .env file
+    env_file = Path(__file__).parent.parent / ".env"
+    if env_file.exists():
+        with env_file.open(encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("VOYAGE_API_KEY="):
+                    return line.split("=", 1)[1].strip()
+    return None
+
+
+def get_embeddings_batch_voyage(
+    texts: list[str],
+    model: str = VOYAGE_CODE_MODEL,
+    max_retries: int = 3,
+    timeout: float = 60.0,
+) -> list[list[float]]:
+    """Get embeddings for a batch of texts using Voyage AI API.
+
+    Args:
+        texts: List of text strings to embed
+        model: Voyage model name (default: voyage-code-3)
+        max_retries: Number of retry attempts for rate limits
+        timeout: Timeout per API call in seconds
+
+    Returns:
+        List of embedding vectors
+
+    """
+    import voyageai
+
+    api_key = _load_voyage_api_key()
+    if not api_key:
+        msg = "VOYAGE_API_KEY not found in environment or .env file"
+        raise ValueError(msg)
+
+    client = voyageai.Client(api_key=api_key, timeout=timeout)
+
+    delays = [1.0, 2.0, 4.0]  # Exponential backoff
+
+    for attempt in range(max_retries):
+        try:
+            result = client.embed(texts, model=model, input_type="document")
+            return [list(map(float, emb)) for emb in result.embeddings]
+
+        except Exception as e:
+            # Check for rate limit error
+            error_str = str(e).lower()
+            is_rate_limit = "rate" in error_str and "limit" in error_str
+            if is_rate_limit and attempt < max_retries - 1:
+                time.sleep(delays[attempt])
+                continue
             if attempt < max_retries - 1:
                 time.sleep(delays[attempt])
             else:
@@ -1516,6 +1637,191 @@ class TestFunctionSimilarityCodestral:
         # Extract functions meeting LOC threshold
         functions = extract_function_infos(min_loc=min_loc)
         _run_codestral_similarity_checks(
+            baselines=baselines,
+            functions=functions,
+            update_baselines=update_baselines,
+            cached_only=cached_only,
+            threshold_pair=threshold_pair,
+            threshold_neighbor=threshold_neighbor,
+            load_complexity_maps_fn=_load_complexity_maps,
+        )
+
+
+def _run_voyage_similarity_checks(
+    *,
+    baselines: dict,
+    functions: list[FunctionInfo],
+    update_baselines: bool,
+    cached_only: bool,
+    threshold_pair: float,
+    threshold_neighbor: float,
+    load_complexity_maps_fn: Callable[[], tuple[dict[str, int], dict[str, int]]],
+) -> None:
+    """Common workflow for Voyage similarity tests across different scopes."""
+    if len(functions) < 2:
+        pytest.skip("Not enough functions to compare")
+
+    uncached_functions: list[FunctionInfo] = []
+    for func in functions:
+        cached = get_cached_voyage_embedding(baselines, func.hash)
+        if cached is not None:
+            func.embedding = cached
+        else:
+            uncached_functions.append(func)
+
+    if cached_only and uncached_functions:
+        uncached_names = [f"{f.file}:{f.name}" for f in uncached_functions]
+        pytest.skip(
+            f"--cached-only mode: {len(uncached_functions)} functions lack "
+            f"cached Voyage embeddings:\n  "
+            + "\n  ".join(uncached_names[:10])
+            + (f"\n  ... and {len(uncached_names) - 10} more" if len(uncached_names) > 10 else ""),
+        )
+
+    if uncached_functions:
+        api_key = _load_voyage_api_key()
+        if not api_key or api_key.startswith(("your_", "pa-xxx")) or len(api_key) < 20:
+            pytest.skip(
+                "VOYAGE_API_KEY not set (or invalid) and some functions lack cached "
+                "Voyage embeddings. Set a valid API key or run with --cached-only to skip.",
+            )
+
+        texts = [f.text for f in uncached_functions]
+        try:
+            new_embeddings = get_embeddings_batch_voyage(texts)
+        except Exception as e:
+            error_msg = str(e).lower()
+            if "401" in error_msg or "authentication" in error_msg or "api key" in error_msg:
+                pytest.skip(
+                    f"Invalid VOYAGE_API_KEY and some functions lack cached Voyage embeddings. "
+                    f"Set a valid API key or run with --cached-only to skip. Error: {e}",
+                )
+            pytest.fail(f"Failed to get Voyage embeddings: {e}")
+
+        for func, embedding in zip(uncached_functions, new_embeddings, strict=True):
+            func.embedding = embedding
+            baselines.setdefault("voyage_embeddings", {})[func.hash] = embedding
+
+        for func in functions:
+            baselines.setdefault("function_hashes", {})[
+                f"{func.file}:{func.name}:{func.start_line}"
+            ] = func.hash
+
+        save_baselines(baselines)
+
+    if update_baselines:
+        pytest.skip("Updated Voyage embedding baselines")
+
+    pair_violations: list[str] = []
+    neighbor_violations: list[str] = []
+
+    for i, func_a in enumerate(functions):
+        if func_a.embedding is None:
+            continue
+
+        similar_neighbors = []
+
+        for j, func_b in enumerate(functions):
+            if i >= j or func_b.embedding is None:
+                continue
+
+            similarity = compute_cosine_similarity(func_a.embedding, func_b.embedding)
+
+            if similarity >= threshold_pair:
+                pair_violations.append(
+                    f"{func_a.file}:{func_a.start_line} {func_a.name}() vs "
+                    f"{func_b.file}:{func_b.start_line} {func_b.name}() - "
+                    f"similarity: {similarity:.1%}",
+                )
+
+            if similarity >= threshold_neighbor:
+                similar_neighbors.append((func_b.file, func_b.name, func_b.start_line, similarity))
+
+        if len(similar_neighbors) >= 2:
+            neighbor_info = ", ".join(
+                f"{f}:{n}() ({s:.1%})" for f, n, _, s in similar_neighbors[:3]
+            )
+            neighbor_violations.append(
+                f"{func_a.file}:{func_a.start_line} {func_a.name}() has "
+                f"{len(similar_neighbors)} similar functions: {neighbor_info}",
+            )
+
+    all_violations: list[str] = []
+    if pair_violations:
+        all_violations.append(
+            f"High similarity pairs (>={threshold_pair:.0%}):\n  " + "\n  ".join(pair_violations),
+        )
+    if neighbor_violations:
+        all_violations.append(
+            f"Functions with multiple similar neighbors (>={threshold_neighbor:.0%}):\n  "
+            + "\n  ".join(neighbor_violations),
+        )
+
+    if all_violations:
+        error_msg = "\n\n".join(all_violations)
+        cc_map, cog_map = load_complexity_maps_fn()
+        refactor_msg = get_refactor_priority_message(functions, cc_map, cog_map)
+        if refactor_msg:
+            error_msg += refactor_msg
+        pytest.fail(error_msg)
+
+
+@pytest.mark.similarity
+@pytest.mark.voyage
+class TestFunctionSimilarityVoyage:
+    """Tests for detecting near-duplicate functions using Voyage AI embeddings."""
+
+    def test_function_similarity_voyage_all_directories(
+        self,
+        update_baselines: bool,
+        cached_only: bool,
+    ) -> None:
+        """Detect near-duplicate functions across ALL puco_eeff directories.
+
+        Uses Voyage voyage-code-3 embeddings with hash-based caching.
+        Fails if:
+        - Any pair has similarity >= threshold_pair (default: 0.95)
+        - Any function has >=2 neighbors with similarity >= threshold_neighbor (0.90)
+        """
+        baselines = load_baselines()
+        config = baselines.get("config", {})
+        min_loc = config.get("min_loc_for_similarity", 1)
+        threshold_pair = config.get("voyage_similarity_threshold_pair", 0.95)
+        threshold_neighbor = config.get("voyage_similarity_threshold_neighbor", 0.90)
+
+        # Extract functions from ALL puco_eeff directories
+        functions = extract_all_function_infos(min_loc=min_loc)
+        _run_voyage_similarity_checks(
+            baselines=baselines,
+            functions=functions,
+            update_baselines=update_baselines,
+            cached_only=cached_only,
+            threshold_pair=threshold_pair,
+            threshold_neighbor=threshold_neighbor,
+            load_complexity_maps_fn=_load_all_complexity_maps,
+        )
+
+    def test_function_similarity_voyage(
+        self,
+        update_baselines: bool,
+        cached_only: bool,
+    ) -> None:
+        """Detect near-duplicate functions in extractor/ only.
+
+        Uses Voyage voyage-code-3 embeddings with hash-based caching.
+        Fails if:
+        - Any pair has similarity >= threshold_pair (default: 0.95)
+        - Any function has >=2 neighbors with similarity >= threshold_neighbor (0.90)
+        """
+        baselines = load_baselines()
+        config = baselines.get("config", {})
+        min_loc = config.get("min_loc_for_similarity", 1)
+        threshold_pair = config.get("voyage_similarity_threshold_pair", 0.95)
+        threshold_neighbor = config.get("voyage_similarity_threshold_neighbor", 0.90)
+
+        # Extract functions meeting LOC threshold
+        functions = extract_function_infos(min_loc=min_loc)
+        _run_voyage_similarity_checks(
             baselines=baselines,
             functions=functions,
             update_baselines=update_baselines,

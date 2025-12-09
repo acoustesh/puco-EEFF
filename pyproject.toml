@@ -43,6 +43,7 @@ python-dotenv = ">=1.0"
 questionary = ">=2.0"
 pymupdf = ">=1.26.6"
 pyright = "^1.1.407"
+voyageai = {version = ">=0.3.6", python = "<3.14"}
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.3"
@@ -135,4 +136,5 @@ addopts = "-v --tb=short"
 asyncio_mode = "auto"
 markers = [
     "codestral: marks tests that use Codestral embeddings via OpenRouter",
+    "voyage: marks tests that use Voyage AI embeddings",
 ]
