@@ -90,4 +90,4 @@ test-results/
 Thumbs.db
 logs/
 tests/baselines/embeddings_cache.json.zlib
-tests/baselines/embeddings_cache.json.zlib
+src/
