@@ -8,10 +8,11 @@ This module orchestrates the complete Sheet1 extraction workflow:
 4. Save extracted data to JSON
 5. Print formatted report
 
-Usage:
-    python -m puco_eeff.main_sheet1 --year 2024 --quarter 2
-    python -m puco_eeff.main_sheet1 --year 2024 --quarter 2 --skip-download
-    python -m puco_eeff.main_sheet1 --year 2024 --quarter 2 --no-save --quiet
+Usage (from project root):
+    cd /path/to/puco-EEFF
+    python -m puco_eeff.main_sheet1 -y 2024 -q 2
+    python -m puco_eeff.main_sheet1 -y 2024 -q 2 --skip-download
+    python -m puco_eeff.main_sheet1 -y 2024 -q 2 --no-save --quiet
 
     # With validation options:
     python -m puco_eeff.main_sheet1 -y 2024 -q 2 --validate-reference
