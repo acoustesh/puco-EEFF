@@ -92,7 +92,9 @@ def _populate_xbrl_totals(result: ExtractionResult, xbrl_totals: dict[str, int |
 
 
 def _validate_with_xbrl(
-    result: ExtractionResult, xbrl_totals: dict[str, int | None], source: str
+    result: ExtractionResult,
+    xbrl_totals: dict[str, int | None],
+    source: str,
 ) -> None:
     """Validate extraction result against XBRL totals."""
     _populate_xbrl_totals(result, xbrl_totals)
@@ -327,7 +329,10 @@ def _unpack_extraction_result(
 
 
 def _orchestrate_extraction(
-    year: int, quarter: int, prefer_source: str, merge_sources: bool
+    year: int,
+    quarter: int,
+    prefer_source: str,
+    merge_sources: bool,
 ) -> tuple[Sheet1Data | None, ValidationReport | None]:
     """Internal orchestration of multi-source extraction with fallback and optional merge."""
     extractors = {
@@ -348,7 +353,9 @@ def _orchestrate_extraction(
 
     if primary == "xbrl" and merge_sources:
         pdf_data, _ = _unpack_extraction_result(
-            extract_sheet1_from_analisis_razonado(year, quarter, validate_with_xbrl=False, return_report=True)
+            extract_sheet1_from_analisis_razonado(
+                year, quarter, validate_with_xbrl=False, return_report=True
+            ),
         )
         if pdf_data is not None:
             data = _merge_pdf_into_xbrl_data(data, pdf_data)
@@ -358,7 +365,11 @@ def _orchestrate_extraction(
 
 
 def extract_sheet1(
-    year: int, quarter: int, prefer_source: str = "pdf", merge_sources: bool = True, return_report: bool = False
+    year: int,
+    quarter: int,
+    prefer_source: str = "pdf",
+    merge_sources: bool = True,
+    return_report: bool = False,
 ) -> Sheet1Data | None | tuple[Sheet1Data | None, ValidationReport | None]:
     """High-level API: extract Sheet1 data from available sources with optional merge and fallback."""
     result = _orchestrate_extraction(year, quarter, prefer_source, merge_sources)

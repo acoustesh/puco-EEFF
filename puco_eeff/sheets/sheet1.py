@@ -44,7 +44,6 @@ from typing import TYPE_CHECKING, Any, cast
 
 from puco_eeff.config import (
     CONFIG_DIR,
-    format_period_display,
     get_period_paths,
     quarter_to_roman,
 )
@@ -621,8 +620,7 @@ class Sheet1Data:
 
 
 # Re-export format_quarter_label from config for backward compatibility
-from puco_eeff.config import format_quarter_label as format_quarter_label  # noqa: E402, F401
-
+from puco_eeff.config import format_quarter_label as format_quarter_label  # noqa: E402
 
 # =============================================================================
 # Sheet1 I/O Functions

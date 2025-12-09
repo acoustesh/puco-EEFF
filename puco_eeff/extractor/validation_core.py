@@ -467,7 +467,12 @@ def _resolve_single_pdf_xbrl_validation(
         return _create_both_sources_result(display_name, pdf_value, xbrl_value, tolerance)
     if xbrl_value is not None or pdf_value is not None:
         return _create_single_source_result(
-            display_name, pdf_value, xbrl_value, data, field_name, use_fallback
+            display_name,
+            pdf_value,
+            xbrl_value,
+            data,
+            field_name,
+            use_fallback,
         )
     return None
 

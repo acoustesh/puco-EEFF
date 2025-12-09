@@ -24,7 +24,6 @@ from typing import TYPE_CHECKING, Any
 import pdfplumber
 
 from puco_eeff.config import (
-    format_period_display,
     get_xbrl_scaling_factor,
     quarter_to_roman,
     setup_logging,
@@ -266,7 +265,11 @@ def find_text_page(
         for page_idx, page in enumerate(pdf.pages):
             page_text = (page.extract_text() or "").lower()
             if _page_matches_criteria(
-                page_text, required_normalized, optional_normalized, min_required, min_optional
+                page_text,
+                required_normalized,
+                optional_normalized,
+                min_required,
+                min_optional,
             ):
                 logger.debug(f"Found text match on page {page_idx + 1}")
                 return page_idx
@@ -481,7 +484,12 @@ def extract_pdf_section(
         return None
 
     rows = _extract_table_with_next_page_fallback(
-        pdf_path, page_idx, expected_items, section_name, year, quarter
+        pdf_path,
+        page_idx,
+        expected_items,
+        section_name,
+        year,
+        quarter,
     )
     if not rows:
         logger.error("Could not extract table for section '%s'", section_name)
@@ -610,13 +618,11 @@ def extract_xbrl_totals(xbrl_path: Path) -> dict[str, int | None]:
 
 
 # Re-export format_quarter_label from config for backward compatibility
-from puco_eeff.config import format_quarter_label as format_quarter_label  # noqa: E402, F401
-
+from puco_eeff.config import format_quarter_label as format_quarter_label  # noqa: E402
 
 # =============================================================================
 # Backward Compatibility Aliases
 # =============================================================================
-
 # Re-export table_parser functions for backward compatibility
 from puco_eeff.extractor.table_parser import (  # noqa: E402, F401
     parse_chilean_number,
