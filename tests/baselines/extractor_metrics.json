@@ -6,8 +6,8 @@
     "xbrl_parser.py:extract_xbrl_aggregates": 15
   },
   "config": {
-    "cc_threshold": 15,
-    "cog_threshold": 22,
+    "cc_threshold": 13,
+    "cog_threshold": 18,
     "mi_threshold": 13,
     "min_loc_for_similarity": 1,
     "pca_variance_threshold": 0.99,
@@ -15,18 +15,18 @@
     "refactor_index_top_n": 5,
     "similarity_threshold_neighbor": 0.8,
     "similarity_threshold_pair": 0.86,
-    "total_lines_baseline": 3600
+    "total_lines_baseline": 3349
   },
   "line_baselines": {
     "__init__.py": 84,
-    "extraction.py": 700,
-    "extraction_pipeline.py": 600,
-    "ocr_fallback.py": 247,
-    "ocr_mistral.py": 217,
+    "extraction.py": 584,
+    "extraction_pipeline.py": 525,
+    "ocr_fallback.py": 284,
+    "ocr_mistral.py": 216,
     "pdf_parser.py": 174,
-    "table_parser.py": 305,
-    "validation_core.py": 682,
-    "xbrl_parser.py": 467
+    "table_parser.py": 299,
+    "validation_core.py": 718,
+    "xbrl_parser.py": 465
   },
   "mi_baselines": {
     "cost_extractor.py": 15

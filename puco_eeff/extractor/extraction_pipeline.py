@@ -69,68 +69,84 @@ __all__ = [
 # =============================================================================
 
 
+def _determine_source(raw_dir: Path, year: int, quarter: int) -> str:
+    """Determine the data source based on available files."""
+    combined_path = find_file_with_alternatives(raw_dir, "pucobre_combined", year, quarter)
+    return "pucobre.cl" if (combined_path and combined_path.exists()) else "cmf"
+
+
+def _extract_nota_sections(pdf_path: Path, result: ExtractionResult) -> None:
+    """Extract Nota 21 and 22 sections into result."""
+    for nota_name in ("nota_21", "nota_22"):
+        section = extract_pdf_section(pdf_path, nota_name)
+        if section is not None:
+            result.sections[nota_name] = section
+
+
+def _populate_xbrl_totals(result: ExtractionResult, xbrl_totals: dict[str, int | None]) -> None:
+    """Populate result.xbrl_totals from XBRL data."""
+    result_key_mapping = get_sheet1_result_key_mapping()
+    for xbrl_key in result_key_mapping.values():
+        if xbrl_key in xbrl_totals:
+            result.xbrl_totals[xbrl_key] = xbrl_totals.get(xbrl_key)
+
+
+def _validate_with_xbrl(
+    result: ExtractionResult, xbrl_totals: dict[str, int | None], source: str
+) -> None:
+    """Validate extraction result against XBRL totals."""
+    _populate_xbrl_totals(result, xbrl_totals)
+    sheet1_data = sections_to_sheet1data(result.sections, result.year, result.quarter)
+    sheet1_data.xbrl_available = True
+    sheet1_data.source = source
+    report = run_sheet1_validations(sheet1_data, xbrl_totals, use_xbrl_fallback=True)
+    result.validations = report.pdf_xbrl_validations
+    result.validation_report = report
+
+
+def _validate_pdf_only(result: ExtractionResult, source: str) -> None:
+    """Validate extraction result without XBRL (PDF only)."""
+    sheet1_data = sections_to_sheet1data(result.sections, result.year, result.quarter)
+    sheet1_data.xbrl_available = False
+    sheet1_data.source = source
+    report = run_sheet1_validations(
+        sheet1_data,
+        None,
+        run_sum_validations=True,
+        run_pdf_xbrl_validations=True,
+        run_cross_validations=False,
+    )
+    result.validations = report.pdf_xbrl_validations
+    result.validation_report = report
+
+
 def extract_detailed_costs(year: int, quarter: int, validate: bool = True) -> ExtractionResult:
     """Extract detailed cost breakdowns for a period."""
     paths = get_period_paths(year, quarter)
     raw_dir = paths["raw_pdf"]
 
-    pdf_path = find_file_with_alternatives(raw_dir, "estados_financieros_pdf", year, quarter)
+    pdf_path = _resolve_pdf_path(raw_dir, year, quarter)
     if not pdf_path:
-        pdf_path = raw_dir / format_filename("estados_financieros_pdf", year, quarter)
-
-    if not pdf_path.exists():
-        logger.error("PDF not found: %s", pdf_path)
+        logger.error("PDF not found in: %s", raw_dir)
         return ExtractionResult(year=year, quarter=quarter, xbrl_available=False)
 
-    combined_path = find_file_with_alternatives(raw_dir, "pucobre_combined", year, quarter)
-    source = "pucobre.cl" if (combined_path and combined_path.exists()) else "cmf"
-
+    source = _determine_source(raw_dir, year, quarter)
     result = ExtractionResult(year=year, quarter=quarter, source=source, pdf_path=pdf_path)
+    _extract_nota_sections(pdf_path, result)
 
-    nota_21 = extract_pdf_section(pdf_path, "nota_21")
-    nota_22 = extract_pdf_section(pdf_path, "nota_22")
-    if nota_21 is not None:
-        result.sections["nota_21"] = nota_21
-    if nota_22 is not None:
-        result.sections["nota_22"] = nota_22
+    xbrl_path, xbrl_available = _resolve_xbrl_path(paths["raw_xbrl"], year, quarter)
+    result.xbrl_available = xbrl_available
+    result.xbrl_path = xbrl_path if xbrl_available else None
 
-    xbrl_dir = paths["raw_xbrl"]
-    xbrl_path = find_file_with_alternatives(xbrl_dir, "estados_financieros_xbrl", year, quarter)
-    if not xbrl_path:
-        xbrl_path = xbrl_dir / format_filename("estados_financieros_xbrl", year, quarter)
+    if not validate:
+        return result
 
-    if xbrl_path and xbrl_path.exists():
-        result.xbrl_available = True
-        result.xbrl_path = xbrl_path
-
-        if validate:
-            xbrl_totals = extract_xbrl_totals(xbrl_path)
-            result_key_mapping = get_sheet1_result_key_mapping()
-            for xbrl_key in result_key_mapping.values():
-                if xbrl_key in xbrl_totals:
-                    result.xbrl_totals[xbrl_key] = xbrl_totals.get(xbrl_key)
-
-            sheet1_data = sections_to_sheet1data(result.sections, year, quarter)
-            sheet1_data.xbrl_available = True
-            sheet1_data.source = source
-
-            report = run_sheet1_validations(sheet1_data, xbrl_totals, use_xbrl_fallback=True)
-            result.validations = report.pdf_xbrl_validations
-            result.validation_report = report
+    if xbrl_available and xbrl_path:
+        xbrl_totals = extract_xbrl_totals(xbrl_path)
+        _validate_with_xbrl(result, xbrl_totals, source)
     else:
         logger.info("No XBRL available for %s Q%s - using PDF only", year, quarter)
-        result.xbrl_available = False
-
-        if validate:
-            sheet1_data = sections_to_sheet1data(result.sections, year, quarter)
-            sheet1_data.xbrl_available = False
-            sheet1_data.source = source
-
-            report = run_sheet1_validations(
-                sheet1_data, None, run_sum_validations=True, run_pdf_xbrl_validations=True, run_cross_validations=False,
-            )
-            result.validations = report.pdf_xbrl_validations
-            result.validation_report = report
+        _validate_pdf_only(result, source)
 
     return result
 
@@ -173,6 +189,35 @@ def _extract_ingresos_fallback(data: Sheet1Data, ef_path: Path) -> ValidationRep
     return ValidationReport(sum_validations=sum_results)
 
 
+def _wrap_result(
+    data: Sheet1Data | None,
+    report: ValidationReport | None,
+    return_report: bool,
+) -> Sheet1Data | None | tuple[Sheet1Data | None, ValidationReport | None]:
+    """Wrap extraction result based on return_report flag."""
+    return (data, report) if return_report else data
+
+
+def _extract_and_populate_notas(data: Sheet1Data, ef_path: Path) -> bool:
+    """Extract Nota 21 and 22 from PDF and populate Sheet1Data.
+
+    Returns True if at least one nota was successfully extracted.
+    """
+    nota_sections = [
+        ("nota_21", "total_costo_venta"),
+        ("nota_22", "total_gasto_admin"),
+    ]
+
+    any_extracted = False
+    for section_name, total_field in nota_sections:
+        nota = extract_pdf_section(ef_path, section_name)
+        if nota:
+            _populate_sheet1_from_nota(data, nota, section_name, total_field)
+            any_extracted = True
+
+    return any_extracted
+
+
 def extract_sheet1_from_analisis_razonado(
     year: int,
     quarter: int,
@@ -186,11 +231,9 @@ def extract_sheet1_from_analisis_razonado(
     ef_path = _resolve_pdf_path(raw_dir, year, quarter)
     if not ef_path:
         logger.warning("Estados Financieros PDF not found in %s", raw_dir)
-        return (None, None) if return_report else None
+        return _wrap_result(None, None, return_report)
 
-    combined_path = find_file_with_alternatives(raw_dir, "pucobre_combined", year, quarter)
-    source = "pucobre.cl" if (combined_path and combined_path.exists()) else "cmf"
-
+    source = _determine_source(raw_dir, year, quarter)
     xbrl_path, xbrl_available = _resolve_xbrl_path(paths["raw_xbrl"], year, quarter)
 
     data = Sheet1Data(
@@ -201,25 +244,17 @@ def extract_sheet1_from_analisis_razonado(
         xbrl_available=xbrl_available,
     )
 
-    nota_21 = extract_pdf_section(ef_path, "nota_21")
-    nota_22 = extract_pdf_section(ef_path, "nota_22")
-
-    if nota_21 is None and nota_22 is None:
+    if not _extract_and_populate_notas(data, ef_path):
         logger.error("Could not extract Nota 21 or 22 from %s", ef_path)
-        return (None, None) if return_report else None
+        return _wrap_result(None, None, return_report)
 
-    if nota_21:
-        _populate_sheet1_from_nota(data, nota_21, "nota_21", "total_costo_venta")
-
-    if nota_22:
-        _populate_sheet1_from_nota(data, nota_22, "nota_22", "total_gasto_admin")
-
-    if xbrl_available and validate_with_xbrl and xbrl_path:
-        report = _validate_sheet1_with_xbrl(data, xbrl_path)
+    should_validate_xbrl = xbrl_available and validate_with_xbrl and xbrl_path is not None
+    if should_validate_xbrl:
+        report = _validate_sheet1_with_xbrl(data, xbrl_path)  # type: ignore[arg-type]
     else:
         report = _extract_ingresos_fallback(data, ef_path)
 
-    return (data, report) if return_report else data
+    return _wrap_result(data, report, return_report)
 
 
 def _map_nota_item_to_sheet1(item: LineItem, data: Sheet1Data, section_name: str) -> None:

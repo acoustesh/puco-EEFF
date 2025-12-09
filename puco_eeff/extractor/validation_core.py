@@ -376,6 +376,61 @@ def _run_sum_validations(data: Sheet1Data) -> list[SumValidationResult]:
     return results
 
 
+def _create_both_sources_result(
+    display_name: str,
+    pdf_value: int,
+    xbrl_value: int,
+    tolerance: int,
+) -> ValidationResult:
+    """Create validation result when both PDF and XBRL values exist."""
+    match, diff = _compare_with_tolerance(pdf_value, xbrl_value, tolerance)
+    if match:
+        logger.info(f"✓ {display_name} matches XBRL: {pdf_value:,}")
+    else:
+        logger.warning(
+            f"✗ {display_name} mismatch - PDF: {pdf_value:,}, XBRL: {xbrl_value:,} (diff: {diff})"
+        )
+    return ValidationResult(
+        field_name=display_name,
+        pdf_value=pdf_value,
+        xbrl_value=xbrl_value,
+        match=match,
+        source="both",
+        difference=diff if not match else None,
+    )
+
+
+def _create_xbrl_only_result(
+    display_name: str,
+    xbrl_value: int,
+    data: Sheet1Data,
+    field_name: str,
+    use_fallback: bool,
+) -> ValidationResult:
+    """Create validation result when only XBRL value exists."""
+    if use_fallback:
+        logger.info(f"Using XBRL value for {display_name}: {xbrl_value:,}")
+        data.set_value(field_name, xbrl_value)
+    return ValidationResult(
+        field_name=display_name,
+        pdf_value=None,
+        xbrl_value=xbrl_value,
+        match=True,
+        source="xbrl_only",
+    )
+
+
+def _create_pdf_only_result(display_name: str, pdf_value: int) -> ValidationResult:
+    """Create validation result when only PDF value exists."""
+    return ValidationResult(
+        field_name=display_name,
+        pdf_value=pdf_value,
+        xbrl_value=None,
+        match=True,
+        source="pdf_only",
+    )
+
+
 def _run_pdf_xbrl_validations(
     data: Sheet1Data,
     xbrl_totals: Mapping[str, int | None] | None,
@@ -384,57 +439,46 @@ def _run_pdf_xbrl_validations(
     """Config-driven PDF ↔ XBRL comparison."""
     results = []
     tolerance = get_sheet1_sum_tolerance()
-    pdf_xbrl_config = get_sheet1_pdf_xbrl_validations()
 
-    for validation in pdf_xbrl_config:
+    for validation in get_sheet1_pdf_xbrl_validations():
         field_name = validation["field_name"]
         xbrl_key = validation["xbrl_key"]
         display_name = validation["display_name"]
         xbrl_value = xbrl_totals.get(xbrl_key) if xbrl_totals else None
         pdf_value = data.get_value(field_name)
 
-        if xbrl_value is not None:
-            if pdf_value is not None:
-                match, diff = _compare_with_tolerance(pdf_value, xbrl_value, tolerance)
-                results.append(
-                    ValidationResult(
-                        field_name=display_name,
-                        pdf_value=pdf_value,
-                        xbrl_value=xbrl_value,
-                        match=match,
-                        source="both",
-                        difference=diff if not match else None,
-                    ),
-                )
-                if match:
-                    logger.info(f"✓ {display_name} matches XBRL: {pdf_value:,}")
-                else:
-                    logger.warning(
-                        f"✗ {display_name} mismatch - PDF: {pdf_value:,}, XBRL: {xbrl_value:,} (diff: {diff})",
-                    )
-            else:
-                if use_fallback:
-                    logger.info(f"Using XBRL value for {display_name}: {xbrl_value:,}")
-                    data.set_value(field_name, xbrl_value)
-                results.append(
-                    ValidationResult(
-                        field_name=display_name,
-                        pdf_value=None,
-                        xbrl_value=xbrl_value,
-                        match=True,
-                        source="xbrl_only",
-                    ),
-                )
-        elif pdf_value is not None:
-            results.append(
-                ValidationResult(
-                    field_name=display_name,
-                    pdf_value=pdf_value,
-                    xbrl_value=None,
-                    match=True,
-                    source="pdf_only",
-                ),
-            )
+        result = _resolve_single_pdf_xbrl_validation(
+            display_name,
+            pdf_value,
+            xbrl_value,
+            tolerance,
+            data,
+            field_name,
+            use_fallback,
+        )
+        if result:
+            results.append(result)
+
+    return results
+
+
+def _resolve_single_pdf_xbrl_validation(
+    display_name: str,
+    pdf_value: int | None,
+    xbrl_value: int | None,
+    tolerance: int,
+    data: Sheet1Data,
+    field_name: str,
+    use_fallback: bool,
+) -> ValidationResult | None:
+    """Resolve a single PDF-XBRL validation based on available values."""
+    if xbrl_value is not None and pdf_value is not None:
+        return _create_both_sources_result(display_name, pdf_value, xbrl_value, tolerance)
+    if xbrl_value is not None:
+        return _create_xbrl_only_result(display_name, xbrl_value, data, field_name, use_fallback)
+    if pdf_value is not None:
+        return _create_pdf_only_result(display_name, pdf_value)
+    return None
 
     return results
 

@@ -306,6 +306,39 @@ def find_section_page(
 # =============================================================================
 
 
+def _get_table_identifiers_for_section(
+    section_name: str, nota_number: int
+) -> tuple[list[str], list[str]]:
+    """Get unique and exclude items for a section."""
+    effective_section = section_name or (f"nota_{nota_number}" if nota_number else "")
+    if effective_section:
+        section_spec = get_sheet1_section_spec(effective_section)
+        return get_table_identifiers(section_spec)
+    return [], []
+
+
+def _find_best_matching_table(
+    tables: list[list[list[str | None]]],
+    expected_items: list[str],
+    unique_items: list[str],
+    exclude_items: list[str],
+    min_score: int = 3,
+) -> list[list[str | None]] | None:
+    """Find the table that best matches expected content."""
+    best_table = None
+    best_score = 0
+
+    for table in tables:
+        if not table:
+            continue
+        score = score_table_match(table, expected_items, unique_items, exclude_items)
+        if score > best_score:
+            best_score = score
+            best_table = table
+
+    return best_table if best_score >= min_score else None
+
+
 def extract_table_from_page(
     pdf_path: Path,
     page_index: int,
@@ -316,37 +349,19 @@ def extract_table_from_page(
     quarter: int | None = None,
 ) -> list[dict[str, Any]]:
     """Extract cost table data from a specific page."""
-    if not section_name and nota_number:
-        section_name = f"nota_{nota_number}"
-    if section_name:
-        section_spec = get_sheet1_section_spec(section_name)
-        unique_items, exclude_items = get_table_identifiers(section_spec)
-    else:
-        unique_items, exclude_items = [], []
+    unique_items, exclude_items = _get_table_identifiers_for_section(section_name, nota_number)
 
     with pdfplumber.open(pdf_path) as pdf:
         if page_index >= len(pdf.pages):
             return []
 
-        page = pdf.pages[page_index]
-        tables = page.extract_tables()
-
+        tables = pdf.pages[page_index].extract_tables()
         if not tables:
             logger.warning(f"No tables found on page {page_index + 1}")
             return []
 
-        best_table = None
-        best_score = 0
-
-        for table in tables:
-            if not table:
-                continue
-            score = score_table_match(table, expected_items, unique_items, exclude_items)
-            if score > best_score:
-                best_score = score
-                best_table = table
-
-        if best_table is None or best_score < 3:
+        best_table = _find_best_matching_table(tables, expected_items, unique_items, exclude_items)
+        if best_table is None:
             logger.warning(f"Could not find expected cost table on page {page_index + 1}")
             return []
 

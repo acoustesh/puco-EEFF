@@ -149,67 +149,47 @@ def score_table_match(
 # =============================================================================
 
 
+def _match_concept_or_total(concept: str, expected_items: list[str]) -> str | None:
+    """Match concept text against expected items or recognize as 'Totales'."""
+    matched = match_item(concept, expected_items)
+    if matched:
+        return matched
+    return "Totales" if "total" in concept.lower() else None
+
+
+def _extract_values_at_index(value_columns: list[list[str]], idx: int) -> list[int]:
+    """Extract parsed numeric values at a specific index from all columns."""
+    values = []
+    for col_values in value_columns:
+        if idx < len(col_values):
+            parsed = parse_chilean_number(col_values[idx])
+            if parsed is not None:
+                values.append(parsed)
+    return values
+
+
 def parse_multiline_row(
     concepts: list[str],
     value_columns: list[list[str]],
     expected_items: list[str],
 ) -> list[dict[str, Any]]:
-    """Parse a row with multiple concepts in a single cell (newline-separated).
-
-    Args:
-        concepts: List of concept names from split cell
-        value_columns: List of value lists, one per column
-        expected_items: List of expected item names for matching
-
-    Returns:
-        List of parsed row dictionaries with concepto and values
-
-    """
+    """Parse a row with multiple concepts in a single cell (newline-separated)."""
     parsed_rows = []
     for idx, concept in enumerate(concepts):
         concept = concept.strip()
         if not concept:
             continue
 
-        matched_item = match_item(concept, expected_items)
-        if not matched_item and "total" in concept.lower():
-            matched_item = "Totales"
-
+        matched_item = _match_concept_or_total(concept, expected_items)
         if matched_item:
-            values = []
-            for col_values in value_columns:
-                if idx < len(col_values):
-                    parsed = parse_chilean_number(col_values[idx])
-                    if parsed is not None:
-                        values.append(parsed)
+            values = _extract_values_at_index(value_columns, idx)
             parsed_rows.append({"concepto": matched_item, "values": values})
 
     return parsed_rows
 
 
-def parse_single_row(
-    row_text: str,
-    row: list[str | None],
-    expected_items: list[str],
-) -> dict[str, Any] | None:
-    """Parse a single-concept row.
-
-    Args:
-        row_text: The concept text from the first cell
-        row: The full row including value cells
-        expected_items: List of expected item names for matching
-
-    Returns:
-        Parsed row dictionary with concepto and values, or None if not matched
-
-    """
-    matched_item = match_item(row_text, expected_items)
-    if not matched_item and "total" in row_text.lower():
-        matched_item = "Totales"
-
-    if not matched_item:
-        return None
-
+def _extract_values_from_row_cells(row: list[str | None]) -> list[int]:
+    """Extract parsed numeric values from row cells (skipping first cell)."""
     values = []
     for cell in row[1:]:
         if cell:
@@ -217,6 +197,20 @@ def parse_single_row(
             parsed = parse_chilean_number(cell_str)
             if parsed is not None:
                 values.append(parsed)
+    return values
+
+
+def parse_single_row(
+    row_text: str,
+    row: list[str | None],
+    expected_items: list[str],
+) -> dict[str, Any] | None:
+    """Parse a single-concept row."""
+    matched_item = _match_concept_or_total(row_text, expected_items)
+    if not matched_item:
+        return None
+
+    values = _extract_values_from_row_cells(row)
 
     return {"concepto": matched_item, "values": values}
 

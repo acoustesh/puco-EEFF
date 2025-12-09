@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import time
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from puco_eeff.config import AUDIT_DIR, get_config, get_openrouter_client, setup_logging
@@ -13,6 +14,98 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 logger = setup_logging(__name__)
+
+
+@dataclass
+class OCRRequest:
+    """Encapsulates OCR request parameters."""
+
+    image_path: Path | None = None
+    image_base64: str | None = None
+    pdf_path: Path | None = None
+    page_number: int | None = None
+    prompt: str | None = None
+    audit_dir: Path | None = None
+
+
+def _try_mistral_ocr(request: OCRRequest, save_response: bool) -> dict[str, Any]:
+    """Attempt OCR using Mistral."""
+    return ocr_with_mistral(
+        image_path=request.image_path,
+        image_base64=request.image_base64,
+        pdf_path=request.pdf_path,
+        page_number=request.page_number,
+        prompt=request.prompt,
+        save_response=save_response,
+        audit_dir=request.audit_dir,
+    )
+
+
+def _try_openrouter_ocr(request: OCRRequest, model: str, save_response: bool) -> dict[str, Any]:
+    """Attempt OCR using OpenRouter."""
+    return _ocr_with_openrouter(
+        model=model,
+        image_path=request.image_path,
+        image_base64=request.image_base64,
+        prompt=request.prompt,
+        audit_dir=request.audit_dir if save_response else None,
+    )
+
+
+def _attempt_single_ocr(
+    provider: str,
+    model: str,
+    request: OCRRequest,
+    save_response: bool,
+) -> dict[str, Any]:
+    """Execute a single OCR attempt for a specific provider."""
+    if provider == "mistral":
+        return _try_mistral_ocr(request, save_response)
+    return _try_openrouter_ocr(request, model, save_response)
+
+
+def _run_with_retries(
+    provider: str,
+    model: str,
+    request: OCRRequest,
+    max_attempts: int,
+    base_delay: float,
+    max_delay: float,
+    save_responses: bool,
+    all_responses: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Run OCR attempts with exponential backoff retry logic."""
+    for attempt in range(max_attempts):
+        logger.info(f"OCR attempt {attempt + 1}/{max_attempts} with {provider}/{model}")
+
+        try:
+            result = _attempt_single_ocr(provider, model, request, save_responses)
+
+            if result.get("success"):
+                all_responses.append(result)
+                result["all_responses"] = all_responses if save_responses else []
+                return result
+
+            logger.warning(f"OCR failed: {result.get('error', 'Unknown error')}")
+            all_responses.append(result)
+
+        except Exception as e:
+            logger.exception("OCR exception: %s", e)
+            all_responses.append({
+                "success": False,
+                "provider": provider,
+                "model": model,
+                "error": str(e),
+                "attempt": attempt + 1,
+            })
+
+        if attempt < max_attempts - 1:
+            delay = min(base_delay * (2**attempt), max_delay)
+            logger.debug("Waiting %ss before retry...", delay)
+            time.sleep(delay)
+
+    logger.warning("All %s attempts failed for %s/%s", max_attempts, provider, model)
+    return None
 
 
 def ocr_with_fallback(
@@ -28,93 +121,37 @@ def ocr_with_fallback(
 
     Tries Mistral OCR first, then falls back to OpenRouter providers
     (Anthropic Claude, OpenAI GPT-4V) with exponential retry.
-
-    Args:
-        image_path: Path to an image file
-        image_base64: Base64-encoded image data
-        pdf_path: Path to a PDF file
-        page_number: Page number if processing a specific page
-        prompt: Custom prompt for OCR extraction
-        save_all_responses: Whether to save all responses for audit/comparison
-        audit_dir: Directory to save audit files
-
-    Returns:
-        Dictionary with extracted content and metadata
-
     """
     config = get_config()
     ocr_config = config["ocr"]
     retry_config = ocr_config["retry"]
 
-    max_attempts = retry_config["max_attempts"]
-    base_delay = retry_config["base_delay_seconds"]
-    max_delay = retry_config["max_delay_seconds"]
+    request = OCRRequest(
+        image_path=image_path,
+        image_base64=image_base64,
+        pdf_path=pdf_path,
+        page_number=page_number,
+        prompt=prompt,
+        audit_dir=audit_dir or AUDIT_DIR,
+    )
 
-    audit_path = audit_dir or AUDIT_DIR
     all_responses: list[dict[str, Any]] = []
-
-    # Build the provider chain: Mistral -> OpenRouter fallbacks
-    providers = [
-        {"provider": "mistral", "model": "mistral-ocr-latest"},
-        *ocr_config["fallback"],
-    ]
+    providers = [{"provider": "mistral", "model": "mistral-ocr-latest"}, *ocr_config["fallback"]]
 
     for provider_info in providers:
-        provider = provider_info["provider"]
-        model = provider_info["model"]
+        result = _run_with_retries(
+            provider=provider_info["provider"],
+            model=provider_info["model"],
+            request=request,
+            max_attempts=retry_config["max_attempts"],
+            base_delay=retry_config["base_delay_seconds"],
+            max_delay=retry_config["max_delay_seconds"],
+            save_responses=save_all_responses,
+            all_responses=all_responses,
+        )
+        if result:
+            return result
 
-        for attempt in range(max_attempts):
-            try:
-                logger.info(f"OCR attempt {attempt + 1}/{max_attempts} with {provider}/{model}")
-
-                if provider == "mistral":
-                    result = ocr_with_mistral(
-                        image_path=image_path,
-                        image_base64=image_base64,
-                        pdf_path=pdf_path,
-                        page_number=page_number,
-                        prompt=prompt,
-                        save_response=save_all_responses,
-                        audit_dir=audit_path,
-                    )
-                else:
-                    result = _ocr_with_openrouter(
-                        model=model,
-                        image_path=image_path,
-                        image_base64=image_base64,
-                        prompt=prompt,
-                        audit_dir=audit_path if save_all_responses else None,
-                    )
-
-                if result.get("success"):
-                    all_responses.append(result)
-                    result["all_responses"] = all_responses if save_all_responses else []
-                    return result
-
-                logger.warning(f"OCR failed: {result.get('error', 'Unknown error')}")
-                all_responses.append(result)
-
-            except Exception as e:
-                logger.exception("OCR exception: %s", e)
-                all_responses.append(
-                    {
-                        "success": False,
-                        "provider": provider,
-                        "model": model,
-                        "error": str(e),
-                        "attempt": attempt + 1,
-                    },
-                )
-
-            # Exponential backoff before retry
-            if attempt < max_attempts - 1:
-                delay = min(base_delay * (2**attempt), max_delay)
-                logger.debug("Waiting %ss before retry...", delay)
-                time.sleep(delay)
-
-        logger.warning("All %s attempts failed for %s/%s", max_attempts, provider, model)
-
-    # All providers failed
     logger.error("All OCR providers failed")
     return {
         "success": False,
