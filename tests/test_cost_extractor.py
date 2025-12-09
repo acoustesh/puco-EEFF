@@ -38,6 +38,7 @@ from puco_eeff.extractor.validation_core import (
     _run_pdf_xbrl_validations,
     _run_sum_validations,
     _safe_eval_expression,
+    format_sum_validation_status,
     format_validation_report,
     run_sheet1_validations,
 )
@@ -339,7 +340,9 @@ class TestPdfXbrlValidation:
             "admin_expense": -17363,
         }
 
-        validations = _run_pdf_xbrl_validations(sample_data_both, xbrl_totals, use_fallback=False)
+        validations = _run_pdf_xbrl_validations(
+            sample_data_both, xbrl_totals, enable_fallback=False
+        )
 
         assert len(validations) == 2
         assert all(v.match for v in validations)
@@ -352,14 +355,16 @@ class TestPdfXbrlValidation:
             "admin_expense": 17363,
         }
 
-        validations = _run_pdf_xbrl_validations(sample_data_both, xbrl_totals, use_fallback=False)
+        validations = _run_pdf_xbrl_validations(
+            sample_data_both, xbrl_totals, enable_fallback=False
+        )
 
         # Should match because we compare absolute values
         assert all(v.match for v in validations)
 
     def test_pdf_only_no_xbrl(self, sample_data_both: Sheet1Data) -> None:
         """PDF-only extraction when no XBRL available."""
-        validations = _run_pdf_xbrl_validations(sample_data_both, None, use_fallback=False)
+        validations = _run_pdf_xbrl_validations(sample_data_both, None, enable_fallback=False)
 
         assert len(validations) == 2
         assert all(v.source == "pdf_only" for v in validations)
@@ -374,7 +379,7 @@ class TestPdfXbrlValidation:
             "admin_expense": -17363,
         }
 
-        validations = _run_pdf_xbrl_validations(data, xbrl_totals, use_fallback=False)
+        validations = _run_pdf_xbrl_validations(data, xbrl_totals, enable_fallback=False)
 
         assert len(validations) == 2
         assert all(v.source == "xbrl_only" for v in validations)
@@ -390,7 +395,7 @@ class TestPdfXbrlValidation:
             "admin_expense": None,
         }
 
-        validations = _run_pdf_xbrl_validations(data, xbrl_totals, use_fallback=False)
+        validations = _run_pdf_xbrl_validations(data, xbrl_totals, enable_fallback=False)
 
         cost_val = next(v for v in validations if "Costo" in v.field_name)
         assert cost_val.match is False
@@ -1037,8 +1042,9 @@ class TestSumValidationResult:
             difference=0,
             tolerance=1,
         )
-        assert "✓" in result.status
-        assert "-126,202" in result.status
+        status = format_sum_validation_status(result)
+        assert "✓" in status
+        assert "-126,202" in status
 
     def test_mismatch_status_message(self) -> None:
         """Mismatch should show error with difference."""
@@ -1051,8 +1057,9 @@ class TestSumValidationResult:
             difference=202,
             tolerance=1,
         )
-        assert "✗" in result.status
-        assert "diff: 202" in result.status
+        status = format_sum_validation_status(result)
+        assert "✗" in status
+        assert "diff: 202" in status
 
     def test_no_total_status_message(self) -> None:
         """Missing total should show warning."""
@@ -1065,8 +1072,9 @@ class TestSumValidationResult:
             difference=0,
             tolerance=1,
         )
-        assert "⚠" in result.status
-        assert "No total" in result.status
+        status = format_sum_validation_status(result)
+        assert "⚠" in status
+        assert "No total" in status
 
 
 class TestCrossValidationResult:
@@ -1809,14 +1817,14 @@ class TestRunPdfXbrlValidations:
             "ingresos": 179165,
         }
 
-        results = _run_pdf_xbrl_validations(sample_data, xbrl_totals, use_fallback=False)
+        results = _run_pdf_xbrl_validations(sample_data, xbrl_totals, enable_fallback=False)
 
         assert len(results) >= 2
         assert all(r.match for r in results if r.source == "both")
 
     def test_pdf_only_when_no_xbrl(self, sample_data: Sheet1Data) -> None:
         """Returns pdf_only results when no XBRL available."""
-        results = _run_pdf_xbrl_validations(sample_data, None, use_fallback=False)
+        results = _run_pdf_xbrl_validations(sample_data, None, enable_fallback=False)
 
         assert len(results) >= 2
         assert all(r.source == "pdf_only" for r in results)
@@ -1833,7 +1841,7 @@ class TestRunPdfXbrlValidations:
             "admin_expense": None,
         }
 
-        results = _run_pdf_xbrl_validations(data, xbrl_totals, use_fallback=True)
+        results = _run_pdf_xbrl_validations(data, xbrl_totals, enable_fallback=True)
 
         # Should have set ingresos on data
         assert data.ingresos_ordinarios == 200000

@@ -20,7 +20,6 @@ from puco_eeff.config import (
 )
 from puco_eeff.extractor.extraction import (
     _get_extraction_labels,
-    _get_table_identifiers,
 )
 from puco_eeff.sheets.sheet1 import (
     SHEET1_CONFIG_DIR,
@@ -30,6 +29,7 @@ from puco_eeff.sheets.sheet1 import (
     get_sheet1_reference_data,
     get_sheet1_reference_values,
     get_sheet1_section_spec,
+    get_sheet1_section_table_identifiers,
     get_sheet1_xbrl_mappings,
 )
 
@@ -275,21 +275,17 @@ class TestCostExtractorCompatibility:
             assert "field_mappings" in spec, f"{section_name} should have field_mappings"
 
     def test_get_table_identifiers_returns_tuples(self) -> None:
-        """_get_table_identifiers should return (unique, exclude) tuple."""
+        """get_sheet1_section_table_identifiers should return (unique, exclude) tuple."""
         for section_name in ["nota_21", "nota_22"]:
-            spec = get_sheet1_section_spec(section_name)
-            unique_items, exclude_items = _get_table_identifiers(spec)
+            unique_items, exclude_items = get_sheet1_section_table_identifiers(section_name)
 
             assert isinstance(unique_items, list)
             assert isinstance(exclude_items, list)
 
     def test_nota_21_unique_items_distinguish_from_nota_22(self) -> None:
         """Nota 21 unique items should not overlap with Nota 22 unique items."""
-        nota_21_spec = get_sheet1_section_spec("nota_21")
-        nota_22_spec = get_sheet1_section_spec("nota_22")
-
-        nota_21_unique, _ = _get_table_identifiers(nota_21_spec)
-        nota_22_unique, _ = _get_table_identifiers(nota_22_spec)
+        nota_21_unique, _ = get_sheet1_section_table_identifiers("nota_21")
+        nota_22_unique, _ = get_sheet1_section_table_identifiers("nota_22")
 
         # Normalize for comparison
         nota_21_normalized = {item.lower() for item in nota_21_unique}

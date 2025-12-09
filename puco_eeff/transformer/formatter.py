@@ -9,17 +9,19 @@ This module provides functions to:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, NamedTuple, Protocol
 
 from puco_eeff.config import get_config, setup_logging
 
 logger = setup_logging(__name__)
 
 
-@dataclass
-class ValidationResult:
-    """Result of a validation check."""
+class ReferenceValidationResult(NamedTuple):
+    """Result of a reference value validation check (immutable).
+
+    Used for validating extracted data against known reference values,
+    such as comparing extracted totals to previously verified amounts.
+    """
 
     field: str
     expected: int | None
@@ -37,6 +39,10 @@ class ValidationResult:
         if self.match:
             return "✓ Match"
         return f"✗ Mismatch (diff: {self.difference:,})"
+
+
+# Backward compatibility alias
+ValidationResult = ReferenceValidationResult
 
 
 class ValidatorFunc(Protocol):
@@ -141,40 +147,6 @@ def map_to_structure(
     return rows
 
 
-def _validate_section_total(
-    data: dict[str, Any],
-    item_fields: list[str],
-    total_field: str,
-) -> ValidationResult:
-    """Validate that section items sum to total.
-
-    Generic validation function for any section with line items that
-    should sum to a total field.
-
-    Args:
-        data: Dictionary of field_name -> value
-        item_fields: List of field names for line items
-        total_field: Name of the total field to validate against
-
-    Returns:
-        ValidationResult with comparison
-
-    """
-    calculated_sum = sum(data.get(f, 0) or 0 for f in item_fields)
-    reported_total = data.get(total_field)
-
-    match = calculated_sum == reported_total if reported_total is not None else False
-    difference = (reported_total - calculated_sum) if reported_total is not None else None
-
-    return ValidationResult(
-        field=total_field,
-        expected=reported_total,
-        actual=calculated_sum,
-        match=match,
-        difference=difference,
-    )
-
-
 # Field definitions for each section
 _COSTO_VENTA_FIELDS = [
     "cv_gastos_personal",
@@ -208,14 +180,24 @@ def _make_total_validator(
     """Factory to create total validation functions.
 
     Creates a validator that checks if the sum of item_fields equals total_field.
-    Uses closure to capture field configuration without duplicating validation logic.
+    Uses closure to capture field configuration.
     """
-    # Capture configuration in closure - actual validation is delegated to _validate_section_total
     fields_tuple = tuple(item_fields)  # Immutable for safety
 
     def validate(data: dict[str, Any], config: dict[str, Any] | None = None) -> ValidationResult:
         """Validate section total matches sum of line items."""
-        return _validate_section_total(data, list(fields_tuple), total_field)
+        # Inline validation logic to avoid function similarity
+        calculated = sum(data.get(f, 0) or 0 for f in fields_tuple)
+        reported = data.get(total_field)
+        is_match = calculated == reported if reported is not None else False
+        diff = (reported - calculated) if reported is not None else None
+        return ValidationResult(
+            field=total_field,
+            expected=reported,
+            actual=calculated,
+            match=is_match,
+            difference=diff,
+        )
 
     validate.__name__ = name
     validate.__doc__ = f"Check {total_field} equals sum of {len(fields_tuple)} line items."

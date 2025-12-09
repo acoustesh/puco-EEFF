@@ -67,17 +67,22 @@ def _get_pucobre_config(config: dict | None = None) -> tuple[str, dict[int, str]
 
 @dataclass
 class PucobreDownloadResult:
-    """Result of a Pucobre download operation."""
+    """Result of a Pucobre.cl download operation.
+
+    This dataclass handles the combined PDF download from Pucobre's website,
+    which bundles Estados Financieros and Análisis Razonado into a single file
+    that gets split into separate documents after download.
+    """
 
     success: bool
-    file_path: Path | None  # Estados Financieros PDF
+    file_path: Path | None  # Estados Financieros PDF after splitting
     file_size: int | None
     error: str | None = None
     source: str = "pucobre.cl"
-    # Additional files extracted from combined PDF
+    # Secondary files extracted from the combined PDF bundle
     analisis_razonado_path: Path | None = None
     analisis_razonado_size: int | None = None
-    combined_pdf_path: Path | None = None  # Original combined file (for reference)
+    combined_pdf_path: Path | None = None  # Retained original for debugging
 
 
 def _find_analisis_razonado_page(pdf_path: Path) -> int | None:

@@ -35,14 +35,18 @@ DOCUMENT_TYPES = ("analisis_razonado", "estados_financieros_pdf", "estados_finan
 
 @dataclass
 class DownloadResult:
-    """Result of a download operation."""
+    """Result of a CMF download operation.
 
-    document_type: str
+    Represents a single document download from CMF Chile regulatory portal.
+    Used for analisis razonado, estados financieros PDF, and XBRL downloads.
+    """
+
+    document_type: str  # "analisis_razonado", "estados_financieros_pdf", "estados_financieros_xbrl"
     success: bool
     file_path: Path | None
     file_size: int | None
     error: str | None = None
-    source: str = "cmf"  # "cmf" or "pucobre.cl"
+    source: str = "cmf"  # Always "cmf" for this dataclass
 
 
 def download_all_documents(

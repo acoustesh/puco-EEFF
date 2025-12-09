@@ -15,7 +15,10 @@ logger = setup_logging(__name__)
 
 
 async def download_file(url: str, destination: Path, request_timeout: float = 60.0) -> Path:
-    """Download a file from URL to destination.
+    """Download a file from URL to destination asynchronously.
+
+    Uses httpx.AsyncClient for non-blocking I/O. Preferred when running
+    in an async context (e.g., with asyncio.run or inside async functions).
 
     Args:
         url: URL to download from
@@ -34,19 +37,23 @@ async def download_file(url: str, destination: Path, request_timeout: float = 60
     logger.info("Downloading: %s", url)
     logger.debug("Destination: %s", destination)
 
-    async with httpx.AsyncClient(timeout=request_timeout, follow_redirects=True) as client:
-        response = await client.get(url)
-        response.raise_for_status()
+    async with httpx.AsyncClient(timeout=request_timeout, follow_redirects=True) as async_http:
+        http_response = await async_http.get(url)
+        http_response.raise_for_status()
 
-        with destination.open("wb") as f:
-            f.write(response.content)
+        with destination.open("wb") as output_file:
+            output_file.write(http_response.content)
 
-    logger.info(f"Downloaded: {destination.name} ({destination.stat().st_size} bytes)")
+    file_stats = destination.stat()
+    logger.info("Downloaded: %s (%d bytes)", destination.name, file_stats.st_size)
     return destination
 
 
 def download_file_sync(url: str, destination: Path, timeout: float = 60.0) -> Path:
-    """Synchronous version of download_file.
+    """Synchronous file download using blocking I/O.
+
+    Uses httpx.Client for blocking requests. Use this when running in
+    synchronous code without an event loop, such as in CLI scripts.
 
     Args:
         url: URL to download from
@@ -61,16 +68,14 @@ def download_file_sync(url: str, destination: Path, timeout: float = 60.0) -> Pa
 
     """
     destination.parent.mkdir(parents=True, exist_ok=True)
-
     logger.info("Downloading: %s", url)
     logger.debug("Destination: %s", destination)
 
-    with httpx.Client(timeout=timeout, follow_redirects=True) as client:
-        response = client.get(url)
-        response.raise_for_status()
+    with httpx.Client(timeout=timeout, follow_redirects=True) as sync_client:
+        resp = sync_client.get(url)
+        resp.raise_for_status()
+        destination.write_bytes(resp.content)
 
-        with destination.open("wb") as f:
-            f.write(response.content)
-
-    logger.info(f"Downloaded: {destination.name} ({destination.stat().st_size} bytes)")
+    downloaded_size = destination.stat().st_size
+    logger.info(f"Downloaded: {destination.name} ({downloaded_size} bytes)")
     return destination

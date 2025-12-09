@@ -42,7 +42,7 @@ openpyxl = ">=3.1"
 python-dotenv = ">=1.0"
 questionary = ">=2.0"
 pymupdf = ">=1.26.6"
-pyright = "^1.1.407"
+pyright = ">=1.1.407"
 voyageai = {version = ">=0.3.6", python = "<3.14"}
 
 [tool.poetry.group.dev.dependencies]

@@ -41,17 +41,6 @@ def _try_mistral_ocr(request: OCRRequest, save_response: bool) -> dict[str, Any]
     )
 
 
-def _try_openrouter_ocr(request: OCRRequest, model: str, save_response: bool) -> dict[str, Any]:
-    """Attempt OCR using OpenRouter."""
-    return _ocr_with_openrouter(
-        model=model,
-        image_path=request.image_path,
-        image_base64=request.image_base64,
-        prompt=request.prompt,
-        audit_dir=request.audit_dir if save_response else None,
-    )
-
-
 def _attempt_single_ocr(
     provider: str,
     model: str,
@@ -61,7 +50,14 @@ def _attempt_single_ocr(
     """Execute a single OCR attempt for a specific provider."""
     if provider == "mistral":
         return _try_mistral_ocr(request, save_response)
-    return _try_openrouter_ocr(request, model, save_response)
+    # OpenRouter provider - call _ocr_with_openrouter directly
+    return _ocr_with_openrouter(
+        model=model,
+        image_path=request.image_path,
+        image_base64=request.image_base64,
+        prompt=request.prompt,
+        audit_dir=request.audit_dir if save_response else None,
+    )
 
 
 def _run_with_retries(

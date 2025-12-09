@@ -1,14 +1,14 @@
 {
   "config": {
-    "codestral_similarity_threshold_neighbor": 0.9,
-    "codestral_similarity_threshold_pair": 0.92,
+    "codestral_similarity_threshold_neighbor": 0.89,
+    "codestral_similarity_threshold_pair": 0.9,
     "min_loc_for_similarity": 1,
     "pca_variance_threshold": 0.99,
     "refactor_index_threshold": 12.0,
     "refactor_index_top_n": 5,
     "similarity_threshold_neighbor": 0.79,
     "similarity_threshold_pair": 0.85,
-    "voyage_similarity_threshold_neighbor": 0.89,
-    "voyage_similarity_threshold_pair": 0.89
+    "voyage_similarity_threshold_neighbor": 0.85,
+    "voyage_similarity_threshold_pair": 0.88
   }
 }

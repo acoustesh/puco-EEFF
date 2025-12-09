@@ -15,8 +15,7 @@ from __future__ import annotations
 import ast
 import re
 from dataclasses import dataclass, field
-from functools import singledispatch
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from puco_eeff.config import setup_logging
 from puco_eeff.sheets.sheet1 import (
@@ -49,6 +48,7 @@ __all__ = [
     # Internal helpers (needed by extraction_pipeline)
     "_run_sum_validations",
     # Formatting
+    "format_sum_validation_status",
     "format_validation_report",
     "log_validation_report",
     # Validation runners
@@ -62,18 +62,21 @@ __all__ = [
 
 
 @dataclass
-class _StatusMixin:
-    """Mixin providing a shared status property via singledispatch."""
+class PDFXBRLComparisonResult:
+    """Result of cross-validation between PDF and XBRL data sources.
 
-    @property
-    def status(self) -> str:
-        """Format result status via singledispatch."""
-        return format_status(self)
+    This class tracks the comparison of a single field between two sources,
+    recording which sources were available and whether values matched.
 
+    Attributes:
+        field_name: Name of the validated field (e.g., "total_costo_venta")
+        pdf_value: Value extracted from PDF (None if unavailable)
+        xbrl_value: Value from XBRL file (None if unavailable)
+        match: True if both sources agree (or one missing)
+        source: Origin indicator ("pdf_only", "xbrl_only", or "both")
+        difference: Absolute difference when mismatch (None if match/missing)
 
-@dataclass
-class ValidationResult(_StatusMixin):
-    """Result of cross-validation between PDF and XBRL."""
+    """
 
     field_name: str
     pdf_value: int | None
@@ -81,6 +84,29 @@ class ValidationResult(_StatusMixin):
     match: bool
     source: str
     difference: int | None = None
+
+    @property
+    def status(self) -> str:
+        """Format PDF/XBRL validation status with source-specific warnings."""
+        # Use dictionary-based dispatch for source-specific messages
+        messages = {
+            "pdf_only": "⚠ PDF only (no XBRL)",
+            "xbrl_only": "⚠ XBRL only (PDF extraction failed)",
+        }
+        if msg := messages.get(self.source):
+            return msg
+        # Standard match/mismatch formatting
+        return (
+            "✓ Match"
+            if self.match
+            else f"✗ Mismatch (diff: {self.difference:,})"
+            if self.difference
+            else "✗ Mismatch (diff: n/a)"
+        )
+
+
+# Backward-compatible alias
+ValidationResult = PDFXBRLComparisonResult
 
 
 @dataclass
@@ -110,7 +136,7 @@ class ExtractionResult:
 
 
 @dataclass
-class SumValidationResult(_StatusMixin):
+class SumValidationResult:
     """Result of line-item sum validation."""
 
     description: str
@@ -122,8 +148,28 @@ class SumValidationResult(_StatusMixin):
     tolerance: int
 
 
+def format_sum_validation_status(result: SumValidationResult) -> str:
+    """Format sum validation status comparing calculated to expected total.
+
+    Args:
+        result: The sum validation result to format
+
+    Returns:
+        Formatted status string with appropriate icon
+
+    """
+    if result.expected_total is None:
+        return "⚠ No total value to compare"
+    if result.match:
+        return f"✓ Sum matches total ({result.calculated_sum:,})"
+    return (
+        f"✗ Sum mismatch: items={result.calculated_sum:,}, "
+        f"total={result.expected_total:,} (diff: {result.difference})"
+    )
+
+
 @dataclass
-class CrossValidationResult(_StatusMixin):
+class CrossValidationResult:
     """Result of cross-validation formula check."""
 
     description: str
@@ -134,6 +180,19 @@ class CrossValidationResult(_StatusMixin):
     difference: int | None
     tolerance: int
     missing_facts: list[str] = field(default_factory=list)
+
+    @property
+    def status(self) -> str:
+        """Format cross-validation status with formula check results."""
+        if self.missing_facts:
+            missing_list = ", ".join(self.missing_facts)
+            return f"⚠ Skipped - missing: {missing_list}"
+        desc, exp, calc = self.description, self.expected_value, self.calculated_value
+        return (
+            f"✓ {desc}: {exp:,}"
+            if self.match
+            else f"✗ {desc}: expected={exp}, calculated={calc} (diff: {self.difference})"
+        )
 
 
 @dataclass
@@ -166,58 +225,6 @@ class ValidationReport:
     def has_reference_failures(self) -> bool:
         """Check if reference validation failed."""
         return self.reference_issues is not None and len(self.reference_issues) > 0
-
-
-# =============================================================================
-# Status formatting helpers
-# =============================================================================
-
-
-def _format_match_status(match: bool, success_msg: str, failure_msg: str) -> str:
-    """Shared helper to format match/mismatch status."""
-    return success_msg if match else failure_msg
-
-
-@singledispatch
-def format_status(result: Any) -> str:
-    """Format validation status for supported result types."""
-    return ""  # Fallback for unexpected objects
-
-
-@format_status.register
-def _format_validation_result_status(result: ValidationResult) -> str:
-    """Format ValidationResult status."""
-    if result.source == "pdf_only":
-        return "⚠ PDF only (no XBRL)"
-    if result.source == "xbrl_only":
-        return "⚠ XBRL only (PDF extraction failed)"
-    diff_display = f"{result.difference:,}" if result.difference is not None else "n/a"
-    return _format_match_status(result.match, "✓ Match", f"✗ Mismatch (diff: {diff_display})")
-
-
-@format_status.register
-def _format_sum_validation_status(result: SumValidationResult) -> str:
-    """Format SumValidationResult status."""
-    if result.expected_total is None:
-        return "⚠ No total value to compare"
-    success = f"✓ Sum matches total ({result.calculated_sum:,})"
-    failure = (
-        f"✗ Sum mismatch: items={result.calculated_sum:,}, total={result.expected_total:,} (diff: {result.difference})"
-    )
-    return _format_match_status(result.match, success, failure)
-
-
-@format_status.register
-def _format_cross_validation_status(result: CrossValidationResult) -> str:
-    """Format CrossValidationResult status."""
-    if result.missing_facts:
-        return f"⚠ Skipped - missing: {', '.join(result.missing_facts)}"
-    success = f"✓ {result.description}: {result.expected_value:,}"
-    failure = (
-        f"✗ {result.description}: expected={result.expected_value}, "
-        f"calculated={result.calculated_value} (diff: {result.difference})"
-    )
-    return _format_match_status(result.match, success, failure)
 
 
 # =============================================================================
@@ -274,7 +281,7 @@ def format_validation_report(report: ValidationReport, verbose: bool = True) -> 
         (
             "Sum Validations:",
             report.sum_validations,
-            lambda v: f"  {v.status}",
+            lambda v: f"  {format_sum_validation_status(v)}",
             "Sum Validations: (none configured)",
         ),
         (
@@ -423,34 +430,38 @@ def _create_single_source_result(
 
 
 def _run_pdf_xbrl_validations(
-    data: Sheet1Data,
-    xbrl_totals: Mapping[str, int | None] | None,
-    use_fallback: bool = True,
+    sheet1_data: Sheet1Data,
+    xbrl_total_values: Mapping[str, int | None] | None,
+    enable_fallback: bool = True,
 ) -> list[ValidationResult]:
-    """Config-driven PDF ↔ XBRL comparison."""
-    results = []
-    tolerance = get_sheet1_sum_tolerance()
+    """Config-driven PDF ↔ XBRL comparison.
 
-    for validation in get_sheet1_pdf_xbrl_validations():
-        field_name = validation["field_name"]
-        xbrl_key = validation["xbrl_key"]
-        display_name = validation["display_name"]
-        xbrl_value = xbrl_totals.get(xbrl_key) if xbrl_totals else None
-        pdf_value = data.get_value(field_name)
+    Iterates through configured validations and compares PDF-extracted
+    values against XBRL facts for each field.
+    """
+    comparison_results = []
+    sum_tolerance = get_sheet1_sum_tolerance()
 
-        result = _resolve_single_pdf_xbrl_validation(
-            display_name,
-            pdf_value,
-            xbrl_value,
-            tolerance,
-            data,
-            field_name,
-            use_fallback,
+    for validation_spec in get_sheet1_pdf_xbrl_validations():
+        field_id = validation_spec["field_name"]
+        xbrl_fact_key = validation_spec["xbrl_key"]
+        label = validation_spec["display_name"]
+        fact_value = xbrl_total_values.get(xbrl_fact_key) if xbrl_total_values else None
+        extracted_value = sheet1_data.get_value(field_id)
+
+        validated = _resolve_single_pdf_xbrl_validation(
+            label,
+            extracted_value,
+            fact_value,
+            sum_tolerance,
+            sheet1_data,
+            field_id,
+            enable_fallback,
         )
-        if result:
-            results.append(result)
+        if validated:
+            comparison_results.append(validated)
 
-    return results
+    return comparison_results
 
 
 def _resolve_single_pdf_xbrl_validation(

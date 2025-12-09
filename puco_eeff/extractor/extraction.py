@@ -65,8 +65,6 @@ __all__ = [
     "format_quarter_label",
     "get_all_field_labels",
     "get_extraction_labels",
-    "get_section_expected_labels",
-    "get_table_identifiers",
     "quarter_to_roman",
 ]
 
@@ -116,29 +114,25 @@ class SectionBreakdown:
 # =============================================================================
 
 
-# Re-export for backward compatibility (prefers sheet1 implementation)
-def get_section_expected_labels(section_name: str, sheet_name: str = "sheet1") -> list[str]:
-    """Adapter for get_sheet1_section_expected_items with sheet dispatch. Only sheet1 supported."""
-    if sheet_name != "sheet1":
-        msg = f"Unsupported sheet: {sheet_name}"
-        raise ValueError(msg)
-    return get_sheet1_section_expected_items(section_name)
-
-
 def get_all_field_labels(sheet_name: str = "sheet1") -> dict[str, str]:
-    """Get all field labels from all sections in config."""
+    """Get all field labels from all sections in config.
+
+    Iterates through extraction sections and builds a mapping of field names
+    to their primary PDF label (first label in pdf_labels list).
+    """
     if sheet_name != "sheet1":
         msg = f"Sheet '{sheet_name}' not yet implemented."
         raise ValueError(msg)
 
-    field_labels = {}
-    for section_name in get_sheet1_extraction_sections():
-        field_mappings = get_sheet1_section_field_mappings(section_name)
-        for field_name, field_spec in field_mappings.items():
-            labels = field_spec.get("pdf_labels", [])
-            if labels:
-                field_labels[field_name] = labels[0]
-    return field_labels
+    aggregated_labels: dict[str, str] = {}
+    configured_sections = get_sheet1_extraction_sections()
+    for section_id in configured_sections:
+        section_fields = get_sheet1_section_field_mappings(section_id)
+        for field_id, field_definition in section_fields.items():
+            pdf_label_list = field_definition.get("pdf_labels", [])
+            if pdf_label_list:
+                aggregated_labels[field_id] = pdf_label_list[0]
+    return aggregated_labels
 
 
 def _extract_labels_for_section(
@@ -204,12 +198,6 @@ def get_extraction_labels(
         )
 
     return section1_items, section2_items, field_labels
-
-
-def get_table_identifiers(section_spec: dict[str, Any]) -> tuple[list[str], list[str]]:
-    """Extract unique/exclude items from a section_spec dict. Low-level dict accessor."""
-    ids = section_spec.get("table_identifiers") or {}
-    return (ids.get("unique_items") or [], ids.get("exclude_items") or [])
 
 
 # =============================================================================
@@ -286,7 +274,7 @@ def find_section_page(
 ) -> int | None:
     """Find the page number where a config-defined section exists."""
     section_spec = get_sheet1_section_spec(section_name)
-    unique_items, _ = get_table_identifiers(section_spec)
+    unique_items, _ = get_sheet1_section_table_identifiers(section_name)
 
     if not unique_items:
         msg = f"No unique_items defined for section '{section_name}'."
@@ -385,23 +373,6 @@ def extract_table_from_page(
 # =============================================================================
 
 
-def _find_section_page_with_fallback(
-    pdf_path: Path,
-    section_name: str,
-    year: int | None,
-    quarter: int | None,
-) -> int | None:
-    """Find section page, trying fallback section if primary not found."""
-    page_idx = find_section_page(pdf_path, section_name, year, quarter)
-    if page_idx is not None:
-        return page_idx
-
-    fallback = get_section_fallback(section_name)
-    if fallback:
-        return find_section_page(pdf_path, fallback, year, quarter)
-    return None
-
-
 def _extract_table_with_next_page_fallback(
     pdf_path: Path,
     page_idx: int,
@@ -475,11 +446,20 @@ def extract_pdf_section(
     quarter: int | None = None,
 ) -> SectionBreakdown | None:
     """Extract a section from PDF using config-driven rules."""
+    if sheet_name != "sheet1":
+        msg = f"Unsupported sheet: {sheet_name}"
+        raise ValueError(msg)
+
     section_spec = get_sheet1_section_spec(section_name)
     section_title = section_spec.get("title", section_name)
-    expected_items = get_section_expected_labels(section_name, sheet_name)
+    expected_items = get_sheet1_section_expected_items(section_name)
 
-    page_idx = _find_section_page_with_fallback(pdf_path, section_name, year, quarter)
+    # Find section page, trying fallback section if primary not found
+    page_idx = find_section_page(pdf_path, section_name, year, quarter)
+    if page_idx is None:
+        fallback_section = get_section_fallback(section_name)
+        if fallback_section:
+            page_idx = find_section_page(pdf_path, fallback_section, year, quarter)
     if page_idx is None:
         logger.error("Could not find section '%s' in PDF", section_name)
         return None
@@ -631,4 +611,3 @@ from puco_eeff.extractor.table_parser import (  # noqa: E402, F401
 
 # Private aliases for backward compatibility
 _get_extraction_labels = get_extraction_labels
-_get_table_identifiers = get_table_identifiers
