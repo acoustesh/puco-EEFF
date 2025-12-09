@@ -341,7 +341,9 @@ class TestPdfXbrlValidation:
         }
 
         validations = _run_pdf_xbrl_validations(
-            sample_data_both, xbrl_totals, enable_fallback=False
+            sample_data_both,
+            xbrl_totals,
+            enable_fallback=False,
         )
 
         assert len(validations) == 2
@@ -356,7 +358,9 @@ class TestPdfXbrlValidation:
         }
 
         validations = _run_pdf_xbrl_validations(
-            sample_data_both, xbrl_totals, enable_fallback=False
+            sample_data_both,
+            xbrl_totals,
+            enable_fallback=False,
         )
 
         # Should match because we compare absolute values

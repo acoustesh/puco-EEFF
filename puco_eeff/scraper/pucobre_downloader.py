@@ -72,7 +72,7 @@ class PucobreDownloadResult:
     This dataclass handles the combined PDF download from Pucobre's website,
     which bundles Estados Financieros and Análisis Razonado into a single file
     that gets split into separate documents after download.
-    
+
     Unlike DownloadResult, this tracks multiple output files from PDF splitting.
     """
 
@@ -85,7 +85,7 @@ class PucobreDownloadResult:
     analisis_razonado_path: Path | None = None
     analisis_razonado_size: int | None = None
     combined_pdf_path: Path | None = None  # Retained original for debugging
-    
+
     @property
     def has_analisis_razonado(self) -> bool:
         """Check if analisis razonado was successfully extracted."""

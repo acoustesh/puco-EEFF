@@ -48,7 +48,7 @@ class DownloadResult:
     file_size: int | None
     error: str | None = None
     source: str = "cmf"  # Always "cmf" for this dataclass
-    
+
     def as_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
         return {

@@ -116,7 +116,7 @@ class SectionBreakdown:
 
 def get_all_field_labels(sheet_name: str = "sheet1") -> dict[str, str]:
     """Aggregate field-to-label mappings from extraction section configs.
-    
+
     Walks through all configured extraction sections and collects the first
     PDF label for each field. Used for PDF parsing label matching.
     """

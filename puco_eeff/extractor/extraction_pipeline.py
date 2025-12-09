@@ -215,7 +215,9 @@ def _create_sheet1_data(year: int, quarter: int, source: str, xbrl_available: bo
 
 
 def _extract_from_pdf(
-    year: int, quarter: int, validate_with_xbrl: bool
+    year: int,
+    quarter: int,
+    validate_with_xbrl: bool,
 ) -> tuple[Sheet1Data | None, ValidationReport | None]:
     """PDF extraction implementation - extracts from Nota 21/22 sections."""
     paths = get_period_paths(year, quarter)
@@ -223,14 +225,16 @@ def _extract_from_pdf(
     if not ef_pdf:
         logger.warning("PDF not found in %s", paths["raw_pdf"])
         return None, None
-    
+
     xbrl_path, has_xbrl = _resolve_xbrl_path(paths["raw_xbrl"], year, quarter)
-    data = _create_sheet1_data(year, quarter, _determine_source(paths["raw_pdf"], year, quarter), has_xbrl)
-    
+    data = _create_sheet1_data(
+        year, quarter, _determine_source(paths["raw_pdf"], year, quarter), has_xbrl
+    )
+
     if not _extract_and_populate_notas(data, ef_pdf):
         logger.error("Nota extraction failed from %s", ef_pdf)
         return None, None
-    
+
     if has_xbrl and validate_with_xbrl and xbrl_path:
         report = run_sheet1_validations(data, extract_xbrl_totals(xbrl_path))
     else:
@@ -257,10 +261,14 @@ _XBRL_TO_SHEET1_FIELDS = {
 }
 
 
-def _extract_from_xbrl_only(year: int, quarter: int) -> tuple[Sheet1Data | None, ValidationReport | None]:
+def _extract_from_xbrl_only(
+    year: int, quarter: int
+) -> tuple[Sheet1Data | None, ValidationReport | None]:
     """XBRL-only extraction - extracts high-level totals without PDF."""
     paths = get_period_paths(year, quarter)
-    xbrl_path = find_file_with_alternatives(paths["raw_xbrl"], "estados_financieros_xbrl", year, quarter)
+    xbrl_path = find_file_with_alternatives(
+        paths["raw_xbrl"], "estados_financieros_xbrl", year, quarter
+    )
     if not xbrl_path:
         xbrl_path = paths["raw_xbrl"] / format_filename("estados_financieros_xbrl", year, quarter)
     if not xbrl_path.exists():
@@ -286,7 +294,7 @@ def extract_sheet1(
     validate_with_xbrl: bool = True,
 ) -> Sheet1Data | None | tuple[Sheet1Data | None, ValidationReport | None]:
     """Unified API: extract Sheet1 data from PDF, XBRL, or both with fallback.
-    
+
     This is the main extraction entry point. Source-specific behavior:
     - prefer_source="pdf": Extract from Nota 21/22 in PDF, validate against XBRL
     - prefer_source="xbrl": Extract totals from XBRL only

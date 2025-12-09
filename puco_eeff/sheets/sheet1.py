@@ -44,7 +44,6 @@ from typing import TYPE_CHECKING, Any, cast
 
 from puco_eeff.config import (
     CONFIG_DIR,
-    get_period_paths,
     quarter_to_roman,
 )
 
