@@ -26,11 +26,13 @@ from puco_eeff.extractor.extraction import (
     format_quarter_label,
     quarter_to_roman,
 )
-from puco_eeff.extractor.validation_core import (
+from puco_eeff.extractor.validation import (
     ExtractionResult,
     ValidationReport,
-    _run_sum_validations,
     run_sheet1_validations,
+)
+from puco_eeff.extractor.validation.runner import (
+    _run_sum_validations_impl as run_sum_validations,
 )
 from puco_eeff.sheets.sheet1 import (
     Sheet1Data,
@@ -216,7 +218,7 @@ def _extract_ingresos_fallback(data: Sheet1Data, ef_path: Path) -> ValidationRep
     else:
         logger.warning("Could not extract Ingresos from PDF")
 
-    return ValidationReport(sum_validations=_run_sum_validations(data))
+    return ValidationReport(sum_validations=run_sum_validations(data))
 
 
 # =============================================================================
@@ -357,13 +359,28 @@ def _extract_from_pdf(
     return sheet1_data, _extract_ingresos_fallback(sheet1_data, estados_financieros_pdf)
 
 
-def _load_xbrl_sheet1_data(year: int, quarter: int) -> tuple[Sheet1Data | None, dict | None]:
+def _load_xbrl_sheet1_data(
+    year: int,
+    quarter: int,
+    *,
+    run_validations: bool = False,
+) -> tuple[Sheet1Data | None, dict | None, ValidationReport | None]:
     """Load XBRL file and map totals into Sheet1Data.
+
+    Parameters
+    ----------
+    year : int
+        Fiscal year.
+    quarter : int
+        Quarter number (1–4).
+    run_validations : bool, optional
+        When ``True``, also compute and return sum validations on the result.
 
     Returns
     -------
-    tuple[Sheet1Data | None, dict | None]
-        Sheet1Data with totals and the raw totals dict; ``(None, None)`` if missing or invalid.
+    tuple[Sheet1Data | None, dict | None, ValidationReport | None]
+        Sheet1Data with totals, raw totals dict, and optional validation report.
+        Returns ``(None, None, None)`` if the XBRL file is missing or invalid.
     """
     xbrl_dir = get_period_paths(year, quarter)["raw_xbrl"]
     xbrl_file = find_file_with_alternatives(xbrl_dir, "estados_financieros_xbrl", year, quarter)
@@ -371,16 +388,21 @@ def _load_xbrl_sheet1_data(year: int, quarter: int) -> tuple[Sheet1Data | None, 
         xbrl_file = xbrl_dir / format_filename("estados_financieros_xbrl", year, quarter)
     if not xbrl_file or not xbrl_file.exists():
         logger.warning("XBRL file not found for %dQ%d", year, quarter)
-        return None, None
+        return None, None, None
 
     totals_from_xbrl = extract_xbrl_totals(xbrl_file)
     if not totals_from_xbrl:
         logger.error("Could not extract totals from XBRL: %s", xbrl_file)
-        return None, None
+        return None, None, None
 
     xbrl_sheet1 = _create_sheet1_data(year, quarter, "xbrl", xbrl_available=True)
     _transfer_xbrl_data(totals_from_xbrl, xbrl_sheet1)
-    return xbrl_sheet1, totals_from_xbrl
+
+    report = None
+    if run_validations:
+        report = ValidationReport(sum_validations=run_sum_validations(xbrl_sheet1))
+
+    return xbrl_sheet1, totals_from_xbrl, report
 
 
 def extract_detailed_costs(year: int, quarter: int, validate: bool = True) -> ExtractionResult:
@@ -456,15 +478,6 @@ def extract_sheet1(
         Sheet1Data (and optional report) when successful; ``None`` if no source succeeds.
     """
 
-    def _xbrl_extraction():
-        """Load XBRL totals and create Sheet1Data with sum validations."""
-        xbrl_sheet1, _ = _load_xbrl_sheet1_data(year, quarter)
-        return (
-            (None, None)
-            if xbrl_sheet1 is None
-            else (xbrl_sheet1, ValidationReport(sum_validations=_run_sum_validations(xbrl_sheet1)))
-        )
-
     def _result(d, r):
         """Format output based on return_report flag."""
         return (d, r) if return_report else d
@@ -472,7 +485,7 @@ def extract_sheet1(
     # Source strategy dispatch using match/case
     match prefer_source:
         case "xbrl":
-            data, report = _xbrl_extraction()
+            data, _, report = _load_xbrl_sheet1_data(year, quarter, run_validations=True)
             if data is None:
                 logger.info("XBRL extraction failed, trying PDF fallback")
                 return _result(*_extract_from_pdf(year, quarter, validate=False))
@@ -480,12 +493,12 @@ def extract_sheet1(
                 pdf_result, _ = _extract_from_pdf(year, quarter, validate=False)
                 if pdf_result:
                     data = _merge_pdf_into_xbrl_data(data, pdf_result)
-                    report = ValidationReport(sum_validations=_run_sum_validations(data))
+                    report = ValidationReport(sum_validations=run_sum_validations(data))
         case _:  # Default to PDF-first
             data, report = _extract_from_pdf(year, quarter, validate_with_xbrl)
             if data is None:
                 logger.info("PDF extraction failed, trying XBRL fallback")
-                data, report = _xbrl_extraction()
+                data, _, report = _load_xbrl_sheet1_data(year, quarter, run_validations=True)
 
     return _result(data, report)
 

@@ -10,7 +10,7 @@ Tests cover:
 7. Validation report formatting
 8. Unified validation API (run_sheet1_validations)
 9. Backward compatibility (validate_extraction deprecation)
-10. PDF↔XBRL validation helper (_run_pdf_xbrl_validations)
+10. PDF↔XBRL validation helper (run_pdf_xbrl_validations)
 11. Config-driven section conversion (sections_to_sheet1data)
 12. ExtractionResult.validation_report field
 """
@@ -27,20 +27,31 @@ from puco_eeff.extractor.extraction import (
     SectionBreakdown,
     parse_chilean_number,
 )
-from puco_eeff.extractor.validation_core import (
+from puco_eeff.extractor.validation import (
     CrossValidationResult,
     ExtractionResult,
     SumValidationResult,
     ValidationReport,
     ValidationResult,
-    _evaluate_cross_validation,
-    _run_cross_validations,
-    _run_pdf_xbrl_validations,
-    _run_sum_validations,
-    _safe_eval_expression,
     format_sum_validation_status,
     format_validation_report,
     run_sheet1_validations,
+)
+from puco_eeff.extractor.validation.formula import (
+    evaluate_cross_validation,
+    safe_eval_expression,
+)
+from puco_eeff.extractor.validation.runner import (
+    _run_cross_validations_impl as run_cross_validations,
+)
+from puco_eeff.extractor.validation.runner import (
+    _run_pdf_xbrl_validations_impl as run_pdf_xbrl_validations,
+)
+from puco_eeff.extractor.validation.runner import (
+    _run_sum_validations_impl as run_sum_validations,
+)
+from puco_eeff.extractor.validation.runner import (
+    compare_with_tolerance,
 )
 from puco_eeff.sheets.sheet1 import (
     Sheet1Data,
@@ -327,7 +338,7 @@ class TestExtractionResult:
 
 
 class TestPdfXbrlValidation:
-    """Tests for PDF↔XBRL validation using _run_pdf_xbrl_validations."""
+    """Tests for PDF↔XBRL validation using run_pdf_xbrl_validations."""
 
     @pytest.fixture
     def sample_data_both(self) -> Sheet1Data:
@@ -344,7 +355,7 @@ class TestPdfXbrlValidation:
             "admin_expense": -17363,
         }
 
-        validations = _run_pdf_xbrl_validations(
+        validations = run_pdf_xbrl_validations(
             sample_data_both,
             xbrl_totals,
             enable_fallback=False,
@@ -361,7 +372,7 @@ class TestPdfXbrlValidation:
             "admin_expense": 17363,
         }
 
-        validations = _run_pdf_xbrl_validations(
+        validations = run_pdf_xbrl_validations(
             sample_data_both,
             xbrl_totals,
             enable_fallback=False,
@@ -372,7 +383,7 @@ class TestPdfXbrlValidation:
 
     def test_pdf_only_no_xbrl(self, sample_data_both: Sheet1Data) -> None:
         """PDF-only extraction when no XBRL available."""
-        validations = _run_pdf_xbrl_validations(sample_data_both, None, enable_fallback=False)
+        validations = run_pdf_xbrl_validations(sample_data_both, None, enable_fallback=False)
 
         assert len(validations) == 2
         assert all(v.source == "pdf_only" for v in validations)
@@ -387,7 +398,7 @@ class TestPdfXbrlValidation:
             "admin_expense": -17363,
         }
 
-        validations = _run_pdf_xbrl_validations(data, xbrl_totals, enable_fallback=False)
+        validations = run_pdf_xbrl_validations(data, xbrl_totals, enable_fallback=False)
 
         assert len(validations) == 2
         assert all(v.source == "xbrl_only" for v in validations)
@@ -403,7 +414,7 @@ class TestPdfXbrlValidation:
             "admin_expense": None,
         }
 
-        validations = _run_pdf_xbrl_validations(data, xbrl_totals, enable_fallback=False)
+        validations = run_pdf_xbrl_validations(data, xbrl_totals, enable_fallback=False)
 
         cost_val = next(v for v in validations if "Costo" in v.field_name)
         assert cost_val.match is False
@@ -776,7 +787,7 @@ class TestXBRLExtraction:
         Note: _validate_sheet1_with_xbrl was inlined during refactoring.
         This test now validates via run_sheet1_validations.
         """
-        from puco_eeff.extractor.validation_core import run_sheet1_validations
+        from puco_eeff.extractor.validation import run_sheet1_validations
         from puco_eeff.sheets.sheet1 import Sheet1Data
 
         data = Sheet1Data(
@@ -806,7 +817,7 @@ class TestXBRLExtraction:
         Note: _validate_sheet1_with_xbrl was inlined during refactoring.
         This test validates that run_sheet1_validations handles None values.
         """
-        from puco_eeff.extractor.validation_core import run_sheet1_validations
+        from puco_eeff.extractor.validation import run_sheet1_validations
         from puco_eeff.sheets.sheet1 import Sheet1Data
 
         data = Sheet1Data(
@@ -906,7 +917,7 @@ class TestExtractSheet1MainEntry:
             mock_pdf.return_value = (None, None)  # PDF failed - return tuple
 
             with patch(
-                "puco_eeff.extractor.extraction_pipeline._load_xbrl_sheet1_data"
+                "puco_eeff.extractor.extraction_pipeline._load_xbrl_sheet1_data",
             ) as mock_xbrl:
                 mock_xbrl.return_value = (xbrl_data, None)  # Return tuple as expected
 
@@ -1101,7 +1112,7 @@ class TestCrossValidationResult:
             difference=0,
             tolerance=1,
         )
-        from puco_eeff.extractor.validation_core import format_cross_validation_status
+        from puco_eeff.extractor.validation.format import format_cross_validation_status
         status = format_cross_validation_status(result)
         assert "✓" in status
         assert "52,963" in status
@@ -1117,7 +1128,7 @@ class TestCrossValidationResult:
             difference=37,
             tolerance=1,
         )
-        from puco_eeff.extractor.validation_core import format_cross_validation_status
+        from puco_eeff.extractor.validation.format import format_cross_validation_status
         status = format_cross_validation_status(result)
         assert "✗" in status
         assert "diff: 37" in status
@@ -1134,7 +1145,7 @@ class TestCrossValidationResult:
             tolerance=1,
             missing_facts=["gross_profit"],
         )
-        from puco_eeff.extractor.validation_core import format_cross_validation_status
+        from puco_eeff.extractor.validation.format import format_cross_validation_status
         status = format_cross_validation_status(result)
         assert "⚠" in status
         assert "Skipped" in status
@@ -1217,7 +1228,7 @@ class TestValidationReport:
 
 
 # =============================================================================
-# Tests for _safe_eval_expression (Phase 2)
+# Tests for safe_eval_expression (Phase 2)
 # =============================================================================
 
 
@@ -1227,45 +1238,45 @@ class TestSafeEvalExpression:
     def test_simple_variable(self) -> None:
         """Evaluate a simple variable."""
         values = {"x": 100}
-        assert _safe_eval_expression("x", values) == 100
+        assert safe_eval_expression("x", values) == 100
 
     def test_integer_literal(self) -> None:
         """Evaluate an integer literal."""
-        assert _safe_eval_expression("42", {}) == 42
+        assert safe_eval_expression("42", {}) == 42
 
     def test_addition(self) -> None:
         """Evaluate addition."""
         values = {"a": 10, "b": 20}
-        assert _safe_eval_expression("a + b", values) == 30
+        assert safe_eval_expression("a + b", values) == 30
 
     def test_subtraction(self) -> None:
         """Evaluate subtraction."""
         values = {"a": 100, "b": 30}
-        assert _safe_eval_expression("a - b", values) == 70
+        assert safe_eval_expression("a - b", values) == 70
 
     def test_abs_function(self) -> None:
         """Evaluate abs() function."""
         values = {"x": -50}
-        assert _safe_eval_expression("abs(x)", values) == 50
+        assert safe_eval_expression("abs(x)", values) == 50
 
     def test_complex_expression(self) -> None:
         """Evaluate complex expression: a - abs(b)."""
         values = {"a": 179165, "b": -126202}
-        assert _safe_eval_expression("a - abs(b)", values) == 52963
+        assert safe_eval_expression("a - abs(b)", values) == 52963
 
     def test_missing_variable(self) -> None:
         """Missing variable returns None."""
         values = {"a": 10}
-        assert _safe_eval_expression("b", values) is None
+        assert safe_eval_expression("b", values) is None
 
     def test_unknown_expression(self) -> None:
         """Unknown expression returns None."""
         values = {}
-        assert _safe_eval_expression("foo(bar)", values) is None
+        assert safe_eval_expression("foo(bar)", values) is None
 
 
 # =============================================================================
-# Tests for _evaluate_cross_validation (Phase 2)
+# Tests for evaluate_cross_validation (Phase 2)
 # =============================================================================
 
 
@@ -1275,7 +1286,7 @@ class TestEvaluateCrossValidation:
     def test_simple_equality_match(self) -> None:
         """Simple equality that matches."""
         values = {"a": 100, "b": 100}
-        expected, calculated, match, diff = _evaluate_cross_validation("a == b", values, tolerance=1)
+        expected, calculated, match, diff = evaluate_cross_validation("a == b", values, tolerance=1)
         assert expected == 100
         assert calculated == 100
         assert match is True
@@ -1285,7 +1296,7 @@ class TestEvaluateCrossValidation:
         """Expression equality that matches."""
         values = {"gross_profit": 52963, "ingresos": 179165, "cost": -126202}
         formula = "gross_profit == ingresos - abs(cost)"
-        expected, calculated, match, diff = _evaluate_cross_validation(formula, values, tolerance=1)
+        expected, calculated, match, diff = evaluate_cross_validation(formula, values, tolerance=1)
         assert expected == 52963
         assert calculated == 52963
         assert match is True
@@ -1294,28 +1305,32 @@ class TestEvaluateCrossValidation:
     def test_mismatch_within_tolerance(self) -> None:
         """Mismatch within tolerance should pass."""
         values = {"a": 100, "b": 101}
-        _expected, _calculated, match, diff = _evaluate_cross_validation("a == b", values, tolerance=5)
+        _expected, _calculated, match, diff = evaluate_cross_validation(
+            "a == b", values, tolerance=5
+        )
         assert match is True
         assert diff == 1
 
     def test_mismatch_outside_tolerance(self) -> None:
         """Mismatch outside tolerance should fail."""
         values = {"a": 100, "b": 110}
-        _expected, _calculated, match, diff = _evaluate_cross_validation("a == b", values, tolerance=5)
+        _expected, _calculated, match, diff = evaluate_cross_validation(
+            "a == b", values, tolerance=5
+        )
         assert match is False
         assert diff == 10
 
     def test_invalid_formula_no_equals(self) -> None:
         """Formula without == returns None values."""
         values = {"a": 100}
-        expected, calculated, match, _diff = _evaluate_cross_validation("a + b", values, tolerance=1)
+        expected, calculated, match, _diff = evaluate_cross_validation("a + b", values, tolerance=1)
         assert expected is None
         assert calculated is None
         assert match is True  # Can't fail without valid formula
 
 
 # =============================================================================
-# Tests for _run_sum_validations (Phase 1)
+# Tests for run_sum_validations (Phase 1)
 # =============================================================================
 
 
@@ -1351,14 +1366,14 @@ class TestRunSumValidations:
 
     def test_all_sums_match(self, sample_sheet1_data: Sheet1Data) -> None:
         """All sum validations pass when totals match."""
-        results = _run_sum_validations(sample_sheet1_data)
+        results = run_sum_validations(sample_sheet1_data)
         assert len(results) >= 2  # At least Nota 21 and Nota 22
         assert all(r.match for r in results)
 
     def test_sum_mismatch_detected(self, sample_sheet1_data: Sheet1Data) -> None:
         """Mismatch detected when total doesn't match sum."""
         sample_sheet1_data.total_costo_venta = -100000  # Wrong total
-        results = _run_sum_validations(sample_sheet1_data)
+        results = run_sum_validations(sample_sheet1_data)
         nota21_result = next(r for r in results if "Costo" in r.description)
         assert nota21_result.match is False
         assert nota21_result.difference > 0
@@ -1366,14 +1381,14 @@ class TestRunSumValidations:
     def test_missing_total_skips_validation(self, sample_sheet1_data: Sheet1Data) -> None:
         """Missing total should not fail validation."""
         sample_sheet1_data.total_costo_venta = None
-        results = _run_sum_validations(sample_sheet1_data)
+        results = run_sum_validations(sample_sheet1_data)
         nota21_result = next(r for r in results if "Costo" in r.description)
         assert nota21_result.match is True  # Can't fail without expected total
         assert nota21_result.expected_total is None
 
 
 # =============================================================================
-# Tests for _run_cross_validations (Phase 2)
+# Tests for run_cross_validations (Phase 2)
 # =============================================================================
 
 
@@ -1397,13 +1412,13 @@ class TestRunCrossValidations:
             "admin_expense": -11632,
             "gross_profit": 52963,  # 179165 - 126202
         }
-        results = _run_cross_validations(sample_sheet1_data, xbrl_totals)
+        results = run_cross_validations(sample_sheet1_data, xbrl_totals)
         # Should have at least one result (may skip if formula not evaluable)
         assert isinstance(results, list)
 
     def test_cross_validation_without_xbrl(self, sample_sheet1_data: Sheet1Data) -> None:
         """Cross-validation skips when XBRL unavailable."""
-        results = _run_cross_validations(sample_sheet1_data, None)
+        results = run_cross_validations(sample_sheet1_data, None)
         # Results may be skipped due to missing facts
         assert isinstance(results, list)
         # All should either match or have missing_facts
@@ -1496,70 +1511,70 @@ class TestSafeEvalExpressionAST:
         """Addition without spaces: a+b (AST handles this)."""
         values = {"a": 10, "b": 20}
         # The old evaluator would fail on this, AST handles it
-        assert _safe_eval_expression("a+b", values) == 30
+        assert safe_eval_expression("a+b", values) == 30
 
     def test_no_spaces_subtraction(self) -> None:
         """Subtraction without spaces: a-b (AST handles this)."""
         values = {"a": 100, "b": 30}
-        assert _safe_eval_expression("a-b", values) == 70
+        assert safe_eval_expression("a-b", values) == 70
 
     def test_mixed_spacing(self) -> None:
         """Mixed spacing: a +b or a- b."""
         values = {"a": 10, "b": 5}
-        assert _safe_eval_expression("a +b", values) == 15
-        assert _safe_eval_expression("a- b", values) == 5
+        assert safe_eval_expression("a +b", values) == 15
+        assert safe_eval_expression("a- b", values) == 5
 
     def test_parentheses_grouping(self) -> None:
         """Parentheses for grouping: (a + b) - c."""
         values = {"a": 10, "b": 20, "c": 5}
-        assert _safe_eval_expression("(a + b) - c", values) == 25
+        assert safe_eval_expression("(a + b) - c", values) == 25
 
     def test_nested_abs(self) -> None:
         """Nested abs: abs(a - b)."""
         values = {"a": 10, "b": 30}
-        assert _safe_eval_expression("abs(a - b)", values) == 20
+        assert safe_eval_expression("abs(a - b)", values) == 20
 
     def test_negative_literal(self) -> None:
         """Negative integer literal: -100."""
         values = {}
-        assert _safe_eval_expression("-100", values) == -100
+        assert safe_eval_expression("-100", values) == -100
 
     def test_unary_plus(self) -> None:
         """Unary plus: +50."""
         values = {}
-        assert _safe_eval_expression("+50", values) == 50
+        assert safe_eval_expression("+50", values) == 50
 
     def test_multiplication(self) -> None:
         """Multiplication: a * b."""
         values = {"a": 7, "b": 6}
-        assert _safe_eval_expression("a * b", values) == 42
+        assert safe_eval_expression("a * b", values) == 42
 
     def test_unsupported_division(self) -> None:
         """Division not supported - returns None."""
         values = {"a": 10, "b": 2}
         # Division is not in whitelist
-        assert _safe_eval_expression("a / b", values) is None
+        assert safe_eval_expression("a / b", values) is None
 
     def test_unsupported_function(self) -> None:
         """Unknown functions return None."""
         values = {"x": 10}
-        assert _safe_eval_expression("sqrt(x)", values) is None
-        assert _safe_eval_expression("max(x, 5)", values) is None
+        assert safe_eval_expression("sqrt(x)", values) is None
+        assert safe_eval_expression("max(x, 5)", values) is None
 
     def test_syntax_error(self) -> None:
         """Syntax errors return None."""
         values = {"a": 10}
-        assert _safe_eval_expression("a + + b", values) is None
-        assert _safe_eval_expression("(a", values) is None
+        assert safe_eval_expression("a + + b", values) is None
+        assert safe_eval_expression("(a", values) is None
 
     def test_empty_expression(self) -> None:
         """Empty expression returns None."""
-        assert _safe_eval_expression("", {}) is None
-        assert _safe_eval_expression("   ", {}) is None
+        assert safe_eval_expression("", {}) is None
+        assert safe_eval_expression("   ", {}) is None
 
 
 # =============================================================================
-# Tests for _compare_with_tolerance helper (Phase 3)
+# Tests for compare_with_tolerance helper (Phase 3)
 # =============================================================================
 
 
@@ -1568,45 +1583,35 @@ class TestCompareWithTolerance:
 
     def test_exact_match(self) -> None:
         """Exact match should return True with diff 0."""
-        from puco_eeff.extractor.validation_core import _compare_with_tolerance
-
-        match, diff = _compare_with_tolerance(100, 100, tolerance=1)
+        match, diff = compare_with_tolerance(100, 100, tolerance=1)
         assert match is True
         assert diff == 0
 
     def test_within_tolerance(self) -> None:
         """Within tolerance should return True."""
-        from puco_eeff.extractor.validation_core import _compare_with_tolerance
-
-        match, diff = _compare_with_tolerance(100, 101, tolerance=5)
+        match, diff = compare_with_tolerance(100, 101, tolerance=5)
         assert match is True
         assert diff == 1
 
     def test_outside_tolerance(self) -> None:
         """Outside tolerance should return False."""
-        from puco_eeff.extractor.validation_core import _compare_with_tolerance
-
-        match, diff = _compare_with_tolerance(100, 110, tolerance=5)
+        match, diff = compare_with_tolerance(100, 110, tolerance=5)
         assert match is False
         assert diff == 10
 
     def test_sign_agnostic(self) -> None:
         """Sign should not matter (absolute comparison)."""
-        from puco_eeff.extractor.validation_core import _compare_with_tolerance
-
-        match, diff = _compare_with_tolerance(-100, 100, tolerance=1)
+        match, diff = compare_with_tolerance(-100, 100, tolerance=1)
         assert match is True
         assert diff == 0
 
     def test_none_values(self) -> None:
         """None values should return True with diff 0."""
-        from puco_eeff.extractor.validation_core import _compare_with_tolerance
-
-        match, diff = _compare_with_tolerance(None, 100, tolerance=1)
+        match, diff = compare_with_tolerance(None, 100, tolerance=1)
         assert match is True
         assert diff == 0
 
-        match, diff = _compare_with_tolerance(100, None, tolerance=1)
+        match, diff = compare_with_tolerance(100, None, tolerance=1)
         assert match is True
         assert diff == 0
 
@@ -1650,8 +1655,12 @@ class TestPerRuleTolerance:
         # With global tolerance=1, this would fail
         # With per-rule tolerance=5, it should pass
         with (
-            patch("puco_eeff.extractor.validation_core.get_sheet1_cross_validations") as mock_cross,
-            patch("puco_eeff.extractor.validation_core.get_sheet1_sum_tolerance") as mock_tolerance,
+            patch(
+                "puco_eeff.extractor.validation.runner.get_sheet1_cross_validations"
+            ) as mock_cross,
+            patch(
+                "puco_eeff.extractor.validation.runner.get_sheet1_sum_tolerance"
+            ) as mock_tolerance,
         ):
             mock_tolerance.return_value = 1  # Global tolerance
             mock_cross.return_value = [
@@ -1662,7 +1671,7 @@ class TestPerRuleTolerance:
                 },
             ]
 
-            results = _run_cross_validations(data, xbrl_totals)
+            results = run_cross_validations(data, xbrl_totals)
 
             assert len(results) == 1
             assert results[0].match is True
@@ -1815,7 +1824,7 @@ class TestRunSheetValidations:
 
 
 class TestRunPdfXbrlValidations:
-    """Tests for _run_pdf_xbrl_validations helper."""
+    """Tests for run_pdf_xbrl_validations helper."""
 
     @pytest.fixture
     def sample_data(self) -> Sheet1Data:
@@ -1834,14 +1843,14 @@ class TestRunPdfXbrlValidations:
             "ingresos": 179165,
         }
 
-        results = _run_pdf_xbrl_validations(sample_data, xbrl_totals, enable_fallback=False)
+        results = run_pdf_xbrl_validations(sample_data, xbrl_totals, enable_fallback=False)
 
         assert len(results) >= 2
         assert all(r.match for r in results if r.source == "both")
 
     def test_pdf_only_when_no_xbrl(self, sample_data: Sheet1Data) -> None:
         """Returns pdf_only results when no XBRL available."""
-        results = _run_pdf_xbrl_validations(sample_data, None, enable_fallback=False)
+        results = run_pdf_xbrl_validations(sample_data, None, enable_fallback=False)
 
         assert len(results) >= 2
         assert all(r.source == "pdf_only" for r in results)
@@ -1858,7 +1867,7 @@ class TestRunPdfXbrlValidations:
             "admin_expense": None,
         }
 
-        results = _run_pdf_xbrl_validations(data, xbrl_totals, enable_fallback=True)
+        results = run_pdf_xbrl_validations(data, xbrl_totals, enable_fallback=True)
 
         # Should have set ingresos on data
         assert data.ingresos_ordinarios == 200000

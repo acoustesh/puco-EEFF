@@ -40,6 +40,37 @@ def pytest_configure(config: pytest.Config) -> None:
         "markers",
         "similarity: marks tests that use embedding similarity (may require API key)",
     )
+    config.addinivalue_line(
+        "markers",
+        "codestral: marks tests that use Codestral embeddings via OpenRouter",
+    )
+    config.addinivalue_line(
+        "markers",
+        "voyage: marks tests that use Voyage AI embeddings",
+    )
+    config.addinivalue_line(
+        "markers",
+        "combined: marks tests that use combined weighted embeddings from all providers",
+    )
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Reorder tests so combined-marked tests run last.
+
+    Combined embedding tests depend on OpenAI, Codestral, and Voyage embedding
+    caches being populated first, so they must run after all other similarity tests.
+    """
+    combined_tests = []
+    other_tests = []
+
+    for item in items:
+        if item.get_closest_marker("combined"):
+            combined_tests.append(item)
+        else:
+            other_tests.append(item)
+
+    # Reorder: all other tests first, then combined tests
+    items[:] = other_tests + combined_tests
 
 
 @pytest.fixture

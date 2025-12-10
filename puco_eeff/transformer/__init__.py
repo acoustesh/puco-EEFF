@@ -40,7 +40,7 @@ for convenience, since they are commonly used with transformer functions.
 """
 
 # Re-export validation types from validation_core for convenience
-from puco_eeff.extractor.validation_core import (
+from puco_eeff.extractor.validation import (
     ComparisonResult,
     ReferenceValidationResult,
     ValidationResult,

@@ -86,3 +86,17 @@ def test_openrouter_client_creation() -> None:
 
     client = get_openrouter_client()
     assert client is not None
+
+
+@pytest.mark.skipif(
+    not __import__("os").getenv("VOYAGE_API_KEY"),
+    reason="VOYAGE_API_KEY not set",
+)
+def test_voyage_client_creation() -> None:
+    """Verify Voyage AI client can be created (requires API key)."""
+    import os
+
+    import voyageai
+
+    client = voyageai.Client(api_key=os.getenv("VOYAGE_API_KEY"))
+    assert client is not None

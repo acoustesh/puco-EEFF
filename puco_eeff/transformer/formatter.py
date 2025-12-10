@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 from puco_eeff.config import get_config, setup_logging
-from puco_eeff.extractor.validation_core import ComparisonResult
+from puco_eeff.extractor.validation import ComparisonResult
 
 logger = setup_logging(__name__)
 

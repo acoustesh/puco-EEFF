@@ -55,6 +55,9 @@ CODESTRAL_EMBEDDINGS_FILE = (
 VOYAGE_EMBEDDINGS_FILE = (
     Path(__file__).parent / "baselines" / "voyage_embeddings_cache.json.zlib"
 )
+COMBINED_EMBEDDINGS_FILE = (
+    Path(__file__).parent / "baselines" / "combined_embeddings_cache.json.zlib"
+)
 
 # OpenRouter config
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/embeddings"
@@ -211,6 +214,100 @@ def _save_voyage_embeddings(embeddings: dict[str, list[float]]) -> None:
 
 
 # =============================================================================
+# Combined Embeddings Storage Management (weighted concatenation of all providers)
+# =============================================================================
+
+
+def _load_combined_embeddings() -> dict[str, list[float]]:
+    """Load and decompress Combined embeddings from the compressed cache file."""
+    if not COMBINED_EMBEDDINGS_FILE.exists():
+        return {}
+    with Path(COMBINED_EMBEDDINGS_FILE).open(encoding="utf-8") as f:
+        compressed = json.load(f)
+    return {h: _decompress_embedding(b64) for h, b64 in compressed.items()}
+
+
+def _save_combined_embeddings(embeddings: dict[str, list[float]]) -> None:
+    """Save Combined embeddings to compressed cache file atomically."""
+    COMBINED_EMBEDDINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+    compressed = {h: _compress_embedding(vec) for h, vec in embeddings.items()}
+
+    fd, temp_path = tempfile.mkstemp(
+        suffix=".json.zlib",
+        prefix="combined_embeddings_",
+        dir=COMBINED_EMBEDDINGS_FILE.parent,
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(compressed, f, indent=2, sort_keys=True)
+            f.write("\n")
+        Path(temp_path).replace(COMBINED_EMBEDDINGS_FILE)
+    except Exception:
+        if Path(temp_path).exists():
+            Path(temp_path).unlink()
+        raise
+
+
+def compute_combined_embedding(
+    openai_emb: list[float],
+    codestral_emb: list[float],
+    voyage_emb: list[float],
+) -> list[float]:
+    """Compute combined embedding as weighted concatenation of all three providers.
+
+    The combined embedding is:
+        [codestral * (n_codestral/n_total),
+         openai * (n_openai/n_total),
+         voyage * (n_voyage/n_total)]
+
+    where n_total = n_codestral + n_openai + n_voyage.
+
+    This creates a single vector that gives each provider's embedding a weight
+    proportional to its dimensionality.
+
+    Args
+    ----
+        openai_emb: OpenAI text-embedding-3-large vector
+        codestral_emb: Codestral-embed vector
+        voyage_emb: Voyage-code-3 vector
+
+    Returns
+    -------
+        Combined weighted embedding vector of size n_total
+    """
+    n_openai = len(openai_emb)
+    n_codestral = len(codestral_emb)
+    n_voyage = len(voyage_emb)
+    n_total = n_openai + n_codestral + n_voyage
+
+    # Weight each embedding by its dimension ratio
+    w_openai = n_openai / n_total
+    w_codestral = n_codestral / n_total
+    w_voyage = n_voyage / n_total
+
+    # Scale each embedding
+    scaled_codestral = [x * w_codestral for x in codestral_emb]
+    scaled_openai = [x * w_openai for x in openai_emb]
+    scaled_voyage = [x * w_voyage for x in voyage_emb]
+
+    # Concatenate: codestral, openai, voyage
+    combined = scaled_codestral + scaled_openai + scaled_voyage
+
+    # L2 normalize the combined vector
+    norm = np.linalg.norm(combined)
+    if norm > 0:
+        combined = (np.array(combined) / norm).tolist()
+
+    return combined
+
+
+def get_cached_combined_embedding(baselines: dict, content_hash: str) -> list[float] | None:
+    """Return cached Combined embedding vector if hash exists, else None."""
+    return baselines.get("combined_embeddings", {}).get(content_hash)
+
+
+# =============================================================================
 # Baseline Management
 # =============================================================================
 
@@ -242,6 +339,7 @@ def load_baselines() -> dict:
     baselines["embeddings"] = _load_embeddings()
     baselines["codestral_embeddings"] = _load_codestral_embeddings()
     baselines["voyage_embeddings"] = _load_voyage_embeddings()
+    baselines["combined_embeddings"] = _load_combined_embeddings()
 
     return baselines
 
@@ -257,6 +355,7 @@ def save_baselines(baselines: dict) -> None:
     embeddings = baselines.pop("embeddings", {})
     codestral_embeddings = baselines.pop("codestral_embeddings", {})
     voyage_embeddings = baselines.pop("voyage_embeddings", {})
+    combined_embeddings = baselines.pop("combined_embeddings", {})
     function_hashes = baselines.pop("function_hashes", {})
 
     # Save main baselines (without embeddings and function_hashes)
@@ -275,6 +374,7 @@ def save_baselines(baselines: dict) -> None:
         baselines["embeddings"] = embeddings
         baselines["codestral_embeddings"] = codestral_embeddings
         baselines["voyage_embeddings"] = voyage_embeddings
+        baselines["combined_embeddings"] = combined_embeddings
         baselines["function_hashes"] = function_hashes
 
     # Save function_hashes to separate file
@@ -305,6 +405,10 @@ def save_baselines(baselines: dict) -> None:
     # Save Voyage embeddings to compressed file
     if voyage_embeddings:
         _save_voyage_embeddings(voyage_embeddings)
+
+    # Save Combined embeddings to compressed file
+    if combined_embeddings:
+        _save_combined_embeddings(combined_embeddings)
 
 
 # =============================================================================
@@ -512,49 +616,148 @@ def extract_function_infos_from_file(
 # =============================================================================
 
 
-def fit_pca_on_all_embeddings(
-    baselines: dict,
-    variance_threshold: float = 0.95,
-):
-    """Fit PCA on all cached embeddings from puco_eeff directories.
+def _get_pca_class():
+    """Get the best available PCA implementation (GPU or CPU).
 
-    Uses ALL cached embeddings (from extractor, scraper, sheets, etc.)
-    to fit a single PCA model for dimensionality reduction.
+    Returns (PCA_class, is_gpu). Falls back to sklearn if cuML unavailable.
+    CUDA library paths are configured in .env file.
+    """
+    try:
+        from cuml.decomposition import PCA
+
+        return PCA, True
+    except ImportError:
+        from sklearn.decomposition import PCA
+
+        return PCA, False
+
+
+def fit_pca(
+    embeddings_cache: dict[str, list[float]],
+    variance_threshold: float,
+):
+    """Fit PCA on embeddings cache for dimensionality reduction.
+
+    Uses cuML GPU PCA if available, falls back to sklearn CPU PCA.
 
     Args:
-        baselines: Baselines dict with cached embeddings
-        variance_threshold: Cumulative variance to retain (default: 0.95)
+        embeddings_cache: Dict mapping hash -> embedding vector
+        variance_threshold: Cumulative variance to retain (from config pca_variance_threshold)
 
     Returns
     -------
-        Tuple of (fitted PCA model, number of components to use)
-        Returns (None, 0) if not enough embeddings
+        Tuple of (fitted PCA model, number of components to use, is_gpu)
+        Returns (None, 0, False) if not enough embeddings (<10)
 
     """
-    from sklearn.decomposition import PCA
+    if len(embeddings_cache) < 10:
+        return None, 0, False
 
-    embeddings_dict = baselines.get("embeddings", {})
-    if len(embeddings_dict) < 10:
-        return None, 0
+    pca_class, is_gpu = _get_pca_class()
 
     # Build matrix from all cached embeddings
-    all_embeddings = np.array(list(embeddings_dict.values()), dtype=np.float32)
+    all_embeddings = np.array(list(embeddings_cache.values()), dtype=np.float32)
 
     # Fit PCA with all components first to analyze variance
     n_samples, n_features = all_embeddings.shape
     max_components = min(n_samples, n_features)
 
-    pca_full = PCA(n_components=max_components, random_state=42)
-    pca_full.fit(all_embeddings)
+    if is_gpu:
+        import cupy as cp
+
+        all_embeddings_gpu = cp.asarray(all_embeddings)
+        pca = pca_class(n_components=max_components)
+        pca.fit(all_embeddings_gpu)
+        # cuML returns cupy array for explained_variance_ratio_
+        cumulative_variance = cp.cumsum(pca.explained_variance_ratio_).get()
+    else:
+        pca = pca_class(n_components=max_components, random_state=42)
+        pca.fit(all_embeddings)
+        cumulative_variance = np.cumsum(pca.explained_variance_ratio_)
 
     # Find number of components for desired variance
-    cumulative_variance = np.cumsum(pca_full.explained_variance_ratio_)
-    n_components = int(np.searchsorted(cumulative_variance, variance_threshold) + 1)
+    n_components = int(np.searchsorted(cumulative_variance, variance_threshold).item()) + 1
     n_components = min(n_components, max_components)
 
-    # Return the components needed for transformation
-    # We store the full PCA to use for transform
-    return pca_full, n_components
+    return pca, n_components, is_gpu
+
+
+def transform_embeddings_with_pca(
+    functions: list[FunctionInfo],
+    pca_model,
+    n_components: int,
+    is_gpu: bool = False,
+) -> None:
+    """Transform function embeddings using pre-fitted PCA model in-place.
+
+    Args:
+        functions: List of FunctionInfo objects with embeddings to transform
+        pca_model: Pre-fitted PCA model (cuML or sklearn)
+        n_components: Number of components to keep
+        is_gpu: Whether PCA model is GPU-based (cuML)
+    """
+    if is_gpu:
+        import cupy as cp
+
+        # Batch transform for GPU efficiency
+        embeddings_to_transform = []
+        indices = []
+        for i, func in enumerate(functions):
+            if func.embedding is not None:
+                embeddings_to_transform.append(func.embedding)
+                indices.append(i)
+
+        if embeddings_to_transform:
+            emb_array = cp.asarray(embeddings_to_transform, dtype=cp.float32)
+            reduced = pca_model.transform(emb_array)[:, :n_components].get()
+            for idx, emb_idx in enumerate(indices):
+                functions[emb_idx].embedding = reduced[idx].tolist()
+    else:
+        for func in functions:
+            if func.embedding is not None:
+                emb_array = np.array([func.embedding], dtype=np.float32)
+                reduced = pca_model.transform(emb_array)[:, :n_components]
+                func.embedding = reduced[0].tolist()
+
+
+def apply_pca_to_functions(
+    functions: list[FunctionInfo],
+    embeddings_cache: dict[str, list[float]],
+    variance_threshold: float,
+) -> None:
+    """Fit PCA on cache and transform function embeddings in-place.
+
+    Convenience wrapper that calls fit_pca() then transform_embeddings_with_pca().
+
+    Args:
+        functions: List of FunctionInfo objects with embeddings to transform
+        embeddings_cache: Full cache of embeddings for this provider (to fit PCA on)
+        variance_threshold: Cumulative variance to retain (from config pca_variance_threshold)
+    """
+    import warnings
+
+    pca_model, n_components, is_gpu = fit_pca(embeddings_cache, variance_threshold)
+    if pca_model is not None:
+        # Get original dimensionality from first embedding in cache
+        original_dim = len(next(iter(embeddings_cache.values())))
+
+        # Calculate actual variance retained
+        if is_gpu:
+            import cupy as cp
+
+            actual_variance = float(
+                cp.sum(pca_model.explained_variance_ratio_[:n_components]).get(),
+            )
+        else:
+            actual_variance = float(sum(pca_model.explained_variance_ratio_[:n_components]))
+
+        backend = "GPU" if is_gpu else "CPU"
+        warnings.warn(
+            f"PCA: {original_dim} → {n_components} dims ({actual_variance:.1%} variance, {backend})",
+            stacklevel=2,
+        )
+
+        transform_embeddings_with_pca(functions, pca_model, n_components, is_gpu)
 
 
 def cluster_functions_kmeans_with_pca(
@@ -598,7 +801,7 @@ def cluster_functions_kmeans_with_pca(
     emb_normalized = emb_reduced
 
     # Run k-means on reduced embeddings
-    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=20, max_iter=3000)
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=30, max_iter=3000)
     labels = kmeans.fit_predict(emb_normalized)
 
     # Group functions by cluster
@@ -655,8 +858,9 @@ def generate_file_split_proposal(
     config = baselines.get("config", {})
     pca_variance = config.get("pca_variance_threshold", 0.95)
 
-    # Fit PCA on ALL extractor embeddings
-    pca_model, n_components = fit_pca_on_all_embeddings(baselines, variance_threshold=pca_variance)
+    # Fit PCA on ALL OpenAI embeddings
+    embeddings_cache = baselines.get("embeddings", {})
+    pca_model, n_components, _is_gpu = fit_pca(embeddings_cache, variance_threshold=pca_variance)
 
     if pca_model is None:
         return "  (Cannot generate split proposal: not enough cached embeddings for PCA)"
@@ -1351,6 +1555,12 @@ def _run_similarity_checks(
     if update_baselines:
         pytest.skip("Updated embedding baselines")
 
+    # Apply PCA dimensionality reduction before similarity comparison
+    config = baselines.get("config", {})
+    pca_variance = config.get("pca_variance_threshold", 0.95)
+    embeddings_cache = baselines.get("embeddings", {})
+    apply_pca_to_functions(functions, embeddings_cache, variance_threshold=pca_variance)
+
     pair_violations: list[str] = []
     neighbor_violations: list[str] = []
 
@@ -1546,6 +1756,12 @@ def _run_codestral_similarity_checks(
     if update_baselines:
         pytest.skip("Updated Codestral embedding baselines")
 
+    # Apply PCA dimensionality reduction before similarity comparison
+    config = baselines.get("config", {})
+    pca_variance = config.get("pca_variance_threshold", 0.95)
+    embeddings_cache = baselines.get("codestral_embeddings", {})
+    apply_pca_to_functions(functions, embeddings_cache, variance_threshold=pca_variance)
+
     pair_violations: list[str] = []
     neighbor_violations: list[str] = []
 
@@ -1731,6 +1947,12 @@ def _run_voyage_similarity_checks(
     if update_baselines:
         pytest.skip("Updated Voyage embedding baselines")
 
+    # Apply PCA dimensionality reduction before similarity comparison
+    config = baselines.get("config", {})
+    pca_variance = config.get("pca_variance_threshold", 0.95)
+    embeddings_cache = baselines.get("voyage_embeddings", {})
+    apply_pca_to_functions(functions, embeddings_cache, variance_threshold=pca_variance)
+
     pair_violations: list[str] = []
     neighbor_violations: list[str] = []
 
@@ -1841,6 +2063,217 @@ class TestFunctionSimilarityVoyage:
         # Extract functions meeting LOC threshold
         functions = extract_function_infos(min_loc=min_loc)
         _run_voyage_similarity_checks(
+            baselines=baselines,
+            functions=functions,
+            update_baselines=update_baselines,
+            cached_only=cached_only,
+            threshold_pair=threshold_pair,
+            threshold_neighbor=threshold_neighbor,
+            load_complexity_maps_fn=_load_complexity_maps,
+        )
+
+
+def _run_combined_similarity_checks(
+    *,
+    baselines: dict,
+    functions: list[FunctionInfo],
+    update_baselines: bool,
+    cached_only: bool,
+    threshold_pair: float,
+    threshold_neighbor: float,
+    load_complexity_maps_fn: Callable[[], tuple[dict[str, int], dict[str, int]]],
+) -> None:
+    """Common workflow for Combined similarity tests across different scopes.
+
+    This test requires all three embedding providers (OpenAI, Codestral, Voyage)
+    to have cached embeddings for each function, then computes a weighted
+    concatenation of all three.
+    """
+    if len(functions) < 2:
+        pytest.skip("Not enough functions to compare")
+
+    # Check which functions have all three embeddings cached
+    uncached_functions: list[FunctionInfo] = []
+    for func in functions:
+        cached_combined = get_cached_combined_embedding(baselines, func.hash)
+        if cached_combined is not None:
+            func.embedding = cached_combined
+        else:
+            # Check if we can compute from component embeddings
+            openai_emb = baselines.get("embeddings", {}).get(func.hash)
+            codestral_emb = baselines.get("codestral_embeddings", {}).get(func.hash)
+            voyage_emb = baselines.get("voyage_embeddings", {}).get(func.hash)
+
+            if openai_emb and codestral_emb and voyage_emb:
+                # Compute and cache the combined embedding
+                combined = compute_combined_embedding(openai_emb, codestral_emb, voyage_emb)
+                func.embedding = combined
+                baselines.setdefault("combined_embeddings", {})[func.hash] = combined
+            else:
+                uncached_functions.append(func)
+
+    if cached_only and uncached_functions:
+        # Report which component embeddings are missing
+        missing_details = []
+        for f in uncached_functions[:10]:
+            missing = []
+            if not baselines.get("embeddings", {}).get(f.hash):
+                missing.append("openai")
+            if not baselines.get("codestral_embeddings", {}).get(f.hash):
+                missing.append("codestral")
+            if not baselines.get("voyage_embeddings", {}).get(f.hash):
+                missing.append("voyage")
+            missing_details.append(f"{f.file}:{f.name} (missing: {', '.join(missing)})")
+
+        pytest.skip(
+            f"--cached-only mode: {len(uncached_functions)} functions lack "
+            f"complete embeddings for combined test:\n  "
+            + "\n  ".join(missing_details)
+            + (
+                f"\n  ... and {len(uncached_functions) - 10} more"
+                if len(uncached_functions) > 10
+                else ""
+            ),
+        )
+
+    if uncached_functions:
+        pytest.skip(
+            f"{len(uncached_functions)} functions lack one or more component embeddings "
+            f"(OpenAI, Codestral, or Voyage). Run the individual embedding tests first "
+            f"to populate all caches, then run this combined test.",
+        )
+
+    # Save any newly computed combined embeddings
+    if any(baselines.get("combined_embeddings", {})):
+        save_baselines(baselines)
+
+    if update_baselines:
+        pytest.skip("Updated Combined embedding baselines")
+
+    # Apply PCA dimensionality reduction before similarity comparison
+    config = baselines.get("config", {})
+    pca_variance = config.get("pca_variance_threshold", 0.95)
+    embeddings_cache = baselines.get("combined_embeddings", {})
+    apply_pca_to_functions(functions, embeddings_cache, variance_threshold=pca_variance)
+
+    pair_violations: list[str] = []
+    neighbor_violations: list[str] = []
+
+    for i, func_a in enumerate(functions):
+        if func_a.embedding is None:
+            continue
+
+        similar_neighbors = []
+
+        for j, func_b in enumerate(functions):
+            if i >= j or func_b.embedding is None:
+                continue
+
+            similarity = compute_cosine_similarity(func_a.embedding, func_b.embedding)
+
+            if similarity >= threshold_pair:
+                pair_violations.append(
+                    f"{func_a.file}:{func_a.start_line} {func_a.name}() vs "
+                    f"{func_b.file}:{func_b.start_line} {func_b.name}() - "
+                    f"similarity: {similarity:.1%}",
+                )
+
+            if similarity >= threshold_neighbor:
+                similar_neighbors.append((func_b.file, func_b.name, func_b.start_line, similarity))
+
+        if len(similar_neighbors) >= 2:
+            neighbor_info = ", ".join(
+                f"{f}:{n}() ({s:.1%})" for f, n, _, s in similar_neighbors[:3]
+            )
+            neighbor_violations.append(
+                f"{func_a.file}:{func_a.start_line} {func_a.name}() has "
+                f"{len(similar_neighbors)} similar functions: {neighbor_info}",
+            )
+
+    all_violations: list[str] = []
+    if pair_violations:
+        all_violations.append(
+            f"High similarity pairs (>={threshold_pair:.0%}):\n  " + "\n  ".join(pair_violations),
+        )
+    if neighbor_violations:
+        all_violations.append(
+            f"Functions with multiple similar neighbors (>={threshold_neighbor:.0%}):\n  "
+            + "\n  ".join(neighbor_violations),
+        )
+
+    if all_violations:
+        error_msg = "\n\n".join(all_violations)
+        cc_map, cog_map = load_complexity_maps_fn()
+        refactor_msg = get_refactor_priority_message(functions, cc_map, cog_map)
+        if refactor_msg:
+            error_msg += refactor_msg
+        pytest.fail(error_msg)
+
+
+@pytest.mark.similarity
+@pytest.mark.combined
+class TestFunctionSimilarityCombined:
+    """Tests for detecting near-duplicate functions using combined weighted embeddings.
+
+    This test combines OpenAI, Codestral, and Voyage embeddings into a single
+    weighted vector. Each provider's embedding is scaled by (n_provider / n_total)
+    where n_total is the sum of all provider dimensions.
+
+    This test runs LAST because it requires all three component embedding caches
+    to be populated first.
+    """
+
+    def test_function_similarity_combined_all_directories(
+        self,
+        update_baselines: bool,
+        cached_only: bool,
+    ) -> None:
+        """Detect near-duplicate functions across ALL puco_eeff directories.
+
+        Uses weighted combination of OpenAI + Codestral + Voyage embeddings.
+        Fails if:
+        - Any pair has similarity >= threshold_pair (default: 0.88)
+        - Any function has >=2 neighbors with similarity >= threshold_neighbor (0.82)
+        """
+        baselines = load_baselines()
+        config = baselines.get("config", {})
+        min_loc = config.get("min_loc_for_similarity", 1)
+        threshold_pair = config.get("combined_similarity_threshold_pair", 0.88)
+        threshold_neighbor = config.get("combined_similarity_threshold_neighbor", 0.82)
+
+        # Extract functions from ALL puco_eeff directories
+        functions = extract_all_function_infos(min_loc=min_loc)
+        _run_combined_similarity_checks(
+            baselines=baselines,
+            functions=functions,
+            update_baselines=update_baselines,
+            cached_only=cached_only,
+            threshold_pair=threshold_pair,
+            threshold_neighbor=threshold_neighbor,
+            load_complexity_maps_fn=_load_all_complexity_maps,
+        )
+
+    def test_function_similarity_combined(
+        self,
+        update_baselines: bool,
+        cached_only: bool,
+    ) -> None:
+        """Detect near-duplicate functions in extractor/ only.
+
+        Uses weighted combination of OpenAI + Codestral + Voyage embeddings.
+        Fails if:
+        - Any pair has similarity >= threshold_pair (default: 0.88)
+        - Any function has >=2 neighbors with similarity >= threshold_neighbor (0.82)
+        """
+        baselines = load_baselines()
+        config = baselines.get("config", {})
+        min_loc = config.get("min_loc_for_similarity", 1)
+        threshold_pair = config.get("combined_similarity_threshold_pair", 0.88)
+        threshold_neighbor = config.get("combined_similarity_threshold_neighbor", 0.82)
+
+        # Extract functions meeting LOC threshold
+        functions = extract_function_infos(min_loc=min_loc)
+        _run_combined_similarity_checks(
             baselines=baselines,
             functions=functions,
             update_baselines=update_baselines,

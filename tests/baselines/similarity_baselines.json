@@ -1,14 +1,16 @@
 {
   "config": {
-    "codestral_similarity_threshold_neighbor": 0.86,
-    "codestral_similarity_threshold_pair": 0.89,
+    "codestral_similarity_threshold_neighbor": 0.84,
+    "codestral_similarity_threshold_pair": 0.87,
+    "combined_similarity_threshold_neighbor": 0.68,
+    "combined_similarity_threshold_pair": 0.75,
     "min_loc_for_similarity": 1,
-    "pca_variance_threshold": 0.95,
+    "pca_variance_threshold": 0.99,
     "refactor_index_threshold": 12.0,
     "refactor_index_top_n": 5,
     "similarity_threshold_neighbor": 0.78,
     "similarity_threshold_pair": 0.83,
-    "voyage_similarity_threshold_neighbor": 0.8,
-    "voyage_similarity_threshold_pair": 0.85
+    "voyage_similarity_threshold_neighbor": 0.78,
+    "voyage_similarity_threshold_pair": 0.83
   }
 }

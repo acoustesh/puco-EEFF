@@ -29,7 +29,7 @@ from puco_eeff.extractor.extraction_pipeline import (
 from puco_eeff.extractor.ocr_fallback import ocr_with_fallback
 from puco_eeff.extractor.ocr_mistral import ocr_with_mistral
 from puco_eeff.extractor.pdf_parser import extract_tables_from_pdf, extract_text_from_pdf
-from puco_eeff.extractor.validation_core import (
+from puco_eeff.extractor.validation import (
     ComparisonResult,
     CrossValidationResult,
     ExtractionResult,
