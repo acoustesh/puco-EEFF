@@ -4,12 +4,12 @@ Per-quarter JSON naming convention: sheet1_2024_QII.json
 Workbook output: EEFF_2024.xlsx with quarters as columns
 """
 
+from puco_eeff.config import quarter_to_roman
 from puco_eeff.writer.sheet_writer import (
     format_period,
     list_available_sheets,
     load_sheet_data,
     parse_period,
-    quarter_to_roman,
     roman_to_quarter,
     save_sheet_data,
     write_sheet_to_csv,

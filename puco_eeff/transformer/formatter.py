@@ -75,12 +75,9 @@ def get_standard_structure(
     return structure
 
 
-def get_field_labels(
-    sheet_name: str = "sheet1", config: dict[str, Any] | None = None,
-) -> dict[str, str]:
-    """Load field→label mapping from config's extraction_labels section."""
-    cfg = config if config is not None else get_config()
-    return cfg.get("sheets", {}).get(sheet_name, {}).get("extraction_labels", {}).get("field_labels", {})
+# Re-export get_all_field_labels as get_field_labels for backward compatibility.
+# The unified implementation lives in extraction module and handles both
+# dynamic config loading and explicit config passing for tests.
 
 
 def map_to_structure(

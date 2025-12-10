@@ -18,7 +18,7 @@ package-mode = false
 python = ">=3.12,<3.15"
 
 # Web scraping & browser automation
-playwright = ">=1.49"
+playwright = ">=1.57"
 httpx = ">=0.28"
 
 # PDF processing
@@ -26,39 +26,39 @@ pdfplumber = ">=0.11"
 
 # XBRL/XML parsing
 python-xbrl = ">=1.1"
-arelle-release = ">=2.30"
-lxml = ">=5.3"
+arelle-release = ">=2.37"
+lxml = ">=6.0"
 
 # OCR APIs
-mistralai = ">=1.2"
-anthropic = ">=0.40"
-openai = ">=1.57"
+mistralai = ">=1.9"
+anthropic = ">=0.75"
+openai = ">=2.9"
 
 # Data processing & Excel output
-pandas = ">=2.2"
+pandas = ">=2.3"
 openpyxl = ">=3.1"
 
 # Configuration & CLI
-python-dotenv = ">=1.0"
-questionary = ">=2.0"
+python-dotenv = ">=1.2"
+questionary = ">=2.1"
 pymupdf = ">=1.26.6"
 pyright = ">=1.1.407"
 voyageai = {version = ">=0.3.6", python = "<3.14"}
 
 
 [tool.poetry.group.dev.dependencies]
-pytest = ">=8.3"
-pytest-asyncio = ">=0.24"
-black = ">=24.10"
-isort = ">=5.13"
-ruff = ">=0.8"
-mypy = ">=1.13"
-pandas-stubs = ">=2.2"
+pytest = ">=9.0"
+pytest-asyncio = ">=1.3"
+black = ">=25.12"
+isort = ">=7.0"
+ruff = ">=0.14"
+mypy = ">=1.19"
+pandas-stubs = ">=2.3"
 types-openpyxl = ">=3.1"
 lxml-stubs = ">=0.5"
 radon = ">=6.0"
-numpy = ">=2.0"
-complexipy = ">=5.0.0"
+numpy = ">=2.3"
+complexipy = ">=5.1"
 pydocstyle = ">=6.3.0"
 
 [tool.black]

@@ -32,23 +32,35 @@ from typing import Any, cast
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
+# Must occur before any config access to ensure overrides take effect
 load_dotenv()
 
-# Project paths
+# =============================================================================
+# Project Path Configuration
+# =============================================================================
+# PROJECT_ROOT is dynamically resolved relative to this module
+# All other paths support environment variable overrides for deployment flexibility
 PROJECT_ROOT = Path(__file__).parent.parent
 CONFIG_DIR = PROJECT_ROOT / "config"
+
+# Environment variable overrides allow custom deployment paths
+# Default paths nest under PROJECT_ROOT for local development
 DATA_DIR = Path(os.getenv("DATA_DIR", PROJECT_ROOT / "data"))
 AUDIT_DIR = Path(os.getenv("AUDIT_DIR", PROJECT_ROOT / "audit"))
 LOGS_DIR = Path(os.getenv("LOGS_DIR", PROJECT_ROOT / "logs"))
 TEMP_DIR = Path(os.getenv("TEMP_DIR", PROJECT_ROOT / "temp"))
 
-# Ensure directories exist
+# Eagerly create directories to ensure downstream code can rely on their existence
+# mkdir with parents=True and exist_ok=True is safe for concurrent execution
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 AUDIT_DIR.mkdir(parents=True, exist_ok=True)
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
-# API Keys
+# =============================================================================
+# API Key Configuration
+# =============================================================================
+# OCR providers require API keys; default to empty strings for optional features
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", "")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
@@ -110,6 +122,9 @@ def get_period_paths(year: int, quarter: int) -> dict[str, Path]:
 def setup_logging(name: str = "puco_eeff") -> logging.Logger:
     """Configure a console+file logger if not already present.
 
+    Idempotent function that reuses existing logger handlers to avoid duplicates
+    when called multiple times with the same name.
+
     Parameters
     ----------
     name : str, optional
@@ -120,20 +135,27 @@ def setup_logging(name: str = "puco_eeff") -> logging.Logger:
     logging.Logger
         Logger with INFO-level console handler and DEBUG-level rotating file
         handler under ``LOGS_DIR``.
+
+    Notes
+    -----
+    File handler writes to a date-stamped log file (YYYY-MM-DD_run.log) in LOGS_DIR.
+    Console output filters to INFO+ while file captures DEBUG+ for troubleshooting.
     """
     logger = logging.getLogger(name)
 
+    # Check if handlers already exist to prevent duplicates on repeated calls
     if not logger.handlers:
         logger.setLevel(logging.DEBUG)
 
-        # Console handler
+        # Console handler: INFO level for user-facing messages
         console_handler = logging.StreamHandler()
         console_handler.setLevel(logging.INFO)
         console_format = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
         console_handler.setFormatter(console_format)
         logger.addHandler(console_handler)
 
-        # File handler
+        # File handler: DEBUG level for detailed troubleshooting
+        # Log filename includes date to avoid overwriting previous runs
         log_filename = f"{datetime.now(UTC).strftime('%Y-%m-%d')}_run.log"
         file_handler = logging.FileHandler(LOGS_DIR / log_filename)
         file_handler.setLevel(logging.DEBUG)

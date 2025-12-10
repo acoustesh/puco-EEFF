@@ -125,13 +125,24 @@ class SectionBreakdown:
 # =============================================================================
 
 
-def get_all_field_labels(sheet_name: str = "sheet1") -> dict[str, str]:
+def get_all_field_labels(
+    sheet_name: str = "sheet1",
+    config: dict | None = None,
+) -> dict[str, str]:
     """Aggregate field-to-label mappings from extraction configs.
+
+    When a custom config is provided (e.g., in tests), reads from the config's
+    ``sheets.<sheet_name>.extraction_labels.field_labels`` path. Otherwise,
+    builds labels dynamically from sheet1 section field mappings.
 
     Parameters
     ----------
     sheet_name : str, optional
         Sheet identifier; only ``"sheet1"`` is supported.
+    config : dict | None, optional
+        Optional configuration dictionary. When provided (e.g., in tests),
+        reads field_labels from config. When ``None``, builds from extraction
+        section configs.
 
     Returns
     -------
@@ -147,6 +158,17 @@ def get_all_field_labels(sheet_name: str = "sheet1") -> dict[str, str]:
     if sheet_name != "sheet1":
         msg = f"Sheet '{sheet_name}' not yet implemented."
         raise ValueError(msg)
+
+    # When config is explicitly passed (e.g., tests), use it directly
+    if config is not None:
+        return (
+            config.get("sheets", {})
+            .get(sheet_name, {})
+            .get("extraction_labels", {})
+            .get("field_labels", {})
+        )
+
+    # Build from sheet1 section configs (the authoritative source)
     return {
         field_id: defn["pdf_labels"][0]
         for section_id in get_sheet1_extraction_sections()

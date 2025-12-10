@@ -23,6 +23,16 @@ Entrypoints
 See ``instructions/*.md`` for operator workflows. The primary runnable module is
 :mod:`puco_eeff.main_sheet1`, which orchestrates download → extract → validate →
 persist for Sheet1.
+
+Examples
+--------
+Run Sheet1 extraction for 2024 Q2:
+
+    >>> python -m puco_eeff.main_sheet1 --year 2024 --quarter 2
+
+Skip download and use existing files:
+
+    >>> python -m puco_eeff.main_sheet1 -y 2024 -q 2 --skip-download
 """
 
 from puco_eeff.config import quarter_to_roman
@@ -32,7 +42,13 @@ __all__ = ["__version__", "quarter_to_roman"]
 
 # Public helper for introspection tools.
 def get_version() -> str:
-    """Return the current package version."""
+    """Return the current package version string.
+
+    Returns
+    -------
+    str
+        Semantic version identifier (e.g., ``"0.1.0"``).
+    """
     return __version__
 
 

@@ -1596,15 +1596,15 @@ langchain-core = ">=1.0.0,<2.0.0"
 
 [[package]]
 name = "langsmith"
-version = "0.4.56"
+version = "0.4.58"
 description = "Client library to connect to the LangSmith Observability and Evaluation Platform."
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 markers = "python_version < \"3.14\""
 files = [
-    {file = "langsmith-0.4.56-py3-none-any.whl", hash = "sha256:f2c61d3f10210e78f16f77e3115f407d40f562ab00ac8c76927c7dd55b5c17b2"},
-    {file = "langsmith-0.4.56.tar.gz", hash = "sha256:c3dc53509972689dbbc24f9ac92a095dcce00f76bb0db03ae385815945572540"},
+    {file = "langsmith-0.4.58-py3-none-any.whl", hash = "sha256:f6999b2f7956f030c32a80c1d631b49677f35648560207a09973c8d5ab74279d"},
+    {file = "langsmith-0.4.58.tar.gz", hash = "sha256:ec72e2fcfbbf90b827212c75acac8fc58bb921726f4326633bd774b50133eea3"},
 ]
 
 [package.dependencies]
@@ -4509,4 +4509,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.15"
-content-hash = "6c5f523566a83ba44d0a1072fa6b14ab5b41492d3db5c99fc7bbf88e1522aa1b"
+content-hash = "4e80eedcc317edb0584e0fcce1fa7d6e400ed0ba6b309e14d952244a6218e798"

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import time
 import zipfile
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from playwright.sync_api import Download, Page
@@ -50,12 +50,27 @@ class DownloadResult:
     source: str = "cmf"  # Always "cmf" for this dataclass
 
     def to_dict(self) -> dict:
-        """Convert to dictionary for JSON serialization."""
-        result = asdict(self)
-        # Convert Path to string for JSON compatibility
-        if result["file_path"] is not None:
-            result["file_path"] = str(result["file_path"])
-        return result
+        """Convert download result to a JSON-serializable dictionary.
+
+        Explicitly constructs the dictionary rather than using ``dataclasses.asdict``
+        to ensure ``Path`` objects are converted to strings. This provides clean
+        JSON serialization for logging and API responses.
+
+        Returns
+        -------
+        dict
+            Dictionary with keys ``document_type``, ``success``, ``file_path``,
+            ``file_size``, ``error``, and ``source``. The ``file_path`` is
+            converted to string if not ``None``.
+        """
+        return {
+            "document_type": self.document_type,
+            "success": self.success,
+            "file_path": str(self.file_path) if self.file_path is not None else None,
+            "file_size": self.file_size,
+            "error": self.error,
+            "source": self.source,
+        }
 
     # Backward-compatible alias
     as_dict = to_dict

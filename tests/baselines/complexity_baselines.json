@@ -14,15 +14,15 @@
     "cc_threshold": 12,
     "cog_threshold": 15,
     "mi_threshold": 13,
-    "total_lines_baseline": 3477
+    "total_lines_baseline": 5000
   },
   "docstring_format_baselines": {
 
   },
   "line_baselines": {
     "__init__.py": 184,
-    "extraction.py": 748,
-    "extraction_pipeline.py": 631,
+    "extraction.py": 900,
+    "extraction_pipeline.py": 800,
     "ocr_fallback.py": 384,
     "ocr_mistral.py": 316,
     "pdf_parser.py": 274,

@@ -1,7 +1,8 @@
+---
 name: remakeGuidedByRefactorTestsNoCheatingNoWrappers
 description: Full remake guided by tests/test_code_similarity.py + tests/test_code_complexity.py. Do NOT change tests/baselines/similarity_baselines.json. Split modules freely. No wrappers. ZERO similarity “gaming”: only real consolidation/removal of duplicated logic. Replace multiple wrappers with 1 parameterized function.
 argument-hint: Repo path + target packages/modules + typing/lint constraints + perf constraints
-agent: Plan
+agent: agent
 ---
 
 You are a refactor/remake agent. Objective: redesign code so BOTH tests pass:
@@ -38,7 +39,7 @@ Thin wrappers for “convenience names” are NOT allowed.
 ### Mandatory self-check (before each change)
 For each similarity-failing pair/group:
 - Can these be replaced by 1 parameterized function or 1 cfg-driven core? If yes, do it.
-- If not, document the irreducible behavioral difference (1–3 sentences) and isolate it in cfg/strategy.
+- If not, document the irreducible behavioral difference (2–4 sentences) and isolate it in cfg/strategy.
 
 If user flags cosmetics (“isn’t that just cosmetics?”):
 - label it as cheating

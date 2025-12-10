@@ -905,7 +905,9 @@ class TestExtractSheet1MainEntry:
         with patch("puco_eeff.extractor.extraction_pipeline._extract_from_pdf") as mock_pdf:
             mock_pdf.return_value = (None, None)  # PDF failed - return tuple
 
-            with patch("puco_eeff.extractor.extraction_pipeline._extract_from_xbrl_only") as mock_xbrl:
+            with patch(
+                "puco_eeff.extractor.extraction_pipeline._load_xbrl_sheet1_data"
+            ) as mock_xbrl:
                 mock_xbrl.return_value = (xbrl_data, None)  # Return tuple as expected
 
                 result = extract_sheet1(2024, 2, prefer_source="pdf")
