@@ -65,12 +65,12 @@ async def download_file(url: str, destination: Path, request_timeout: float = 60
     logger.info("Downloading: %s", url)
     logger.debug("Destination: %s", destination)
 
-    # Async client with redirect following for CDN-hosted files
+    # Async client with redirect following for CDN-hosted files.
     async with httpx.AsyncClient(timeout=request_timeout, follow_redirects=True) as async_http:
         http_response = await async_http.get(url)
         http_response.raise_for_status()  # Raise on 4xx/5xx
 
-        # Write response content in binary mode
+        # Write response content in binary mode.
         with destination.open("wb") as output_file:
             output_file.write(http_response.content)
 
