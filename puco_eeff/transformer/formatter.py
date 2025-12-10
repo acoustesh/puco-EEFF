@@ -39,14 +39,19 @@ def get_standard_structure(
 ) -> list[dict[str, Any]]:
     """Get the standard row structure for a sheet.
 
-    Args:
-        sheet_name: Name of the sheet (e.g., "sheet1")
-        config: Configuration dict, or None to load from file
+    Parameters
+    ----------
+    sheet_name
+        Sheet identifier (e.g., ``"sheet1"``).
+    config
+        Optional configuration dictionary. When ``None``, configuration is
+        loaded from disk.
 
     Returns
     -------
-        List of row definitions with field, label, section
-
+    list[dict[str, Any]]
+        Ordered row definitions containing ``row``, ``field``, ``label``, and
+        ``section`` keys.
     """
     if config is None:
         config = get_config()
@@ -85,15 +90,21 @@ def map_to_structure(
 ) -> list[dict[str, Any]]:
     """Map extracted data to standard sheet structure.
 
-    Args:
-        data: Dictionary of field_name -> value
-        sheet_name: Name of the sheet
-        config: Configuration dict, or None to load from file
+    Parameters
+    ----------
+    data
+        Mapping of field name to extracted numeric value.
+    sheet_name
+        Sheet identifier used to load row metadata.
+    config
+        Optional configuration dictionary. When ``None``, configuration is
+        loaded from disk.
 
     Returns
     -------
-        List of row dictionaries with concepto and valor
-
+    list[dict[str, Any]]
+        Row dictionaries containing ``concepto`` and ``valor`` aligned with the
+        configured row mapping.
     """
     structure = get_standard_structure(sheet_name, config)
 
@@ -162,19 +173,25 @@ def validate_section_total(
 ) -> ValidationResult:
     """Validate that a section's total equals the sum of its line items.
 
-    Args:
-        data: Dictionary containing field values
-        section: Section identifier - 'costo_venta' or 'gasto_admin'
-        config: Optional configuration (unused, for interface compatibility)
+    Parameters
+    ----------
+    data
+        Mapping of field names to numeric values.
+    section
+        Section identifier: ``"costo_venta"`` or ``"gasto_admin"``.
+    config
+        Optional configuration (currently unused; kept for interface
+        compatibility).
 
     Returns
     -------
-        ValidationResult comparing reported vs calculated totals
+    ValidationResult
+        Comparison between reported total and calculated subtotal.
 
     Raises
     ------
-        KeyError: If section is not recognized
-
+    KeyError
+        If the provided ``section`` is not recognized.
     """
     total_field, component_fields = _SECTION_CONFIG[section]
     calculated = _sum_fields(data, component_fields)
@@ -196,14 +213,18 @@ def validate_balance_sheet(
 ) -> list[ValidationResult]:
     """Validate all balance sheet totals.
 
-    Args:
-        data: Dictionary of field_name -> value
-        config: Configuration dict, or None to load from file
+    Parameters
+    ----------
+    data
+        Mapping of field names to numeric values.
+    config
+        Optional configuration dictionary. When ``None``, configuration is
+        loaded from disk.
 
     Returns
     -------
-        List of ValidationResults
-
+    list[ValidationResult]
+        Validation results for each section total.
     """
     return [
         validate_section_total(data, "costo_venta", config),
@@ -221,15 +242,20 @@ def validate_against_reference(
     Compares extracted values against known-good reference data stored
     in config["sheets"]["sheet1"]["data"][period].
 
-    Args:
-        extracted_data: Dictionary of field_name -> extracted value
-        period: Period label (e.g., "IIQ2024")
-        config: Configuration dict, or None to load from file
+    Parameters
+    ----------
+    extracted_data
+        Mapping of field names to extracted numeric values.
+    period
+        Period label (e.g., ``"IIQ2024"``) used to select reference data.
+    config
+        Optional configuration dictionary. When ``None``, configuration is
+        loaded from disk.
 
     Returns
     -------
-        List of ValidationResults comparing each field
-
+    list[ValidationResult]
+        Reference comparison results per field.
     """
     if config is None:
         config = get_config()
@@ -290,13 +316,15 @@ def validate_against_reference(
 def format_validation_report(results: list[ValidationResult]) -> str:
     """Format validation results as a human-readable report.
 
-    Args:
-        results: List of ValidationResults
+    Parameters
+    ----------
+    results
+        List of validation outcomes to summarize.
 
     Returns
     -------
-        Formatted string report
-
+    str
+        Text report showing pass/fail counts and per-field status.
     """
     if not results:
         return "No validations performed."

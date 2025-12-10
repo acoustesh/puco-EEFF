@@ -76,21 +76,28 @@ def download_all_documents(
     2. Estados Financieros (PDF)
     3. Estados Financieros (XBRL ZIP)
 
-    If CMF Chile doesn't have the data and fallback_to_pucobre is True,
+    If CMF Chile doesn't have the data and ``fallback_to_pucobre`` is True,
     attempts to download Estados Financieros PDF from Pucobre.cl.
 
-    Args:
-        year: Year of the financial statement (e.g., 2024)
-        quarter: Quarter (1-4)
-        headless: Run browser in headless mode
-        tipo: Type of balance ("C" for Consolidado or "I" for Individual)
-        tipo_norma: Accounting standard ("IFRS" for Estándar IFRS or "NCH" for Norma Chilena)
-        fallback_to_pucobre: If True, try Pucobre.cl when CMF fails
+    Parameters
+    ----------
+    year
+        Year of the financial statement (e.g., 2024).
+    quarter
+        Quarter number (1–4).
+    headless
+        Whether to run Playwright in headless mode.
+    tipo
+        Balance type ("C" consolidado, "I" individual).
+    tipo_norma
+        Accounting standard ("IFRS" or "NCH").
+    fallback_to_pucobre
+        When ``True``, fall back to pucobre.cl for the PDF if CMF fails.
 
     Returns
     -------
-        List of DownloadResult for each document type
-
+    list[DownloadResult]
+        One result per requested document type.
     """
     config = get_config()
     paths = get_period_paths(year, quarter)
@@ -169,17 +176,23 @@ def _download_with_pucobre_fallback(
 ) -> list[DownloadResult]:
     """Try to download from Pucobre.cl as a fallback.
 
-    Args:
-        year: Target year
-        quarter: Target quarter
-        existing_results: Results from CMF Chile attempt
-        pdf_dir: Output directory for PDFs
-        headless: Run browser in headless mode
+    Parameters
+    ----------
+    year
+        Target year.
+    quarter
+        Target quarter.
+    existing_results
+        Results accumulated from the CMF attempt.
+    pdf_dir
+        Directory where PDFs should be stored.
+    headless
+        Whether to run the browser in headless mode.
 
     Returns
     -------
-        Updated results list
-
+    list[DownloadResult]
+        Updated results including any fallback artifacts.
     """
     from puco_eeff.scraper.pucobre_downloader import download_from_pucobre
 
@@ -285,19 +298,28 @@ def download_single_document(
 ) -> DownloadResult:
     """Download a single document type.
 
-    Args:
-        year: Year of the financial statement
-        quarter: Quarter (1-4)
-        document_type: Which document to download
-        headless: Run browser in headless mode
-        tipo: Type of balance
-        tipo_norma: Accounting standard
-        fallback_to_pucobre: If True, try Pucobre.cl when CMF fails (PDF only)
+    Parameters
+    ----------
+    year
+        Year of the financial statement.
+    quarter
+        Quarter number (1–4).
+    document_type
+        Document key from config ("analisis_razonado", "estados_financieros_pdf",
+        or "estados_financieros_xbrl").
+    headless
+        Whether to run Playwright headlessly.
+    tipo
+        Balance type.
+    tipo_norma
+        Accounting standard.
+    fallback_to_pucobre
+        When ``True``, fall back to pucobre.cl for PDFs if CMF fails.
 
     Returns
     -------
-        DownloadResult with status and file path
-
+    DownloadResult
+        Result indicating success and saved file path when applicable.
     """
     config = get_config()
     paths = get_period_paths(year, quarter)
@@ -395,18 +417,25 @@ def _navigate_and_filter(
 ) -> bool:
     """Navigate to CMF Chile and apply period/type filters.
 
-    Args:
-        page: Playwright page instance
-        cmf_config: CMF configuration from config.json
-        year: Target year
-        quarter: Target quarter (1-4)
-        tipo: Balance type
-        tipo_norma: Accounting standard
+    Parameters
+    ----------
+    page
+        Playwright page instance.
+    cmf_config
+        CMF configuration block from ``config.json``.
+    year
+        Target year.
+    quarter
+        Target quarter (1–4).
+    tipo
+        Balance type.
+    tipo_norma
+        Accounting standard.
 
     Returns
     -------
-        True if navigation and filtering succeeded
-
+    bool
+        ``True`` when navigation and filtering succeed.
     """
     base_url = cmf_config["base_url"]
     selectors = cmf_config["filters"]["selectors"]
@@ -540,16 +569,21 @@ def _extract_xbrl_zip(
 
     This function prioritizes .xbrl files as they contain the actual financial facts.
 
-    Args:
-        zip_path: Path to the ZIP file
-        xbrl_dir: Directory to extract XBRL files to (data/raw/xbrl/)
-        year: Year for naming
-        quarter: Quarter for naming
+    Parameters
+    ----------
+    zip_path
+        Path to the downloaded ZIP file.
+    xbrl_dir
+        Directory to extract XBRL files into (``data/raw/xbrl``).
+    year
+        Statement year used for naming.
+    quarter
+        Statement quarter used for naming.
 
     Returns
     -------
-        Path to the extracted XBRL file, or None if extraction failed
-
+    Path | None
+        Path to the extracted XBRL/XML file, or ``None`` if extraction failed.
     """
     if zip_path is None or not zip_path.exists():
         logger.warning("ZIP file not found: %s", zip_path)
@@ -607,14 +641,16 @@ def _extract_cmf_periods_from_page(page: Page) -> list[dict]:
     We query both dropdowns, extract their option values, and build a cartesian
     product filtered by valid quarterly months (03, 06, 09, 12).
 
-    Args:
-        page: Playwright Page object navigated to CMF Chile SVSI portal.
+    Parameters
+    ----------
+    page
+        Playwright Page object already navigated to the CMF SVSI portal.
 
     Returns
     -------
-        List of period dicts with year/month/quarter for each valid combination.
-        Empty list if required form elements not found.
-
+    list[dict]
+        Period dictionaries with year/month/quarter entries; empty when form
+        elements are missing.
     """
     config_filters = get_config()["sources"]["cmf_chile"]["filters"]
     quarter_for_month = config_filters["month_to_quarter"]
@@ -649,13 +685,15 @@ def list_available_periods(headless: bool = True) -> list[dict]:
     Discovers what periods are available for download by extracting
     year/month combinations from the CMF filter dropdown selectors.
 
-    Args:
-        headless: Run browser in headless mode
+    Parameters
+    ----------
+    headless
+        Whether to run the browser in headless mode.
 
     Returns
     -------
-        List of available periods with year, month, and quarter keys
-
+    list[dict]
+        Available periods with ``year``, ``month``, and ``quarter`` keys.
     """
     cmf_config = get_config()["sources"]["cmf_chile"]
     extractor = PeriodExtractor(

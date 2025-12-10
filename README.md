@@ -11,33 +11,30 @@ Pipeline para extraer Estados Financieros (EEFF) de Pucobre desde PDFs públicos
 - **Re-ejecución parcial**: Cada hoja se guarda independientemente, permite re-procesar hojas individuales
 - **Output estructurado**: `EEFF_YYYY_QN.xlsx` con múltiples hojas
 
-## Quick Start
-
-### 1. Clonar e instalar dependencias
+## Quick Start (Sheet1 end-to-end)
 
 ```bash
 git clone <repo-url>
 cd puco-EEFF
 poetry install
+chmod +x setup_browser.sh && ./setup_browser.sh  # instala Chromium para Playwright
+cp .env.example .env && $EDITOR .env             # añade API keys
+
+# Ejecuta Sheet1: descarga (si falta), extrae PDF/XBRL, valida, guarda JSON y Excel
+python -m puco_eeff.main_sheet1 --year 2025 --quarter 3
+
+# Reutilizar descargas existentes
+python -m puco_eeff.main_sheet1 --year 2025 --quarter 3 --skip-download
+
+# Procesar todos los trimestres de un año
+python -m puco_eeff.main_sheet1 --year 2025
 ```
 
-### 2. Instalar navegador headless
-
-```bash
-chmod +x setup_browser.sh
-./setup_browser.sh
-```
-
-### 3. Configurar API keys
-
-```bash
-cp .env.example .env
-# Editar .env con tus API keys
-```
-
-### 4. Ejecutar
-
-El pipeline se ejecuta siguiendo las instrucciones en `instructions/` de forma secuencial.
+Entradas/salidas principales:
+- Descargas: `data/raw/pdf/`, `data/raw/xbrl/`
+- Extraídos por hoja: `data/processed/`
+- Excel combinado: `data/output/EEFF_<year>.xlsx`
+- Auditoría OCR y trazabilidad: `audit/`
 
 ## Estructura del Proyecto
 
@@ -80,6 +77,24 @@ puco-EEFF/
 - Patrones de secciones PDF (ej: `"note 20.b"`)
 - XPath expressions para XML
 - Configuración OCR y reintentos
+
+## Operación y debugging
+
+- **Sólo descargar**: ver `instructions/01_download_all.md` (usa `download_all_documents` o CLI de `main_sheet1`).
+- **Validar referencia**: `python -m puco_eeff.main_sheet1 --year 2025 --quarter 3 --validate-reference`.
+- **OCR fallback**: Mistral → OpenRouter/Claude → OpenRouter/GPT-4o-mini; respuestas quedan en `audit/`.
+- **Combinar Excel**: `python - <<'PY'
+from puco_eeff.writer.workbook_combiner import combine_sheet1_quarters
+combine_sheet1_quarters(year=2025)
+PY`
+
+## QA / Tests
+
+```bash
+poetry run ruff check puco_eeff --select D   # estilo NumPy de docstrings
+poetry run pytest tests/test_comment_density.py  # densidad de comentarios
+poetry run pytest                              # suite completa
+```
 
 ## Workflow
 

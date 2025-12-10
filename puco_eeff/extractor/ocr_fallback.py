@@ -1,4 +1,9 @@
-"""OCR fallback using OpenRouter (Anthropic Claude and OpenAI GPT-4V)."""
+"""OCR fallback chain using Mistral and OpenRouter vision models.
+
+The pipeline first tries the dedicated Mistral OCR model, then walks through
+OpenRouter providers (e.g., Claude 3.5, GPT-4V) with exponential backoff.
+All attempts can be stored in the audit directory for post-mortem analysis.
+"""
 
 from __future__ import annotations
 
@@ -18,7 +23,7 @@ logger = setup_logging(__name__)
 
 @dataclass
 class OCRRequest:
-    """Encapsulates OCR request parameters."""
+    """Encapsulate OCR request parameters for reuse across providers."""
 
     image_path: Path | None = None
     image_base64: str | None = None
@@ -29,7 +34,7 @@ class OCRRequest:
 
 
 def _try_mistral_ocr(request: OCRRequest, save_response: bool) -> dict[str, Any]:
-    """Attempt OCR using Mistral."""
+    """Attempt OCR using the Mistral provider with audit toggling."""
     return ocr_with_mistral(
         image_path=request.image_path,
         image_base64=request.image_base64,
@@ -47,7 +52,9 @@ def _attempt_single_ocr(
     request: OCRRequest,
     save_response: bool,
 ) -> dict[str, Any]:
-    """Execute a single OCR attempt for a specific provider."""
+    """Execute a single OCR attempt for a specific provider/model pair."""
+    # The provider switch remains explicit to keep future vendors pluggable
+    # without threading dynamic imports through the retry loop.
     if provider == "mistral":
         return _try_mistral_ocr(request, save_response)
     # OpenRouter provider - call _ocr_with_openrouter directly
@@ -71,6 +78,8 @@ def _run_with_retries(
     all_responses: list[dict[str, Any]],
 ) -> dict[str, Any] | None:
     """Run OCR attempts with exponential backoff retry logic."""
+    # The backoff intentionally grows per-attempt to avoid hammering providers
+    # that enforce short-rate limits; max_delay caps runaway wait times.
     for attempt in range(max_attempts):
         logger.info(f"OCR attempt {attempt + 1}/{max_attempts} with {provider}/{model}")
 
@@ -113,10 +122,32 @@ def ocr_with_fallback(
     save_all_responses: bool = True,
     audit_dir: Path | None = None,
 ) -> dict[str, Any]:
-    """Extract text using OCR with fallback chain.
+    """Extract text using an OCR fallback chain.
 
-    Tries Mistral OCR first, then falls back to OpenRouter providers
-    (Anthropic Claude, OpenAI GPT-4V) with exponential retry.
+    Parameters
+    ----------
+    image_path
+        Path to an image file to OCR.
+    image_base64
+        Raw base64-encoded image payload.
+    pdf_path
+        Path to a PDF file; when provided, forwarded to Mistral which can
+        handle PDFs directly.
+    page_number
+        Optional page indicator for PDF requests.
+    prompt
+        Custom extraction prompt to override the default table/text request.
+    save_all_responses
+        Whether to persist every attempt (success and failures) to the audit
+        directory for debugging.
+    audit_dir
+        Directory for audit artifacts; defaults to the global audit directory.
+
+    Returns
+    -------
+    dict[str, Any]
+        Final provider response with ``all_responses`` containing prior
+        attempts when ``save_all_responses`` is ``True``.
     """
     config = get_config()
     ocr_config = config["ocr"]
@@ -135,6 +166,7 @@ def ocr_with_fallback(
     providers = [{"provider": "mistral", "model": "mistral-ocr-latest"}, *ocr_config["fallback"]]
 
     for provider_info in providers:
+        # Attempt providers in declared order; first success short-circuits the loop.
         result = _run_with_retries(
             provider=provider_info["provider"],
             model=provider_info["model"],
@@ -163,19 +195,27 @@ def _ocr_with_openrouter(
     prompt: str | None = None,
     audit_dir: Path | None = None,
 ) -> dict[str, Any]:
-    """Perform OCR using OpenRouter API.
+    """Perform OCR using an OpenRouter-hosted vision model.
 
-    Args:
-        model: OpenRouter model identifier (e.g., "anthropic/claude-3.5-sonnet")
-        image_path: Path to an image file
-        image_base64: Base64-encoded image data
-        prompt: Custom prompt for OCR extraction
-        audit_dir: Directory to save audit files (None to skip)
+    Parameters
+    ----------
+    model
+        OpenRouter model identifier (e.g., ``"anthropic/claude-3.5-sonnet"`` or
+        ``"openai/gpt-4o-mini-vision"``).
+    image_path
+        Path to an image on disk to encode and send.
+    image_base64
+        Raw base64 image string; used when ``image_path`` is not provided.
+    prompt
+        Custom prompt for extraction; defaults to a structured table/text prompt.
+    audit_dir
+        Directory to persist the response; when ``None`` audit is skipped.
 
     Returns
     -------
-        Dictionary with extracted content and metadata
-
+    dict[str, Any]
+        Result payload mirroring the Mistral response shape with ``success``,
+        ``content``, ``usage``, and error details if applicable.
     """
     client = get_openrouter_client()
 
@@ -216,6 +256,8 @@ Format tables as markdown tables when possible."""
     ]
 
     logger.info("Calling OpenRouter OCR: %s", model)
+    # OpenRouter normalizes model identifiers; keep the fully qualified ID for
+    # audit parity with upstream dashboards.
 
     try:
         response = client.chat.completions.create(
@@ -237,6 +279,8 @@ Format tables as markdown tables when possible."""
         }
 
         logger.info("OpenRouter OCR successful with %s", model)
+        # Note: token accounting may be missing for some providers; default to 0
+        # rather than raising to keep the OCR pipeline resilient.
 
     except Exception as e:
         logger.exception("OpenRouter OCR failed: %s", e)
@@ -250,22 +294,26 @@ Format tables as markdown tables when possible."""
 
     # Save response for audit
     if audit_dir:
+        # Persist each attempt for auditability; callers can disable by passing None.
         _save_audit_response(result, audit_dir, model)
 
     return result
 
 
 def _encode_image(image_path: Path) -> str:
-    """Encode an image file to base64 data URL.
+    """Encode an image file to a data URL string.
 
-    Args:
-        image_path: Path to image file
+    Parameters
+    ----------
+    image_path
+        Image path on disk.
 
     Returns
     -------
-        Base64 data URL string
-
+    str
+        Base64 data URL suitable for OpenRouter ``image_url`` payloads.
     """
+    # Encode once per call; callers should cache if reusing the same image.
     suffix = image_path.suffix.lower()
     mime_types = {
         ".png": "image/png",

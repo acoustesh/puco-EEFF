@@ -1,4 +1,4 @@
-"""PDF parser using pdfplumber for text and table extraction."""
+"""PDF parser using pdfplumber for text, table, and metadata extraction."""
 
 from __future__ import annotations
 
@@ -20,14 +20,22 @@ def extract_text_from_pdf(
 ) -> dict[int, str]:
     """Extract text content from PDF pages.
 
-    Args:
-        file_path: Path to the PDF file
-        pages: List of page numbers to extract (1-indexed). If None, extract all.
+    Parameters
+    ----------
+    file_path : Path
+        PDF to read.
+    pages : list[int] | None, optional
+        One-indexed pages to extract; ``None`` processes all pages.
 
     Returns
     -------
-        Dictionary mapping page numbers to extracted text
+    dict[int, str]
+        Mapping of one-indexed page numbers to extracted text.
 
+    Raises
+    ------
+    FileNotFoundError
+        If ``file_path`` does not exist.
     """
     logger.info("Extracting text from PDF: %s", file_path)
 
@@ -61,17 +69,26 @@ def extract_tables_from_pdf(
     pages: list[int] | None = None,
     table_settings: dict[str, Any] | None = None,
 ) -> dict[int, list[list[list[str | None]]]]:
-    """Extract tables from PDF pages.
+    """Extract tables from PDF pages using pdfplumber settings.
 
-    Args:
-        file_path: Path to the PDF file
-        pages: List of page numbers to extract (1-indexed). If None, extract all.
-        table_settings: pdfplumber table extraction settings
+    Parameters
+    ----------
+    file_path : Path
+        PDF to read.
+    pages : list[int] | None, optional
+        One-indexed pages to extract; ``None`` processes all pages.
+    table_settings : dict[str, Any] | None, optional
+        Overrides for pdfplumber ``extract_tables`` configuration.
 
     Returns
     -------
-        Dictionary mapping page numbers to list of tables (each table is a list of rows)
+    dict[int, list[list[list[str | None]]]]
+        One-indexed page numbers mapped to extracted tables.
 
+    Raises
+    ------
+    FileNotFoundError
+        If ``file_path`` does not exist.
     """
     logger.info("Extracting tables from PDF: %s", file_path)
 
@@ -112,16 +129,19 @@ def find_section_in_pdf(
     file_path: Path,
     section_pattern: str,
 ) -> list[dict[str, Any]]:
-    """Find sections in PDF matching a pattern.
+    """Find occurrences of a pattern in PDF text.
 
-    Args:
-        file_path: Path to the PDF file
-        section_pattern: Section pattern (e.g., "note 20.b", "section 5")
+    Parameters
+    ----------
+    file_path : Path
+        PDF to scan.
+    section_pattern : str
+        Case-insensitive pattern such as ``"note 20.b"``.
 
     Returns
     -------
-        List of dictionaries with page number and context
-
+    list[dict[str, Any]]
+        Matches with page numbers and surrounding text context.
     """
     logger.info("Searching for section: %s", section_pattern)
 
@@ -156,15 +176,22 @@ def find_section_in_pdf(
 
 
 def get_pdf_info(file_path: Path) -> dict[str, Any]:
-    """Get basic information about a PDF file.
+    """Return page count and metadata for a PDF.
 
-    Args:
-        file_path: Path to the PDF file
+    Parameters
+    ----------
+    file_path : Path
+        PDF to inspect.
 
     Returns
     -------
-        Dictionary with PDF metadata
+    dict[str, Any]
+        ``{"path": str, "num_pages": int, "metadata": pdf.metadata}``.
 
+    Raises
+    ------
+    FileNotFoundError
+        If ``file_path`` does not exist.
     """
     if not file_path.exists():
         msg = f"PDF file not found: {file_path}"

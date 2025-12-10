@@ -1,19 +1,8 @@
 """PDF and XBRL extraction logic for cost data.
 
-This module provides high-level extraction functions for parsing PDFs and XBRL files.
-It contains config-driven extraction logic, page finding, and section extraction.
-
-Key Classes:
-    LineItem: Single line item with concepto and period values.
-    SectionBreakdown: Generic container for PDF section data.
-
-Key Functions:
-    extract_pdf_section(): Generic config-driven PDF section extraction.
-    find_text_page(): Generic PDF page finder - searches for required text strings.
-    find_section_page(): Config-driven wrapper using find_text_page.
-    extract_table_from_page(): Extract cost table data from a specific page.
-    extract_xbrl_totals(): Extract relevant totals from XBRL file.
-    extract_ingresos_from_pdf(): Extract Ingresos from Estado de Resultados.
+This module uses pdfplumber to locate and parse PDF tables and lxml-powered
+helpers to read XBRL facts. Extraction is config-driven via ``config/sheet1``
+mappings and returns structured dataclasses used downstream by Sheet1.
 """
 
 from __future__ import annotations
@@ -76,7 +65,15 @@ __all__ = [
 
 @dataclass
 class LineItem:
-    """A single line item from the cost breakdown."""
+    """Line item with periodized values.
+
+    Attributes
+    ----------
+    concepto : str
+        Label as it appears in the PDF table.
+    ytd_actual, ytd_anterior, quarter_actual, quarter_anterior : int | None
+        Values parsed for current/prior year-to-date and quarter figures.
+    """
 
     concepto: str
     ytd_actual: int | None = None
@@ -87,7 +84,21 @@ class LineItem:
 
 @dataclass
 class SectionBreakdown:
-    """Breakdown from a PDF section (e.g., nota_21, nota_22, ingresos)."""
+    """Parsed PDF section payload (e.g., nota_21, nota_22, ingresos).
+
+    Attributes
+    ----------
+    section_id : str
+        Internal section key from configuration.
+    section_title : str
+        Human-readable section heading.
+    items : list[LineItem]
+        Detail rows excluding totals.
+    total_ytd_actual, total_ytd_anterior, total_quarter_actual, total_quarter_anterior : int | None
+        Parsed totals captured from the PDF table.
+    page_number : int | None
+        One-based page index for traceability.
+    """
 
     section_id: str
     section_title: str
@@ -99,11 +110,11 @@ class SectionBreakdown:
     page_number: int | None = None
 
     def sum_items_ytd_actual(self) -> int:
-        """Sum all YTD actual values (excluding total row)."""
+        """Return the sum of YTD actual values excluding total rows."""
         return sum(item.ytd_actual or 0 for item in self.items if "total" not in item.concepto.lower())
 
     def is_valid(self) -> bool:
-        """Check if the sum of items equals the total."""
+        """Return whether detail rows reconcile to the extracted total."""
         if self.total_ytd_actual is None:
             return False
         return self.sum_items_ytd_actual() == self.total_ytd_actual
@@ -115,10 +126,23 @@ class SectionBreakdown:
 
 
 def get_all_field_labels(sheet_name: str = "sheet1") -> dict[str, str]:
-    """Aggregate field-to-label mappings from extraction section configs.
+    """Aggregate field-to-label mappings from extraction configs.
 
-    Walks through all configured extraction sections and collects the first
-    PDF label for each field. Used for PDF parsing label matching.
+    Parameters
+    ----------
+    sheet_name : str, optional
+        Sheet identifier; only ``"sheet1"`` is supported.
+
+    Returns
+    -------
+    dict[str, str]
+        Mapping of field identifiers to their primary PDF labels used when
+        matching parsed table headers.
+
+    Raises
+    ------
+    ValueError
+        If ``sheet_name`` is not implemented.
     """
     if sheet_name != "sheet1":
         msg = f"Sheet '{sheet_name}' not yet implemented."
@@ -138,7 +162,7 @@ def _extract_labels_for_section(
     section2_items: list[str],
     field_labels: dict[str, str],
 ) -> None:
-    """Extract labels from a section and populate items/labels dicts."""
+    """Populate intermediate label collections for configured sections."""
     section_spec = get_sheet1_section_spec(section_name)
     field_mappings = section_spec.get("field_mappings", {})
 
@@ -159,23 +183,23 @@ def _extract_labels_for_section(
 def get_extraction_labels(
     config: dict | None = None,
 ) -> tuple[list[str], list[str], dict[str, str]]:
-    """Get extraction labels from config/sheet1/extraction.json.
+    """Load configured PDF labels for Sheet1 sections.
 
-    This function loads labels from the Sheet1 extraction config for all
-    configured sections. Returns labels for nota_21, nota_22, and all fields.
-
-    Args:
-        config: Configuration dict (ignored, kept for backward compat)
+    Parameters
+    ----------
+    config : dict | None, optional
+        Deprecated parameter retained for backward compatibility; ignored.
 
     Returns
     -------
-        Tuple of (costo_venta_items, gasto_admin_items, field_labels)
-        where costo_venta_items are from nota_21 and gasto_admin_items from nota_22
+    tuple[list[str], list[str], dict[str, str]]
+        ``(costo_venta_items, gasto_admin_items, field_labels)`` extracted from
+        sheet1 section definitions.
 
     Raises
     ------
-        ValueError: If config loading fails
-
+    ValueError
+        If fewer than two extraction sections are defined.
     """
     sections = get_sheet1_extraction_sections()
     if len(sections) < 2:
@@ -204,7 +228,7 @@ def get_extraction_labels(
 
 
 def _normalize_text_list(texts: list[str]) -> list[str]:
-    """Normalize a list of texts for case-insensitive matching."""
+    """Return lowercase and normalized variants of provided strings."""
     result = []
     for text in texts:
         result.append(text.lower())
@@ -221,7 +245,7 @@ def _page_matches_criteria(
     min_required: int,
     min_optional: int,
 ) -> bool:
-    """Check if page text matches required/optional criteria."""
+    """Return whether a page satisfies required/optional token thresholds."""
     required_count = sum(1 for req in required_normalized if req in page_text)
     if required_count < min_required:
         return False
@@ -241,7 +265,26 @@ def find_text_page(
     min_required: int | None = None,
     min_optional: int = 0,
 ) -> int | None:
-    """Find the first page containing required text strings."""
+    """Locate the first PDF page meeting text presence criteria.
+
+    Parameters
+    ----------
+    pdf_path : Path
+        PDF to scan.
+    required_texts : list[str]
+        Terms that must appear at least ``min_required`` times on a page.
+    optional_texts : list[str] | None, optional
+        Additional terms that count toward ``min_optional`` matches.
+    min_required : int | None, optional
+        Minimum number of required text matches (defaults to 1).
+    min_optional : int, optional
+        Minimum optional matches when ``optional_texts`` is provided.
+
+    Returns
+    -------
+    int | None
+        Zero-based page index if found; otherwise ``None``.
+    """
     if min_required is None:
         min_required = 1
 
@@ -270,7 +313,27 @@ def find_section_page(
     year: int | None = None,
     quarter: int | None = None,
 ) -> int | None:
-    """Find the page number where a config-defined section exists."""
+    """Find the PDF page index for a configured section.
+
+    Parameters
+    ----------
+    pdf_path : Path
+        PDF to scan.
+    section_name : str
+        Section identifier as defined in sheet1 extraction config.
+    year, quarter : int | None
+        Optional metadata used for logging context.
+
+    Returns
+    -------
+    int | None
+        Zero-based page index if located; otherwise ``None``.
+
+    Raises
+    ------
+    ValueError
+        If required search patterns are missing from configuration.
+    """
     section_spec = get_sheet1_section_spec(section_name)
     unique_items, _ = get_sheet1_section_table_identifiers(section_name)
 
@@ -320,7 +383,26 @@ def _find_best_matching_table(
     exclude_items: list[str],
     min_score: int = 3,
 ) -> list[list[str | None]] | None:
-    """Find the table that best matches expected content."""
+    """Select the table whose content best matches expectations.
+
+    Parameters
+    ----------
+    tables : list[list[list[str | None]]]
+        Tables extracted from a PDF page.
+    expected_items : list[str]
+        Concept labels expected to appear.
+    unique_items : list[str]
+        Labels that should appear uniquely and boost match score.
+    exclude_items : list[str]
+        Labels that disqualify a table when present.
+    min_score : int, optional
+        Minimum acceptable match score computed by :func:`score_table_match`.
+
+    Returns
+    -------
+    list[list[str | None]] | None
+        Best matching table when a score threshold is met; otherwise ``None``.
+    """
     best_table = None
     best_score = 0
 
@@ -344,7 +426,28 @@ def extract_table_from_page(
     year: int | None = None,
     quarter: int | None = None,
 ) -> list[dict[str, Any]]:
-    """Extract cost table data from a specific page."""
+    """Extract a structured table from a PDF page.
+
+    Parameters
+    ----------
+    pdf_path : Path
+        Source PDF.
+    page_index : int
+        Zero-based page index to parse.
+    expected_items : list[str]
+        Expected concept labels used to score tables.
+    nota_number : int, optional
+        Legacy note number used when ``section_name`` is absent.
+    section_name : str, optional
+        Section identifier to resolve unique/exclude items.
+    year, quarter : int | None
+        Optional metadata for logging context.
+
+    Returns
+    -------
+    list[dict[str, Any]]
+        Parsed rows with ``concepto`` and ``values`` keys; empty when no table matches.
+    """
     # Resolve section name and get identifiers
     effective = section_name or (f"nota_{nota_number}" if nota_number else "")
     unique_items, exclude_items = get_sheet1_section_table_identifiers(effective) if effective else ([], [])
@@ -379,7 +482,7 @@ def _extract_table_with_next_page_fallback(
     year: int | None,
     quarter: int | None,
 ) -> list[dict[str, Any]]:
-    """Extract table from page, trying next page if empty."""
+    """Extract from the target page, then try the next if nothing is found."""
     rows = extract_table_from_page(
         pdf_path,
         page_idx,
@@ -401,12 +504,12 @@ def _extract_table_with_next_page_fallback(
 
 
 def _safe_get_value(values: list, index: int) -> int | None:
-    """Safely get value at index or None if out of bounds."""
+    """Return a value by index or ``None`` when missing."""
     return values[index] if len(values) > index else None
 
 
 def _set_breakdown_totals(breakdown: SectionBreakdown, values: list) -> None:
-    """Set total values on breakdown from extracted values list."""
+    """Populate total fields on a breakdown from an extracted values list."""
     breakdown.total_ytd_actual = _safe_get_value(values, 0)
     breakdown.total_ytd_anterior = _safe_get_value(values, 1)
     breakdown.total_quarter_actual = _safe_get_value(values, 2)
@@ -414,7 +517,7 @@ def _set_breakdown_totals(breakdown: SectionBreakdown, values: list) -> None:
 
 
 def _create_line_item(concepto: str, values: list) -> LineItem:
-    """Create a LineItem from concept and values list."""
+    """Build a :class:`LineItem` from a concept label and values list."""
     return LineItem(
         concepto=concepto,
         ytd_actual=_safe_get_value(values, 0),
@@ -425,7 +528,7 @@ def _create_line_item(concepto: str, values: list) -> LineItem:
 
 
 def _populate_breakdown_from_rows(breakdown: SectionBreakdown, rows: list[dict[str, Any]]) -> None:
-    """Populate SectionBreakdown with data from extracted rows."""
+    """Fill a :class:`SectionBreakdown` with parsed table rows."""
     for row in rows:
         concepto = row["concepto"]
         values = row.get("values", [])
@@ -443,7 +546,30 @@ def extract_pdf_section(
     year: int | None = None,
     quarter: int | None = None,
 ) -> SectionBreakdown | None:
-    """Extract a section from PDF using config-driven rules."""
+    """Extract a section from a PDF using config-driven rules.
+
+    Parameters
+    ----------
+    pdf_path : Path
+        PDF containing the desired section.
+    section_name : str
+        Section identifier (e.g., ``"nota_21"``).
+    sheet_name : str, optional
+        Sheet identifier (only ``"sheet1"`` supported).
+    year, quarter : int | None
+        Optional metadata for logging.
+
+    Returns
+    -------
+    SectionBreakdown | None
+        Structured section data with item rows and totals; ``None`` when the
+        section cannot be found or parsed.
+
+    Raises
+    ------
+    ValueError
+        If an unsupported sheet is requested.
+    """
     if sheet_name != "sheet1":
         msg = f"Unsupported sheet: {sheet_name}"
         raise ValueError(msg)
@@ -486,7 +612,7 @@ def extract_pdf_section(
 
 
 def _get_ingresos_config() -> tuple[list[str], int]:
-    """Get ingresos match keywords and minimum threshold from config."""
+    """Return ingresos keyword list and minimum value threshold from config."""
     ingresos_spec = get_sheet1_section_spec("ingresos")
     field_mappings = ingresos_spec.get("field_mappings", {})
     ingresos_mapping = field_mappings.get("ingresos_ordinarios", {})
@@ -503,7 +629,7 @@ def _search_tables_for_ingresos(
     match_keywords: list[str],
     min_threshold: int,
 ) -> int | None:
-    """Search tables for ingresos value matching keywords."""
+    """Search table rows for an ingresos value that meets matching rules."""
     for table in tables:
         for row in table:
             if not row or len(row) < 2:
@@ -515,7 +641,18 @@ def _search_tables_for_ingresos(
 
 
 def extract_ingresos_from_pdf(pdf_path: Path) -> int | None:
-    """Extract Ingresos de actividades ordinarias from Estado de Resultados page."""
+    """Extract ingresos from the Estado de Resultados section.
+
+    Parameters
+    ----------
+    pdf_path : Path
+        PDF containing the Estado de Resultados.
+
+    Returns
+    -------
+    int | None
+        Parsed ingresos value when found; otherwise ``None``.
+    """
     match_keywords, min_threshold = _get_ingresos_config()
 
     page_idx = find_section_page(pdf_path, "ingresos")
@@ -541,7 +678,7 @@ def extract_ingresos_from_pdf(pdf_path: Path) -> int | None:
 
 
 def _find_xbrl_facts(data: dict, fact_mapping: dict, field_name: str) -> list[dict]:
-    """Find XBRL facts using primary and fallback names."""
+    """Locate XBRL facts using primary and fallback fact names."""
     primary_fact = fact_mapping.get("primary")
     facts = get_facts_by_name(data, primary_fact) if primary_fact else []
 
@@ -555,7 +692,7 @@ def _find_xbrl_facts(data: dict, fact_mapping: dict, field_name: str) -> list[di
 
 
 def _extract_fact_value(facts: list[dict], fact_mapping: dict, scaling_factor: int) -> int | None:
-    """Extract and optionally scale the value from XBRL facts."""
+    """Return the first valid XBRL fact value, applying scaling if configured."""
     for fact in facts:
         if not fact.get("value"):
             continue
@@ -570,7 +707,19 @@ def _extract_fact_value(facts: list[dict], fact_mapping: dict, scaling_factor: i
 
 
 def extract_xbrl_totals(xbrl_path: Path) -> dict[str, int | None]:
-    """Extract relevant totals from XBRL file using config-driven fact names."""
+    """Extract configured totals from an XBRL file.
+
+    Parameters
+    ----------
+    xbrl_path : Path
+        Path to the XBRL instance document.
+
+    Returns
+    -------
+    dict[str, int | None]
+        Values keyed by result mapping (e.g., ``cost_of_sales``); ``None`` when
+        facts are absent or parsing fails.
+    """
     try:
         data = parse_xbrl_file(xbrl_path)
     except Exception as e:

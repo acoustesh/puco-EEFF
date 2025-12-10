@@ -1,5 +1,14 @@
 # Troubleshooting Guide
 
+## Quick sanity checks
+
+```bash
+poetry run ruff check puco_eeff --select D          # estilo de docstrings
+poetry run pytest tests/test_comment_density.py      # densidad de comentarios
+poetry run pytest tests/test_config_integrity.py -v  # JSON de config válido
+python -m puco_eeff.main_sheet1 --year 2025 --quarter 3 --skip-download --validate-reference
+```
+
 ## Common Issues and Solutions
 
 ### Browser / Playwright Issues

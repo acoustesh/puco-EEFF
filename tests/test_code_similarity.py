@@ -322,7 +322,8 @@ def get_function_text(
         node: AST function or class node
         source: Full source code of the file
 
-    Returns:
+    Returns
+    -------
         Function/class text including signature, docstring, and body
 
     """
@@ -358,7 +359,8 @@ def extract_function_infos(
         min_loc: Minimum lines of code for inclusion
         directory: Directory to scan (default: EXTRACTOR_DIR)
 
-    Returns:
+    Returns
+    -------
         List of FunctionInfo objects
 
     """
@@ -406,7 +408,8 @@ def extract_all_function_infos(min_loc: int = 15) -> list[FunctionInfo]:
     Args:
         min_loc: Minimum lines of code for inclusion
 
-    Returns:
+    Returns
+    -------
         List of FunctionInfo objects from all directories
 
     """
@@ -465,7 +468,8 @@ def extract_function_infos_from_file(
         file_path: Path to the Python file
         min_loc: Minimum lines of code for inclusion (default: 1 to include all)
 
-    Returns:
+    Returns
+    -------
         List of FunctionInfo objects
 
     """
@@ -521,7 +525,8 @@ def fit_pca_on_all_embeddings(
         baselines: Baselines dict with cached embeddings
         variance_threshold: Cumulative variance to retain (default: 0.95)
 
-    Returns:
+    Returns
+    -------
         Tuple of (fitted PCA model, number of components to use)
         Returns (None, 0) if not enough embeddings
 
@@ -566,7 +571,8 @@ def cluster_functions_kmeans_with_pca(
         n_components: Number of PCA components to use
         n_clusters: Number of clusters (default: 2)
 
-    Returns:
+    Returns
+    -------
         Tuple of (list of function lists per cluster, list of cluster names)
 
     """
@@ -623,7 +629,8 @@ def generate_file_split_proposal(
         file_path: Path to the Python file to analyze
         baselines: Baselines dict with cached embeddings
 
-    Returns:
+    Returns
+    -------
         Formatted proposal string, or None if not enough functions
 
     """
@@ -725,7 +732,8 @@ def get_embeddings_batch(
         max_retries: Number of retry attempts for rate limits
         timeout: Timeout per API call in seconds
 
-    Returns:
+    Returns
+    -------
         List of embedding vectors
 
     """
@@ -775,7 +783,7 @@ def get_embeddings_batch_codestral(
     texts: list[str],
     model: str = CODESTRAL_EMBED_MODEL,
     max_retries: int = 3,
-    timeout: float = 60.0,
+    timeout: float = 120.0,
 ) -> list[list[float]]:
     """Get embeddings for a batch of texts using OpenRouter Codestral Embed API.
 
@@ -785,7 +793,8 @@ def get_embeddings_batch_codestral(
         max_retries: Number of retry attempts for rate limits
         timeout: Timeout per API call in seconds
 
-    Returns:
+    Returns
+    -------
         List of embedding vectors
 
     """
@@ -861,7 +870,7 @@ def get_embeddings_batch_voyage(
     texts: list[str],
     model: str = VOYAGE_CODE_MODEL,
     max_retries: int = 3,
-    timeout: float = 60.0,
+    timeout: float = 120.0,
 ) -> list[list[float]]:
     """Get embeddings for a batch of texts using Voyage AI API.
 
@@ -871,7 +880,8 @@ def get_embeddings_batch_voyage(
         max_retries: Number of retry attempts for rate limits
         timeout: Timeout per API call in seconds
 
-    Returns:
+    Returns
+    -------
         List of embedding vectors
 
     """
@@ -932,7 +942,8 @@ def compute_similarity_matrix(functions: list[FunctionInfo]) -> np.ndarray:
     Args:
         functions: List of FunctionInfo objects with embeddings
 
-    Returns:
+    Returns
+    -------
         n x n numpy array of cosine similarities
 
     """
@@ -967,7 +978,8 @@ def compute_max_similarities(similarity_matrix: np.ndarray) -> np.ndarray:
     Args:
         similarity_matrix: n x n similarity matrix
 
-    Returns:
+    Returns
+    -------
         Array of max similarities for each function
 
     """
@@ -982,7 +994,8 @@ def compute_similarity_indices(max_similarities: np.ndarray) -> np.ndarray:
     Args:
         max_similarities: Array of max similarity values
 
-    Returns:
+    Returns
+    -------
         Array of similarity indices
 
     """
@@ -1003,7 +1016,8 @@ def compute_refactor_indices(
         cog_values: Array of cognitive complexity values
         similarity_indices: Array of similarity index values
 
-    Returns:
+    Returns
+    -------
         Array of refactor indices
 
     """
@@ -1026,7 +1040,8 @@ def get_refactor_priority_message(
         threshold: Minimum refactor index to include
         top_n: Maximum number of functions to show
 
-    Returns:
+    Returns
+    -------
         Formatted message string, or None if no functions meet threshold
 
     """
@@ -1111,7 +1126,8 @@ def get_refactor_priority_message(
 def _get_all_function_complexities(file_path: Path) -> list[tuple[str, int, int]]:
     """Get cyclomatic complexity for all functions in a file.
 
-    Returns:
+    Returns
+    -------
         List of (function_name, line_number, complexity) tuples
 
     """
@@ -1129,7 +1145,8 @@ def _get_all_function_complexities(file_path: Path) -> list[tuple[str, int, int]
 def _get_all_cognitive_complexities(file_path: Path) -> list[tuple[str, int, int]]:
     """Get cognitive complexity for all functions in a file using complexipy.
 
-    Returns:
+    Returns
+    -------
         List of (function_name, line_number, complexity) tuples
 
     """
@@ -1149,7 +1166,8 @@ def _load_complexity_maps(directory: Path | None = None) -> tuple[dict[str, int]
     Args:
         directory: Directory to scan (default: EXTRACTOR_DIR)
 
-    Returns:
+    Returns
+    -------
         Tuple of (cc_map, cog_map) where each maps "file:func" to complexity value
 
     """
@@ -1176,7 +1194,8 @@ def _load_complexity_maps(directory: Path | None = None) -> tuple[dict[str, int]
 def _load_all_complexity_maps() -> tuple[dict[str, int], dict[str, int]]:
     """Load cyclomatic and cognitive complexity maps for ALL puco_eeff functions.
 
-    Returns:
+    Returns
+    -------
         Tuple of (cc_map, cog_map) where each maps "subdir/file:func" to complexity value
 
     """

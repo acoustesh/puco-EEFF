@@ -67,17 +67,21 @@ logger = setup_logging(__name__)
 
 
 def files_exist_for_period(year: int, quarter: int, require_xbrl: bool = False) -> bool:
-    """Check if required files exist for a period.
+    """Determine whether prerequisite files are already on disk.
 
-    Args:
-        year: Year of the financial statement
-        quarter: Quarter (1-4)
-        require_xbrl: If True, also require XBRL file to exist
+    Parameters
+    ----------
+    year : int
+        Fiscal year to inspect.
+    quarter : int
+        Quarter number (1–4).
+    require_xbrl : bool, optional
+        When ``True`` also require the XBRL file alongside the PDF.
 
     Returns
     -------
-        True if all required files exist
-
+    bool
+        ``True`` when all required files are present using configured filename patterns.
     """
     paths = get_period_paths(year, quarter)
 
@@ -109,21 +113,25 @@ def ensure_files_downloaded(
     force: bool = False,
     skip_download: bool = False,
 ) -> bool:
-    """Ensure files are downloaded for a period.
+    """Guarantee presence of raw PDF/XBRL assets for a period.
 
-    Checks if files exist, downloads if missing (unless skip_download=True).
-
-    Args:
-        year: Year of the financial statement
-        quarter: Quarter (1-4)
-        headless: Run browser in headless mode
-        force: If True, download even if files exist
-        skip_download: If True, only check existence without downloading
+    Parameters
+    ----------
+    year : int
+        Fiscal year to download.
+    quarter : int
+        Quarter number (1–4).
+    headless : bool, optional
+        Whether to run Playwright downloads without a visible browser.
+    force : bool, optional
+        Download even if files already exist.
+    skip_download : bool, optional
+        Only check for presence; do not fetch missing files.
 
     Returns
     -------
-        True if files are available (existed or downloaded successfully)
-
+    bool
+        ``True`` when required files exist or were downloaded successfully.
     """
     files_present = files_exist_for_period(year, quarter)
 
@@ -174,13 +182,22 @@ def _run_reference_validation(
     report: ValidationReport | None,
     fail_on_mismatch: bool,
 ) -> tuple[bool, list[str] | None]:
-    """Run reference validation and return (should_continue, issues).
+    """Validate extracted values against reference data.
+
+    Parameters
+    ----------
+    data : Sheet1Data
+        Extracted sheet payload to compare.
+    report : ValidationReport | None
+        Report object to mutate with reference issues when provided.
+    fail_on_mismatch : bool
+        When ``True`` aborts on any mismatch.
 
     Returns
     -------
-        Tuple of (should_continue, ref_issues). should_continue is False
-        if fail_on_mismatch is True and issues were found.
-
+    tuple[bool, list[str] | None]
+        ``(should_continue, issues_or_none)`` where ``should_continue`` reflects
+        the strictness flag and whether mismatches were found.
     """
     ref_issues = validate_sheet1_against_reference(data)
     if report:
@@ -221,26 +238,34 @@ def process_sheet1(
     fail_on_sum_mismatch: bool = False,
     fail_on_reference_mismatch: bool = False,
 ) -> tuple[Sheet1Data | None, ValidationReport | None]:
-    """Process Sheet1: download if needed, extract, save, and report.
+    """Run the end-to-end Sheet1 workflow for a period.
 
-    Orchestrates the complete Sheet1 workflow: file acquisition, extraction,
-    validation, persistence, and reporting.
-
-    Args:
-        year: Year of the financial statement
-        quarter: Quarter (1-4)
-        skip_download: If True, skip download step (fail if files missing)
-        save: If True, save extracted data to JSON
-        verbose: If True, print extraction report
-        headless: Run browser in headless mode for downloads
-        validate_reference: If True, validate against reference data
-        fail_on_sum_mismatch: If True, return None on sum validation failure
-        fail_on_reference_mismatch: If True, return None on reference mismatch
+    Parameters
+    ----------
+    year : int
+        Fiscal year to process.
+    quarter : int
+        Quarter number (1–4).
+    skip_download : bool, optional
+        Skip network fetches; fail if inputs are missing.
+    save : bool, optional
+        Persist extracted data to JSON when ``True``.
+    verbose : bool, optional
+        Print a human-readable report when ``True``.
+    headless : bool, optional
+        Run Playwright without UI when downloading.
+    validate_reference : bool, optional
+        Compare results against curated reference values when available.
+    fail_on_sum_mismatch : bool, optional
+        Abort when sum validations fail.
+    fail_on_reference_mismatch : bool, optional
+        Abort on reference mismatches (implies ``validate_reference``).
 
     Returns
     -------
-        Tuple of (Sheet1Data, ValidationReport) if successful, (None, None) otherwise
-
+    tuple[Sheet1Data | None, ValidationReport | None]
+        Extracted data and validation report when successful; ``(None, None)``
+        on failure or aborted validations.
     """
     logger.info("Processing Sheet1 for %s Q%s", year, quarter)
 
@@ -284,7 +309,13 @@ def process_sheet1(
 
 
 def main() -> int:
-    """CLI entry point."""
+    """Parse CLI flags and process requested quarters.
+
+    Returns
+    -------
+    int
+        ``0`` when at least one quarter succeeded; ``1`` otherwise.
+    """
     parser = argparse.ArgumentParser(
         description="Process Sheet1: download, extract, and save financial data.",
         formatter_class=argparse.RawDescriptionHelpFormatter,

@@ -44,16 +44,22 @@ def combine_sheet1_quarters(
     Supports incremental append - if workbook exists and append_to_existing=True,
     adds new quarter columns without regenerating existing ones.
 
-    Args:
-        year: Year to combine (e.g., 2024)
-        output_dir: Directory for output Excel file (defaults to DATA_DIR/output)
-        input_dir: Directory with sheet JSON files (defaults to DATA_DIR/processed)
-        append_to_existing: If True, append new quarters to existing workbook
+    Parameters
+    ----------
+    year
+        Year to combine (e.g., 2024).
+    output_dir
+        Destination directory for the Excel file; defaults to ``DATA_DIR/output``.
+    input_dir
+        Directory containing sheet JSON files; defaults to ``DATA_DIR/processed``.
+    append_to_existing
+        When ``True``, reuse existing workbook columns and append only new
+        quarters.
 
     Returns
     -------
-        Path to the created/updated Excel workbook
-
+    Path
+        Path to the created or updated Excel workbook.
     """
     save_dir = output_dir if output_dir is not None else DATA_DIR / "output"
     save_dir.mkdir(parents=True, exist_ok=True)
@@ -143,7 +149,7 @@ def combine_sheet1_quarters(
 
 
 def _period_sort_key(period: str) -> tuple[int, int]:
-    """Sort key for period strings (e.g., '2024_QII' -> (2024, 2))."""
+    """Sort key for period strings (e.g., ``"2024_QII"`` → ``(2024, 2)``)."""
     try:
         year, quarter = parse_period(period)
         return (year, quarter)
@@ -154,13 +160,15 @@ def _period_sort_key(period: str) -> tuple[int, int]:
 def _load_existing_sheet1(filepath: Path) -> tuple[dict[str, dict[str, Any]], set[str]]:
     """Load existing Sheet1 data from workbook.
 
-    Args:
-        filepath: Path to existing Excel workbook
+    Parameters
+    ----------
+    filepath
+        Path to the existing Excel workbook.
 
     Returns
     -------
-        Tuple of (data dict mapping period -> field values, set of existing periods)
-
+    tuple[dict[str, dict[str, Any]], set[str]]
+        Mapping of period to field values and the set of existing periods.
     """
     try:
         df = pd.read_excel(filepath, sheet_name="Ingresos y Costos")
@@ -215,16 +223,21 @@ def append_quarter_to_workbook(
 
     Convenience function that calls combine_sheet1_quarters with append mode.
 
-    Args:
-        year: Year (e.g., 2024)
-        quarter: Quarter to append (1-4)
-        output_dir: Directory for output Excel file
-        input_dir: Directory with sheet JSON files
+    Parameters
+    ----------
+    year
+        Year to append (e.g., 2024).
+    quarter
+        Quarter number in ``1–4``.
+    output_dir
+        Destination directory for the Excel workbook.
+    input_dir
+        Directory containing sheet JSON files.
 
     Returns
     -------
-        Path to the updated workbook
-
+    Path
+        Path to the updated workbook.
     """
     period = format_period(year, quarter)
     logger.info("Appending %s to workbook", period)
@@ -240,13 +253,15 @@ def append_quarter_to_workbook(
 def _format_sheet_name(name: str) -> str:
     """Format a sheet name for display.
 
-    Args:
-        name: Raw sheet name (e.g., "balance_general")
+    Parameters
+    ----------
+    name
+        Raw sheet name (e.g., ``"balance_general"``).
 
     Returns
     -------
-        Formatted name (e.g., "Balance General")
-
+    str
+        Display-friendly sheet name (e.g., ``"Balance General"``).
     """
     # Replace underscores with spaces and title case
     formatted = name.replace("_", " ").title()
@@ -269,14 +284,17 @@ def create_workbook_from_dataframes(
 ) -> Path:
     """Create an Excel workbook directly from DataFrames.
 
-    Args:
-        sheets: Dictionary mapping sheet names to DataFrames
-        output_path: Path for the output Excel file
+    Parameters
+    ----------
+    sheets
+        Mapping of sheet name to DataFrame content.
+    output_path
+        Destination path for the workbook.
 
     Returns
     -------
-        Path to the created workbook
-
+    Path
+        Path to the created workbook.
     """
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -300,14 +318,17 @@ def list_workbook_quarters(
 ) -> list[str]:
     """List quarters already present in a workbook.
 
-    Args:
-        year: Year to check
-        output_dir: Directory with workbooks (defaults to DATA_DIR/output)
+    Parameters
+    ----------
+    year
+        Year to check.
+    output_dir
+        Directory containing workbooks; defaults to ``DATA_DIR/output``.
 
     Returns
     -------
-        List of period strings (e.g., ["2024_QI", "2024_QII"])
-
+    list[str]
+        Period identifiers such as ``"2024_QI"``.
     """
     search_dir = output_dir if output_dir is not None else DATA_DIR / "output"
     filepath = search_dir / f"EEFF_{year}.xlsx"

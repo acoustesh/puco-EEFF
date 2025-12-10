@@ -1,4 +1,9 @@
-"""Mistral OCR integration for PDF image extraction."""
+"""Mistral OCR integration for PDF and image extraction.
+
+This module provides thin wrappers around the Mistral vision/chat API to turn
+PDFs or images into text and markdown-formatted tables. Responses can be
+persisted to the audit directory for traceability.
+"""
 
 from __future__ import annotations
 
@@ -26,21 +31,33 @@ def ocr_with_mistral(
     save_response: bool = True,
     audit_dir: Path | None = None,
 ) -> dict[str, Any]:
-    """Extract text and tables from an image using Mistral OCR.
+    """Extract text and tables using the Mistral OCR model.
 
-    Args:
-        image_path: Path to an image file
-        image_base64: Base64-encoded image data
-        pdf_path: Path to a PDF file (Mistral can process PDFs directly)
-        page_number: Page number if processing a specific page
-        prompt: Custom prompt for OCR extraction
-        save_response: Whether to save the response for audit
-        audit_dir: Directory to save audit files
+    Parameters
+    ----------
+    image_path
+        Path to a single image file to encode and send.
+    image_base64
+        Raw base64-encoded image string (with or without ``data:`` prefix).
+    pdf_path
+        Path to a PDF file; if provided, takes precedence over image inputs.
+    page_number
+        Optional page number hint for the PDF request (may be ignored by the
+        API, but useful for logging and downstream consumers).
+    prompt
+        Custom extraction prompt to override the default “extract all text and
+        tables” instruction.
+    save_response
+        Whether to persist the provider response to the audit directory.
+    audit_dir
+        Directory used when ``save_response`` is ``True``; defaults to the
+        global audit directory.
 
     Returns
     -------
-        Dictionary with extracted content and metadata
-
+    dict[str, Any]
+        Result payload containing ``success`` flag, ``content`` string,
+        provider metadata, and optional token usage or error details.
     """
     if not any([image_path, image_base64, pdf_path]):
         msg = "Must provide image_path, image_base64, or pdf_path"
@@ -119,16 +136,20 @@ Format tables as markdown tables when possible."""
 
 
 def _prepare_pdf_content(pdf_path: Path, page_number: int | None) -> dict[str, Any]:
-    """Prepare PDF content for Mistral API.
+    """Convert a PDF file into the data URL structure expected by Mistral.
 
-    Args:
-        pdf_path: Path to PDF file
-        page_number: Optional specific page
+    Parameters
+    ----------
+    pdf_path
+        Path to the PDF on disk.
+    page_number
+        Optional page indicator logged for traceability; the API may ignore it.
 
     Returns
     -------
-        Content dictionary for API
-
+    dict[str, Any]
+        Payload entry suitable for ``messages[0]["content"]`` with a
+        ``type: image_url`` pointing to a PDF data URL.
     """
     with pdf_path.open("rb") as f:
         pdf_base64 = base64.standard_b64encode(f.read()).decode("utf-8")
@@ -161,17 +182,23 @@ def _prepare_image_content(
     is_base64: bool = False,
     default_mime: str = "image/png",
 ) -> dict[str, Any]:
-    """Prepare image content for Mistral API.
+    """Normalize an image input into the Mistral ``image_url`` payload.
 
-    Args:
-        image_source: Either a Path to an image file, or a base64-encoded string
-        is_base64: If True, treat image_source as base64 string; if False, as file path
-        default_mime: Default MIME type when not determinable (default: image/png)
+    Parameters
+    ----------
+    image_source
+        Path to an image on disk or the raw base64 string to embed.
+    is_base64
+        When ``True``, treat ``image_source`` as pre-encoded base64 content;
+        otherwise read from the filesystem.
+    default_mime
+        Fallback MIME type used when the extension is unknown.
 
     Returns
     -------
-        Content dictionary for API with {"type": "image_url", "image_url": {"url": ...}}
-
+    dict[str, Any]
+        ``{"type": "image_url", "image_url": {"url": ...}}`` payload ready
+        for use inside a chat message.
     """
     if is_base64:
         # Handle base64 string input
@@ -192,13 +219,16 @@ def _prepare_image_content(
 
 
 def _save_audit_response(result: dict[str, Any], audit_dir: Path, model: str = "mistral") -> None:
-    """Save OCR response to audit directory.
+    """Persist OCR response for traceability.
 
-    Args:
-        result: OCR result dictionary
-        audit_dir: Directory to save audit files
-        model: Model name for filename (default: "mistral")
-
+    Parameters
+    ----------
+    result
+        Result payload returned by the provider call.
+    audit_dir
+        Destination directory; created if it does not exist.
+    model
+        Model name used to derive a safe filename.
     """
     audit_dir.mkdir(parents=True, exist_ok=True)
 

@@ -1,13 +1,8 @@
-"""High-level extraction orchestration for Sheet1 data.
+"""High-level orchestration for Sheet1 extraction.
 
-This module provides the main entry points for extracting Sheet1 data from
-PDF and XBRL files.
-
-Key Functions:
-    extract_sheet1(): Unified entry point for Sheet1 extraction (PDF/XBRL/both).
-    extract_detailed_costs(): Extract detailed cost breakdowns.
-    save_extraction_result(): Save extraction result to JSON file.
-    print_extraction_report(): Print extraction report to console.
+Functions here wire together PDF parsing, XBRL aggregation, validations, and
+JSON persistence. The entrypoint :func:`extract_sheet1` supports PDF-first or
+XBRL-first strategies with optional merging.
 """
 
 from __future__ import annotations
@@ -65,13 +60,39 @@ __all__ = [
 
 
 def _determine_source(raw_dir: Path, year: int, quarter: int) -> str:
-    """Determine the data source based on available files."""
+    """Return the inferred source label for a period.
+
+    Parameters
+    ----------
+    raw_dir : Path
+        Directory containing raw PDF files.
+    year, quarter : int
+        Period identifiers used to locate combined Pucobre files.
+
+    Returns
+    -------
+    str
+        ``"pucobre.cl"`` when a combined PDF exists, otherwise ``"cmf"``.
+    """
     combined_path = find_file_with_alternatives(raw_dir, "pucobre_combined", year, quarter)
     return "pucobre.cl" if (combined_path and combined_path.exists()) else "cmf"
 
 
 def _resolve_pdf_path(raw_dir: Path, year: int, quarter: int) -> Path | None:
-    """Resolve the Estados Financieros PDF path."""
+    """Resolve the Estados Financieros PDF path, honoring alt patterns.
+
+    Parameters
+    ----------
+    raw_dir : Path
+        Directory containing PDF downloads.
+    year, quarter : int
+        Period identifiers.
+
+    Returns
+    -------
+    Path | None
+        Path to the PDF if present; otherwise ``None``.
+    """
     ef_path = find_file_with_alternatives(raw_dir, "estados_financieros_pdf", year, quarter)
     if not ef_path:
         ef_path = raw_dir / format_filename("estados_financieros_pdf", year, quarter)
@@ -79,7 +100,20 @@ def _resolve_pdf_path(raw_dir: Path, year: int, quarter: int) -> Path | None:
 
 
 def _resolve_xbrl_path(raw_xbrl_dir: Path, year: int, quarter: int) -> tuple[Path | None, bool]:
-    """Resolve the XBRL path and availability."""
+    """Resolve the XBRL file path and report its presence.
+
+    Parameters
+    ----------
+    raw_xbrl_dir : Path
+        Directory containing XBRL downloads.
+    year, quarter : int
+        Period identifiers.
+
+    Returns
+    -------
+    tuple[Path | None, bool]
+        Candidate path and availability flag.
+    """
     xbrl_path = find_file_with_alternatives(raw_xbrl_dir, "estados_financieros_xbrl", year, quarter)
     if not xbrl_path:
         xbrl_path = raw_xbrl_dir / format_filename("estados_financieros_xbrl", year, quarter)
@@ -93,7 +127,7 @@ def _resolve_xbrl_path(raw_xbrl_dir: Path, year: int, quarter: int) -> tuple[Pat
 
 
 def _create_sheet1_data(year: int, quarter: int, source: str, xbrl_available: bool) -> Sheet1Data:
-    """Create a new Sheet1Data instance with common initialization."""
+    """Instantiate :class:`Sheet1Data` with period metadata and source flags."""
     return Sheet1Data(
         quarter=format_quarter_label(year, quarter),
         year=year,
@@ -109,7 +143,7 @@ def _create_sheet1_data(year: int, quarter: int, source: str, xbrl_available: bo
 
 
 def _extract_nota_sections(pdf_path: Path, result: ExtractionResult) -> None:
-    """Extract Nota 21 and 22 sections into result."""
+    """Populate an :class:`ExtractionResult` with nota sections from the PDF."""
     for nota_name in ("nota_21", "nota_22"):
         section = extract_pdf_section(pdf_path, nota_name)
         if section is not None:
@@ -117,7 +151,7 @@ def _extract_nota_sections(pdf_path: Path, result: ExtractionResult) -> None:
 
 
 def _map_nota_item_to_sheet1(item: LineItem, data: Sheet1Data, section_name: str) -> None:
-    """Map a Nota line item to Sheet1Data fields using config-driven matching."""
+    """Assign a nota line item to the matching Sheet1 field if configured."""
     field_name = match_concepto_to_field(item.concepto, section_name)
 
     if field_name:
@@ -128,9 +162,19 @@ def _map_nota_item_to_sheet1(item: LineItem, data: Sheet1Data, section_name: str
 
 
 def _populate_sheet1_from_notas(data: Sheet1Data, ef_path: Path) -> bool:
-    """Extract Nota 21 and 22 from PDF and populate Sheet1Data.
+    """Extract Nota 21/22 and populate Sheet1Data values.
 
-    Returns True if at least one nota was successfully extracted.
+    Parameters
+    ----------
+    data : Sheet1Data
+        Target object to mutate.
+    ef_path : Path
+        Estados Financieros PDF path.
+
+    Returns
+    -------
+    bool
+        ``True`` when at least one nota is parsed successfully.
     """
     nota_sections = [
         ("nota_21", "total_costo_venta"),
@@ -150,7 +194,20 @@ def _populate_sheet1_from_notas(data: Sheet1Data, ef_path: Path) -> bool:
 
 
 def _extract_ingresos_fallback(data: Sheet1Data, ef_path: Path) -> ValidationReport:
-    """Extract Ingresos from PDF and return sum-only validation report."""
+    """Extract ingresos directly from PDF when XBRL is unavailable.
+
+    Parameters
+    ----------
+    data : Sheet1Data
+        Target payload to populate.
+    ef_path : Path
+        Estados Financieros PDF path.
+
+    Returns
+    -------
+    ValidationReport
+        Report containing only sum validations derived from PDF values.
+    """
     logger.info("No XBRL available, extracting Ingresos from Estado de Resultados")
     ingresos_value = extract_ingresos_from_pdf(ef_path)
     if ingresos_value is not None:
@@ -179,15 +236,14 @@ def _transfer_xbrl_data(
     xbrl_totals: dict[str, int | None],
     target: ExtractionResult | Sheet1Data,
 ) -> None:
-    """Transfer XBRL data to target (ExtractionResult or Sheet1Data).
+    """Copy XBRL totals into either an ExtractionResult or Sheet1Data.
 
-    For ExtractionResult: Populates xbrl_totals dict using result_key_mapping.
-    For Sheet1Data: Populates field values using _XBRL_TO_SHEET1_FIELDS mapping.
-
-    Args:
-        xbrl_totals: Source XBRL totals dictionary.
-        target: Destination ExtractionResult or Sheet1Data object.
-
+    Parameters
+    ----------
+    xbrl_totals : dict[str, int | None]
+        Parsed totals from :func:`extract_xbrl_totals` keyed by result name.
+    target : ExtractionResult | Sheet1Data
+        Destination object to mutate.
     """
     if isinstance(target, ExtractionResult):
         # ExtractionResult: copy XBRL totals using key mapping
@@ -212,11 +268,16 @@ def _validate_extraction(
     source: str,
     xbrl_totals: dict[str, int | None] | None = None,
 ) -> None:
-    """Validate extraction result, optionally against XBRL totals.
+    """Run validations on an :class:`ExtractionResult`.
 
-    Consolidates validation logic for both XBRL-backed and PDF-only modes.
-    When xbrl_totals is provided, runs full validation including cross-validations.
-    When xbrl_totals is None, runs only sum and PDF-only validations.
+    Parameters
+    ----------
+    result : ExtractionResult
+        Parsed PDF sections with optional XBRL totals.
+    source : str
+        Origin label (``"cmf"`` or ``"pucobre.cl"``).
+    xbrl_totals : dict[str, int | None] | None, optional
+        When provided, enables cross-validations against XBRL values.
     """
     has_xbrl = xbrl_totals is not None
 
@@ -249,18 +310,21 @@ def _extract_from_pdf(
     quarter: int,
     validate: bool,
 ) -> tuple[Sheet1Data | None, ValidationReport | None]:
-    """Extract Sheet1 data from PDF Nota 21/22 sections, optionally validating against XBRL.
+    """Extract Sheet1 data from PDF nota sections, optionally cross-validating with XBRL.
 
-    This is the core PDF extraction workflow - it handles path resolution, table parsing,
-    nota extraction, and optional XBRL cross-validation. The implementation intentionally
-    uses a linear flow with early returns for clarity in error handling.
+    Parameters
+    ----------
+    year : int
+        Fiscal year.
+    quarter : int
+        Quarter number (1–4).
+    validate : bool
+        Whether to perform validations (PDF-only or PDF vs XBRL).
 
-    Pipeline stages:
-        1. Resolve PDF path → fail fast if missing
-        2. Check for XBRL availability → sets cross-validation mode
-        3. Parse nota sections from PDF tables
-        4. Run validation against XBRL (if available and requested)
-        5. Fall back to ingresos extraction if no XBRL
+    Returns
+    -------
+    tuple[Sheet1Data | None, ValidationReport | None]
+        Extracted data and validation report; ``(None, None)`` when PDF parsing fails.
     """
     period_paths = get_period_paths(year, quarter)
     raw_pdf_dir = period_paths["raw_pdf"]
@@ -286,6 +350,7 @@ def _extract_from_pdf(
     # Stage 4/5: Validation or fallback
     should_cross_validate = xbrl_exists and validate and xbrl_file_path is not None
     if should_cross_validate:
+        assert xbrl_file_path is not None  # Guard for type checkers
         xbrl_data = extract_xbrl_totals(xbrl_file_path)
         return sheet1_data, run_sheet1_validations(sheet1_data, xbrl_data)
 
@@ -293,7 +358,13 @@ def _extract_from_pdf(
 
 
 def _load_xbrl_sheet1_data(year: int, quarter: int) -> tuple[Sheet1Data | None, dict | None]:
-    """Load XBRL file and return Sheet1Data with raw totals. Returns (None, None) on failure."""
+    """Load XBRL file and map totals into Sheet1Data.
+
+    Returns
+    -------
+    tuple[Sheet1Data | None, dict | None]
+        Sheet1Data with totals and the raw totals dict; ``(None, None)`` if missing or invalid.
+    """
     xbrl_dir = get_period_paths(year, quarter)["raw_xbrl"]
     xbrl_file = find_file_with_alternatives(xbrl_dir, "estados_financieros_xbrl", year, quarter)
     if xbrl_file is None:
@@ -313,7 +384,22 @@ def _load_xbrl_sheet1_data(year: int, quarter: int) -> tuple[Sheet1Data | None, 
 
 
 def extract_detailed_costs(year: int, quarter: int, validate: bool = True) -> ExtractionResult:
-    """Extract detailed cost breakdowns for a period."""
+    """Extract nota breakdowns and optional validations for a period.
+
+    Parameters
+    ----------
+    year : int
+        Fiscal year.
+    quarter : int
+        Quarter number (1–4).
+    validate : bool, optional
+        Whether to run validations (PDF-only or PDF vs XBRL).
+
+    Returns
+    -------
+    ExtractionResult
+        Parsed nota sections plus validation results when requested.
+    """
     paths = get_period_paths(year, quarter)
     pdf_path = _resolve_pdf_path(paths["raw_pdf"], year, quarter)
     if not pdf_path:
@@ -349,7 +435,26 @@ def extract_sheet1(
     return_report: bool = False,
     validate_with_xbrl: bool = True,
 ) -> Sheet1Data | None | tuple[Sheet1Data | None, ValidationReport | None]:
-    """Unified API entry point for Sheet1 extraction with configurable source strategy."""
+    """Unified API entry point for Sheet1 extraction with configurable source strategy.
+
+    Parameters
+    ----------
+    year, quarter : int
+        Period to process.
+    prefer_source : str, optional
+        ``"pdf"`` (default) or ``"xbrl"`` to prioritize XBRL-first.
+    merge_sources : bool, optional
+        When XBRL-first, merge PDF details into XBRL totals if both available.
+    return_report : bool, optional
+        Return a validation report alongside data when ``True``.
+    validate_with_xbrl : bool, optional
+        If ``True``, cross-validate PDF extraction against XBRL when present.
+
+    Returns
+    -------
+    Sheet1Data | None | tuple[Sheet1Data | None, ValidationReport | None]
+        Sheet1Data (and optional report) when successful; ``None`` if no source succeeds.
+    """
 
     def _xbrl_extraction():
         """Load XBRL totals and create Sheet1Data with sum validations."""
@@ -386,7 +491,7 @@ def extract_sheet1(
 
 
 def _merge_pdf_into_xbrl_data(xbrl_data: Sheet1Data, pdf_data: Sheet1Data) -> Sheet1Data:
-    """Merge detailed PDF data into XBRL data."""
+    """Overlay PDF-only fields onto an XBRL-backed Sheet1Data instance."""
     for field_name in pdf_data.__dataclass_fields__:
         if field_name in {"quarter", "year", "quarter_num", "source", "xbrl_available"}:
             continue
@@ -403,7 +508,7 @@ def _merge_pdf_into_xbrl_data(xbrl_data: Sheet1Data, pdf_data: Sheet1Data) -> Sh
 
 
 def _breakdown_to_dict(breakdown: SectionBreakdown) -> dict:
-    """Convert SectionBreakdown to dictionary."""
+    """Serialize a :class:`SectionBreakdown` to a JSON-friendly dict."""
     return {
         "section_id": breakdown.section_id,
         "section_title": breakdown.section_title,
@@ -426,7 +531,7 @@ def _breakdown_to_dict(breakdown: SectionBreakdown) -> dict:
 
 
 def _save_legacy_extraction_result(result: ExtractionResult, output_dir: Path | None) -> Path:
-    """Save ExtractionResult in legacy format (detailed_costs.json)."""
+    """Persist an ExtractionResult using the legacy ``detailed_costs.json`` schema."""
     if output_dir is None:
         paths = get_period_paths(result.year, result.quarter)
         output_dir = paths["processed"]
@@ -465,7 +570,7 @@ def _save_legacy_extraction_result(result: ExtractionResult, output_dir: Path | 
 
 
 def _build_validation_summary(report: ValidationReport) -> dict:
-    """Build validation summary dictionary from report."""
+    """Summarize validation counts for embedding into JSON outputs."""
     return {
         "sum_validations": len(report.sum_validations),
         "pdf_xbrl_validations": len(report.pdf_xbrl_validations),
@@ -482,11 +587,28 @@ def save_extraction_result(
     quarter: int | None = None,
     report: ValidationReport | None = None,
 ) -> Path:
-    """Save extraction result to JSON file.
+    """Serialize extraction outputs to JSON (new and legacy formats).
 
-    Supports two signatures for backward compatibility:
-    1. save_extraction_result(Sheet1Data, year, quarter, report) - new style
-    2. save_extraction_result(ExtractionResult, output_dir) - legacy style
+    Parameters
+    ----------
+    data_or_result : Sheet1Data | ExtractionResult
+        New-style Sheet1 payload or legacy ExtractionResult.
+    year_or_output_dir : int | Path | None, optional
+        Year for new-style saves or explicit output directory for legacy saves.
+    quarter : int | None, optional
+        Quarter number (required for new-style saves).
+    report : ValidationReport | None, optional
+        Optional validation report to embed as summary in the new-style JSON.
+
+    Returns
+    -------
+    Path
+        Location of the written JSON file.
+
+    Raises
+    ------
+    TypeError
+        If required ``quarter`` is not provided for new-style usage.
     """
     # Legacy signature: save_extraction_result(ExtractionResult, output_dir)
     if isinstance(data_or_result, ExtractionResult):
@@ -522,6 +644,31 @@ def print_extraction_report(
     report: ValidationReport | None = None,
     detailed: bool = False,
 ) -> None:
-    """Print extraction report to console."""
-    if report:
-        pass
+    """Print a human-readable extraction report.
+
+    Parameters
+    ----------
+    data : Sheet1Data
+        Extracted payload to display.
+    report : ValidationReport | None, optional
+        Optional validation report to summarize.
+    detailed : bool, optional
+        When ``True``, include counts for each validation category.
+    """
+    print_sheet1_report(data)
+
+    if not report:
+        return
+
+    summary = _build_validation_summary(report)
+    logger.info(
+        "Validations — sum:%s pdf_xbrl:%s cross:%s",
+        f" {summary['sum_passed']}/{summary['sum_validations']}",
+        f" {summary['pdf_xbrl_passed']}/{summary['pdf_xbrl_validations']}",
+        f" {summary['cross_passed']}/{summary['cross_validations']}",
+    )
+
+    if detailed:
+        logger.debug("Sum validations: %s", report.sum_validations)
+        logger.debug("PDF/XBRL validations: %s", report.pdf_xbrl_validations)
+        logger.debug("Cross validations: %s", report.cross_validations)

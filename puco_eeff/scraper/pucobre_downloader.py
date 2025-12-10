@@ -32,13 +32,16 @@ logger = setup_logging(__name__)
 def _get_pucobre_config(config: dict | None = None) -> tuple[str, dict[int, str]]:
     """Get Pucobre URL and quarter-to-date mapping from config.
 
-    Args:
-        config: Configuration dict, or None to load from file
+    Parameters
+    ----------
+    config
+        Optional configuration dictionary; when ``None`` it is loaded from
+        disk via ``get_config``.
 
     Returns
     -------
-        Tuple of (base_url, quarter_to_date_mapping)
-
+    tuple[str, dict[int, str]]
+        Base URL and quarter-to-date mapping.
     """
     if config is None:
         config = get_config()
@@ -100,13 +103,16 @@ def _find_analisis_razonado_page(pdf_path: Path) -> int | None:
     Análisis Razonado. The Análisis Razonado section typically starts with
     a title page containing "ANALISIS RAZONADO" and resets page numbering to 1.
 
-    Args:
-        pdf_path: Path to the combined PDF file
+    Parameters
+    ----------
+    pdf_path
+        Path to the combined PDF file.
 
     Returns
     -------
-        0-based page index where Análisis Razonado starts, or None if not found
-
+    int | None
+        Zero-based page index where Análisis Razonado starts, or ``None`` when
+        no match is found or PyMuPDF is unavailable.
     """
     try:
         import fitz  # PyMuPDF
@@ -145,16 +151,22 @@ def _split_combined_pdf(
 ) -> tuple[bool, str | None]:
     """Split combined PDF into Estados Financieros and Análisis Razonado.
 
-    Args:
-        combined_pdf_path: Path to the original combined PDF
-        estados_financieros_path: Output path for Estados Financieros (pages 0 to split_page-1)
-        analisis_razonado_path: Output path for Análisis Razonado (pages split_page to end)
-        split_page: 0-based page index where Análisis Razonado starts
+    Parameters
+    ----------
+    combined_pdf_path
+        Path to the downloaded combined PDF.
+    estados_financieros_path
+        Output path for the first segment (pages ``0`` to ``split_page - 1``).
+    analisis_razonado_path
+        Output path for the second segment (pages ``split_page`` to end).
+    split_page
+        Zero-based page index indicating where Análisis Razonado begins.
 
     Returns
     -------
-        Tuple of (success, error_message)
-
+    tuple[bool, str | None]
+        ``(success, error_message)`` where ``error_message`` is ``None`` on
+        success.
     """
     try:
         import fitz  # PyMuPDF
@@ -201,17 +213,25 @@ def download_from_pucobre(
     AND Análisis Razonado. This function downloads the combined file and
     optionally splits it into separate PDFs matching the CMF naming convention.
 
-    Args:
-        year: Year of the financial statement (e.g., 2024)
-        quarter: Quarter (1-4)
-        headless: Run browser in headless mode
-        split_pdf: If True, split combined PDF into separate files
-        config: Configuration dict, or None to load from file
+    Parameters
+    ----------
+    year
+        Year of the financial statement (e.g., 2024).
+    quarter
+        Quarter number ``1–4``.
+    headless
+        Whether to run Playwright in headless mode.
+    split_pdf
+        When ``True``, split the combined PDF into Estados Financieros and
+        Análisis Razonado files.
+    config
+        Optional configuration dictionary; when ``None`` configuration is
+        loaded via ``get_config``.
 
     Returns
     -------
-        PucobreDownloadResult with status and file paths
-
+    PucobreDownloadResult
+        Status object with file paths and sizes for the extracted PDFs.
     """
     pucobre_url, quarter_to_date = _get_pucobre_config(config)
 
@@ -390,16 +410,21 @@ def _find_period_link(
 ) -> Locator | None:
     """Find the download link for a specific period using various patterns.
 
-    Args:
-        page: Playwright page instance
-        year: Target year
-        quarter: Target quarter (1-4)
-        quarter_to_date: Mapping from quarter number to date string
+    Parameters
+    ----------
+    page
+        Playwright page instance.
+    year
+        Target year.
+    quarter
+        Target quarter (1–4).
+    quarter_to_date
+        Mapping from quarter number to date string.
 
     Returns
     -------
-        Locator for the link, or None if not found
-
+    Locator | None
+        Locator when a matching link is found, otherwise ``None``.
     """
     date_str = f"{quarter_to_date[quarter]}-{year}"
 
@@ -430,13 +455,16 @@ def _extract_pucobre_periods_from_page(page: Page) -> list[dict]:
     of hyperlinks with titles like "Estados Financieros 31-03-2024". We locate
     all matching links and parse the embedded date (DD-MM-YYYY) to extract periods.
 
-    Args:
-        page: Playwright Page navigated to Pucobre.cl investors section.
+    Parameters
+    ----------
+    page
+        Playwright Page navigated to Pucobre.cl investors section.
 
     Returns
     -------
-        List of period dicts with year/quarter/link_text/source for each found document.
-
+    list[dict]
+        Period dictionaries with ``year``, ``quarter``, ``link_text``, and
+        ``source`` keys.
     """
     time.sleep(2)  # Allow dynamic content to load
 
@@ -476,14 +504,18 @@ def list_pucobre_periods(headless: bool = True, config: dict | None = None) -> l
     Wraps the generic period extraction with Pucobre-specific configuration
     and logging of the found periods.
 
-    Args:
-        headless: Run browser in headless mode
-        config: Configuration dict, or None to load from file
+    Parameters
+    ----------
+    headless
+        Whether to run the browser headlessly.
+    config
+        Optional configuration dictionary; defaults to loading from disk.
 
     Returns
     -------
-        List of available periods with year, quarter, link_text, and source
-
+    list[dict]
+        Available periods with ``year``, ``quarter``, ``link_text``, and
+        ``source`` keys.
     """
     pucobre_url, _ = _get_pucobre_config(config)
     extractor = PeriodExtractor(
@@ -504,16 +536,21 @@ def check_pucobre_availability(
 ) -> bool:
     """Check if a specific period is available on Pucobre.cl.
 
-    Args:
-        year: Target year
-        quarter: Target quarter (1-4)
-        headless: Run browser in headless mode
-        config: Configuration dict, or None to load from file
+    Parameters
+    ----------
+    year
+        Target year.
+    quarter
+        Target quarter (1–4).
+    headless
+        Whether to run Playwright headlessly.
+    config
+        Optional configuration dictionary; when ``None`` load from file.
 
     Returns
     -------
-        True if the period is available
-
+    bool
+        ``True`` when the period link is present on the page.
     """
     pucobre_url, quarter_to_date = _get_pucobre_config(config)
     date_str = f"{quarter_to_date[quarter]}-{year}"

@@ -185,13 +185,15 @@ class SumValidationResult:
 def format_sum_validation_status(result: SumValidationResult) -> str:
     """Format sum validation status comparing calculated to expected total.
 
-    Args:
-        result: The sum validation result to format
+    Parameters
+    ----------
+    result
+        Sum validation outcome with calculated and expected totals.
 
     Returns
     -------
-        Formatted status string with appropriate icon
-
+    str
+        Status string with an icon and mismatch context when relevant.
     """
     if result.expected_total is None:
         return "⚠ No total value to compare"
@@ -240,18 +242,18 @@ class ValidationReport:
     def has_failures(self, category: str | None = None) -> bool:
         """Check for validation failures, optionally filtered by category.
 
-        Args:
-            category: Optional filter. Valid values:
-                - None: Check ALL categories (sum + cross + pdf_xbrl + reference)
-                - "sum": Check only sum_validations
-                - "cross": Check only cross_validations
-                - "pdf_xbrl": Check only pdf_xbrl_validations
-                - "reference": Check only reference_issues
+        Parameters
+        ----------
+        category
+            Optional filter for a specific validation bucket. Acceptable values
+            are ``None`` (all categories), ``"sum"``, ``"cross"``,
+            ``"pdf_xbrl"``, or ``"reference"``.
 
         Returns
         -------
-            True if any validation in the specified category/ies failed.
-
+        bool
+            ``True`` when any validation in the selected category failed or
+            when reference issues are present.
         """
         if category == "reference":
             return bool(self.reference_issues)
@@ -380,6 +382,7 @@ def log_validation_report(report: ValidationReport) -> None:
 
 def _compare_with_tolerance(a: int | None, b: int | None, tolerance: int) -> tuple[bool, int]:
     """Compare two values with tolerance, using absolute values."""
+    # Treat missing values as a soft pass; downstream callers decide how to log.
     if a is None or b is None:
         return True, 0
     diff = abs(abs(a) - abs(b))

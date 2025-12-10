@@ -29,7 +29,23 @@ ROMAN_TO_QUARTER = {"I": 1, "II": 2, "III": 3, "IV": 4}
 
 
 def roman_to_quarter(roman: str) -> int:
-    """Parse Roman numeral quarter string to integer (inverse of config.quarter_to_roman)."""
+    """Parse a Roman numeral quarter string to an integer.
+
+    Parameters
+    ----------
+    roman
+        Roman numeral representation (``"I"``–``"IV"``).
+
+    Returns
+    -------
+    int
+        Quarter number (1–4).
+
+    Raises
+    ------
+    ValueError
+        If the Roman numeral is not one of ``I``, ``II``, ``III``, or ``IV``.
+    """
     q = ROMAN_TO_QUARTER.get(roman.upper())
     if q is None:
         msg = f"Invalid Roman numeral: {roman}. Must be I, II, III, or IV."
@@ -44,13 +60,20 @@ def roman_to_quarter(roman: str) -> int:
 def parse_period(period: str) -> tuple[int, int]:
     """Parse period string into year and quarter.
 
-    Args:
-        period: Period string (e.g., "2024_QII" or "2024_Q2")
+    Parameters
+    ----------
+    period
+        Period key such as ``"2024_QII"`` or ``"2024_Q2"``.
 
     Returns
     -------
-        Tuple of (year, quarter)
+    tuple[int, int]
+        Parsed ``(year, quarter)`` pair.
 
+    Raises
+    ------
+    ValueError
+        If the period string does not match the expected pattern.
     """
     match = re.match(r"(\d{4})_Q(I{1,3}|IV|\d)", period)
     if not match:
@@ -78,17 +101,23 @@ def save_sheet_data(
     Uses naming convention: sheet1_2024_QII.json for alphabetical ordering
     with Roman numeral quarters.
 
-    Args:
-        sheet_name: Name of the sheet (e.g., "sheet1", "balance_general")
-        data: DataFrame or dictionary with sheet data
-        year: Year (e.g., 2024)
-        quarter: Quarter number (1-4)
-        output_dir: Directory to save to (defaults to DATA_DIR/processed)
+    Parameters
+    ----------
+    sheet_name
+        Name of the sheet (e.g., ``"sheet1"`` or ``"balance_general"``).
+    data
+        Sheet payload as a DataFrame or mapping.
+    year
+        Year of the statement.
+    quarter
+        Quarter number in ``1–4``.
+    output_dir
+        Custom output directory; defaults to ``DATA_DIR/processed``.
 
     Returns
     -------
-        Path to saved JSON file
-
+    Path
+        Location of the written JSON file.
     """
     save_dir = output_dir if output_dir is not None else DATA_DIR / "processed"
     save_dir.mkdir(parents=True, exist_ok=True)
@@ -133,16 +162,21 @@ def load_sheet_data(
 ) -> pd.DataFrame:
     """Load sheet data from JSON.
 
-    Args:
-        sheet_name: Name of the sheet
-        year: Year (e.g., 2024)
-        quarter: Quarter number (1-4)
-        input_dir: Directory to load from (defaults to DATA_DIR/processed)
+    Parameters
+    ----------
+    sheet_name
+        Target sheet name.
+    year
+        Year of the statement.
+    quarter
+        Quarter number in ``1–4``.
+    input_dir
+        Optional directory to load from; defaults to ``DATA_DIR/processed``.
 
     Returns
     -------
-        DataFrame with sheet data
-
+    pd.DataFrame
+        Sheet data reconstructed from the JSON file.
     """
     load_dir = input_dir if input_dir is not None else DATA_DIR / "processed"
 
@@ -168,13 +202,15 @@ def load_sheet_data(
 def load_sheet_json(filepath: Path) -> dict[str, Any]:
     """Load raw JSON data from a sheet file.
 
-    Args:
-        filepath: Path to the JSON file
+    Parameters
+    ----------
+    filepath
+        Path to the JSON file.
 
     Returns
     -------
-        Dictionary with sheet data including metadata
-
+    dict[str, Any]
+        Raw JSON object including metadata and content.
     """
     with filepath.open(encoding="utf-8") as f:
         return json.load(f)  # type: ignore[no-any-return]
@@ -189,17 +225,23 @@ def write_sheet_to_csv(
 ) -> Path:
     """Write sheet data to CSV file.
 
-    Args:
-        sheet_name: Name of the sheet
-        data: DataFrame with sheet data
-        year: Year (e.g., 2024)
-        quarter: Quarter number (1-4)
-        output_dir: Directory to save to (defaults to DATA_DIR/processed)
+    Parameters
+    ----------
+    sheet_name
+        Name of the sheet.
+    data
+        DataFrame containing the sheet content.
+    year
+        Statement year.
+    quarter
+        Quarter number in ``1–4``.
+    output_dir
+        Optional output directory; defaults to ``DATA_DIR/processed``.
 
     Returns
     -------
-        Path to saved CSV file
-
+    Path
+        Location of the written CSV file.
     """
     save_dir = output_dir if output_dir is not None else DATA_DIR / "processed"
     save_dir.mkdir(parents=True, exist_ok=True)
@@ -222,15 +264,19 @@ def list_available_sheets(
 ) -> list[dict[str, Any]]:
     """List available sheet data files.
 
-    Args:
-        sheet_name: Optional sheet name filter (e.g., "sheet1")
-        year: Optional year filter (e.g., 2024)
-        input_dir: Directory to search (defaults to DATA_DIR/processed)
+    Parameters
+    ----------
+    sheet_name
+        Optional sheet name filter (e.g., ``"sheet1"``).
+    year
+        Optional year filter.
+    input_dir
+        Directory to search; defaults to ``DATA_DIR/processed``.
 
     Returns
     -------
-        List of dicts with sheet_name, year, quarter, period, and filepath
-
+    list[dict[str, Any]]
+        Metadata for each discovered sheet JSON file.
     """
     search_dir = input_dir if input_dir is not None else DATA_DIR / "processed"
 

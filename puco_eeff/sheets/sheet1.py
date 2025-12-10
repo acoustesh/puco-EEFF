@@ -63,17 +63,20 @@ SHEET1_CONFIG_DIR = CONFIG_DIR / "sheet1"
 def _load_sheet1_config(filename: str) -> dict[str, Any]:
     """Load a sheet1 config file.
 
-    Args:
-        filename: Config filename (e.g., "fields.json")
+    Parameters
+    ----------
+    filename
+        Config filename (e.g., ``"fields.json"``).
 
     Returns
     -------
-        Parsed JSON config dict.
+    dict[str, Any]
+        Parsed JSON configuration.
 
     Raises
     ------
-        FileNotFoundError: If config file not found.
-
+    FileNotFoundError
+        If the config file cannot be located.
     """
     config_path = SHEET1_CONFIG_DIR / filename
     if not config_path.exists():
@@ -109,8 +112,8 @@ def get_sheet1_value_fields() -> dict[str, dict[str, Any]]:
 
     Returns
     -------
-        Dictionary mapping field names to their definitions.
-
+    dict[str, dict[str, Any]]
+        Mapping of field names to their configuration entries.
     """
     fields = get_sheet1_fields()
     return cast("dict[str, dict[str, Any]]", fields.get("value_fields", {}))
@@ -121,8 +124,8 @@ def get_sheet1_metadata_fields() -> list[str]:
 
     Returns
     -------
-        List of metadata field names.
-
+    list[str]
+        Metadata field names to exclude from value comparisons.
     """
     fields = get_sheet1_fields()
     return cast("list[str]", fields.get("metadata_fields", []))
@@ -131,18 +134,20 @@ def get_sheet1_metadata_fields() -> list[str]:
 def get_sheet1_detail_fields(sections: list[str] | None = None) -> list[str]:
     """Get Sheet1 detail field names (non-total fields from specified sections).
 
-    Detail fields are line items that have individual values extracted from PDF.
-    Total fields (is_total: true) are excluded since they are computed or validated
+    Detail fields are line items extracted directly from PDF. Total fields
+    (``is_total: true``) are excluded since they are computed or validated
     separately.
 
-    Args:
-        sections: List of section names to filter by (e.g., ["nota_21", "nota_22"]).
-                  If None, returns detail fields from all PDF sections.
+    Parameters
+    ----------
+    sections
+        Optional list of section names (e.g., ``["nota_21", "nota_22"]``). When
+        ``None``, all PDF sections are considered.
 
     Returns
     -------
-        List of detail field names (e.g., ["cv_gastos_personal", "cv_materiales", ...]).
-
+    list[str]
+        Detail field names such as ``"cv_gastos_personal"``.
     """
     value_fields = get_sheet1_value_fields()
 
@@ -166,8 +171,8 @@ def get_sheet1_row_mapping() -> dict[str, dict[str, Any]]:
 
     Returns
     -------
-        Dictionary mapping row numbers (as strings) to row definitions.
-
+    dict[str, dict[str, Any]]
+        Row definitions keyed by row number as a string.
     """
     fields = get_sheet1_fields()
     return cast("dict[str, dict[str, Any]]", fields.get("row_mapping", {}))
@@ -176,17 +181,20 @@ def get_sheet1_row_mapping() -> dict[str, dict[str, Any]]:
 def get_sheet1_section_spec(section_name: str) -> dict[str, Any]:
     """Get extraction spec for a specific section.
 
-    Args:
-        section_name: Section key (e.g., "nota_21", "nota_22", "ingresos")
+    Parameters
+    ----------
+    section_name
+        Section key (e.g., ``"nota_21"``, ``"nota_22"``, ``"ingresos"``).
 
     Returns
     -------
+    dict[str, Any]
         Section specification dictionary.
 
     Raises
     ------
-        ValueError: If section not found.
-
+    ValueError
+        If the section is not defined in ``sheet1/extraction.json``.
     """
     extraction_config = get_sheet1_extraction_config()
     sections = extraction_config.get("sections", {})
@@ -203,19 +211,24 @@ def get_section_config(section_name: str, *, sheet: str = "sheet1") -> dict[str,
     This is the canonical accessor for section configuration. Validates that
     required keys exist and raises clear errors if config is malformed.
 
-    Args:
-        section_name: Section key (e.g., "nota_21", "nota_22", "ingresos")
-        sheet: Sheet name (currently only "sheet1" supported)
+    Parameters
+    ----------
+    section_name
+        Section key (e.g., ``"nota_21"``, ``"nota_22"``, ``"ingresos"``).
+    sheet
+        Sheet name; only ``"sheet1"`` is currently supported.
 
     Returns
     -------
-        Full section configuration dictionary.
+    dict[str, Any]
+        Validated section configuration.
 
     Raises
     ------
-        ValueError: If section not found or sheet not supported.
-        KeyError: If required config keys are missing.
-
+    ValueError
+        If the sheet is unsupported or the section is missing.
+    KeyError
+        If required configuration keys are missing.
     """
     if sheet != "sheet1":
         msg = f"Sheet '{sheet}' not supported. Only 'sheet1' is implemented."
@@ -236,20 +249,23 @@ def get_section_config(section_name: str, *, sheet: str = "sheet1") -> dict[str,
 def get_section_fallback(section_name: str) -> str | None:
     """Get fallback section for page lookup.
 
-    Used when a section's page cannot be found - tries the fallback section's page.
-    For example, nota_22 often shares a page with nota_21.
+    Used when a section's page cannot be found—falls back to the paired section
+    (e.g., ``nota_22`` often shares a page with ``nota_21``).
 
-    Args:
-        section_name: Section key (e.g., "nota_22")
+    Parameters
+    ----------
+    section_name
+        Section key (e.g., ``"nota_22"``).
 
     Returns
     -------
-        Fallback section name, or None if no fallback configured.
+    str | None
+        Fallback section name or ``None`` when absent.
 
     Raises
     ------
-        KeyError: If fallback_section key is missing from config.
-
+    KeyError
+        If the ``fallback_section`` key is missing from the config.
     """
     section = get_section_config(section_name)
     if "fallback_section" not in section:
@@ -266,17 +282,18 @@ def get_section_fallback(section_name: str) -> str | None:
 def get_ingresos_pdf_fallback_config() -> dict[str, Any]:
     """Get ingresos PDF fallback extraction configuration.
 
-    Returns configuration used when extracting ingresos from PDF instead of XBRL,
-    including minimum value threshold and search patterns.
+    Returns configuration used when extracting ingresos from PDF instead of
+    XBRL, including minimum value threshold and search patterns.
 
     Returns
     -------
-        Dictionary with min_value_threshold, search_patterns, etc.
+    dict[str, Any]
+        Configuration dictionary with ``min_value_threshold`` and patterns.
 
     Raises
     ------
-        KeyError: If required keys missing from config.
-
+    KeyError
+        If required keys are missing from the section config.
     """
     section = get_section_config("ingresos")
     pdf_fallback = section.get("pdf_fallback", {})
@@ -294,13 +311,15 @@ def get_ingresos_pdf_fallback_config() -> dict[str, Any]:
 def get_sheet1_section_field_mappings(section_name: str) -> dict[str, dict[str, Any]]:
     """Get field mappings for a specific section.
 
-    Args:
-        section_name: Section name ("nota_21", "nota_22", "ingresos")
+    Parameters
+    ----------
+    section_name
+        Section name (``"nota_21"``, ``"nota_22"``, ``"ingresos"``).
 
     Returns
     -------
-        Dictionary of field mappings with match_keywords, exclude_keywords, etc.
-
+    dict[str, dict[str, Any]]
+        Field mapping entries including keywords and labels.
     """
     section = get_sheet1_section_spec(section_name)
     return cast("dict[str, Any]", section.get("field_mappings", {}))
@@ -311,8 +330,8 @@ def get_sheet1_extraction_sections() -> list[str]:
 
     Returns
     -------
-        List of section keys (e.g., ["nota_21", "nota_22", "ingresos"])
-
+    list[str]
+        Section keys such as ``"nota_21"``, ``"nota_22"``, ``"ingresos"``.
     """
     extraction_config = get_sheet1_extraction_config()
     sections = extraction_config.get("sections", {})
@@ -322,17 +341,20 @@ def get_sheet1_extraction_sections() -> list[str]:
 def get_sheet1_section_search_patterns(section_name: str) -> list[str]:
     """Get search patterns for finding a section in PDF.
 
-    Args:
-        section_name: Section key from extraction.json
+    Parameters
+    ----------
+    section_name
+        Section key from ``extraction.json``.
 
     Returns
     -------
-        List of search pattern strings.
+    list[str]
+        Search pattern strings.
 
     Raises
     ------
-        ValueError: If search_patterns not found for section.
-
+    ValueError
+        If ``search_patterns`` are missing for the section.
     """
     section = get_sheet1_section_spec(section_name)
     patterns = section.get("search_patterns")
@@ -345,13 +367,15 @@ def get_sheet1_section_search_patterns(section_name: str) -> list[str]:
 def get_sheet1_section_table_identifiers(section_name: str) -> tuple[list[str], list[str]]:
     """Get unique and exclude items for identifying a section's table.
 
-    Args:
-        section_name: Section key from extraction.json
+    Parameters
+    ----------
+    section_name
+        Section key from ``extraction.json``.
 
     Returns
     -------
-        Tuple of (unique_items, exclude_items) lists.
-
+    tuple[list[str], list[str]]
+        Unique indicators and exclusion terms used to select the correct table.
     """
     section = get_sheet1_section_spec(section_name)
     identifiers = section.get("table_identifiers", {})
@@ -364,15 +388,17 @@ def get_sheet1_section_table_identifiers(section_name: str) -> tuple[list[str], 
 def get_sheet1_section_expected_items(section_name: str) -> list[str]:
     """Get list of expected PDF labels for a section's line items.
 
-    Extracts pdf_labels from field_mappings for the section.
+    Extracts ``pdf_labels`` from the field mappings for the section.
 
-    Args:
-        section_name: Section key from extraction.json
+    Parameters
+    ----------
+    section_name
+        Section key from ``extraction.json``.
 
     Returns
     -------
-        List of expected item label strings.
-
+    list[str]
+        Expected item labels used during PDF parsing.
     """
     field_mappings = get_sheet1_section_field_mappings(section_name)
     items = []
@@ -385,13 +411,16 @@ def get_sheet1_section_expected_items(section_name: str) -> list[str]:
 def get_sheet1_xbrl_fact_mapping(field_name: str) -> dict[str, Any] | None:
     """Get XBRL fact mapping for a specific field.
 
-    Args:
-        field_name: Field name (e.g., "ingresos_ordinarios")
+    Parameters
+    ----------
+    field_name
+        Field name (e.g., ``"ingresos_ordinarios"``).
 
     Returns
     -------
-        Dictionary with primary, fallbacks, and other XBRL info, or None.
-
+    dict[str, Any] | None
+        Mapping containing primary and fallback XBRL facts, or ``None`` when
+        unmapped.
     """
     xbrl_mappings = get_sheet1_xbrl_mappings()
     return cast("dict[str, Any] | None", xbrl_mappings.get("fact_mappings", {}).get(field_name))
@@ -402,27 +431,27 @@ def get_sheet1_config(key: str, default: Any = None) -> Any:
 
     This is the unified accessor for all Sheet1-related configuration data.
 
-    Args:
-        key: Configuration key. Supported keys:
-            - "validation_rules": dict with sum_tolerance, total_validations, cross_validations
-            - "sum_tolerance": int for sum validation tolerance
-            - "total_validations": list of total validation rules
-            - "cross_validations": list of cross-validation rules
-            - "result_key_mapping": dict mapping field names to XBRL result keys
-            - "pdf_xbrl_validations": list of PDF↔XBRL validation definitions
-        default: Default value if key not found
+    Parameters
+    ----------
+    key
+        Configuration key. Supported keys include ``"validation_rules"``,
+        ``"sum_tolerance"``, ``"total_validations"``, ``"cross_validations"``,
+        ``"result_key_mapping"``, and ``"pdf_xbrl_validations"``.
+    default
+        Fallback value if the key is missing.
 
     Returns
     -------
-        Configuration value for the given key.
-
+    Any
+        Configuration value corresponding to the requested key.
     """
     mappings = get_sheet1_xbrl_mappings()
 
     # Direct top-level keys
     if key in ("validation_rules", "result_key_mapping", "pdf_xbrl_validations"):
         return mappings.get(
-            key, default if default is not None else ({} if key == "validation_rules" else [])
+            key,
+            default if default is not None else ({} if key == "validation_rules" else []),
         )
 
     # Nested validation_rules keys
@@ -450,8 +479,8 @@ def get_sheet1_validation_rules() -> dict[str, Any]:
 
     Returns
     -------
-        dict containing all validation rules configuration.
-
+    dict[str, Any]
+        Validation rules containing sum/cross validation specs and tolerance.
     """
     return cast("dict[str, Any]", get_sheet1_config("validation_rules", {}))
 
@@ -464,8 +493,8 @@ def get_sheet1_sum_tolerance() -> int:
 
     Returns
     -------
-        Integer tolerance value (default: 1).
-
+    int
+        Tolerance value (default: 1).
     """
     return cast("int", get_sheet1_config("sum_tolerance", 1))
 
@@ -478,8 +507,9 @@ def get_sheet1_total_validations() -> list[dict[str, Any]]:
 
     Returns
     -------
-        List of validation rule dictionaries with sum_fields, total_field, name.
-
+    list[dict[str, Any]]
+        Validation rule dictionaries with ``sum_fields``, ``total_field``, and
+        ``description``.
     """
     return cast("list[dict[str, Any]]", get_sheet1_config("total_validations", []))
 
@@ -492,8 +522,8 @@ def get_sheet1_cross_validations() -> list[dict[str, Any]]:
 
     Returns
     -------
-        List of validation rule dictionaries with formula, expected_field, name.
-
+    list[dict[str, Any]]
+        Validation rules with formulas and display metadata.
     """
     return cast("list[dict[str, Any]]", get_sheet1_config("cross_validations", []))
 
@@ -506,9 +536,9 @@ def get_sheet1_result_key_mapping() -> dict[str, str]:
 
     Returns
     -------
-        Dictionary mapping Sheet1 field names to XBRL result keys.
-        Example: {"total_costo_venta": "costo_de_ventas"}
-
+    dict[str, str]
+        Mapping of Sheet1 field names to XBRL result keys (e.g.,
+        ``{"total_costo_venta": "costo_de_ventas"}``).
     """
     return cast("dict[str, str]", get_sheet1_config("result_key_mapping", {}))
 
@@ -521,8 +551,9 @@ def get_sheet1_pdf_xbrl_validations() -> list[dict[str, str]]:
 
     Returns
     -------
-        List of validation definitions with field_name, xbrl_key, display_name.
-
+    list[dict[str, str]]
+        Validation definitions with ``field_name``, ``xbrl_key``, and
+        ``display_name``.
     """
     return cast("list[dict[str, str]]", get_sheet1_config("pdf_xbrl_validations", []))
 
@@ -534,9 +565,9 @@ def get_sheet1_section_total_mapping() -> dict[str, str]:
 
     Returns
     -------
-        Dictionary mapping section_id to total field name.
-        Example: {"nota_21": "total_costo_venta", "nota_22": "total_gasto_admin"}
-
+    dict[str, str]
+        Mapping of section identifier to total field name (e.g.,
+        ``{"nota_21": "total_costo_venta"}``).
     """
     xbrl_mappings = get_sheet1_xbrl_mappings()
     mapping = xbrl_mappings.get("section_total_mapping", {})
@@ -547,14 +578,17 @@ def get_sheet1_section_total_mapping() -> dict[str, str]:
 def get_sheet1_reference_values(year: int, quarter: int) -> dict[str, int] | None:
     """Get reference values for a specific period.
 
-    Args:
-        year: Year of the financial statement
-        quarter: Quarter (1-4)
+    Parameters
+    ----------
+    year
+        Statement year.
+    quarter
+        Quarter number (1–4).
 
     Returns
     -------
-        Dictionary of reference values, or None if not available.
-
+    dict[str, int] | None
+        Reference values for the period when present.
     """
     ref_data = get_sheet1_reference_data()
     period_key = f"{year}_Q{quarter}"
@@ -569,17 +603,20 @@ def get_sheet1_reference_values(year: int, quarter: int) -> dict[str, int] | Non
 def match_concepto_to_field(concepto: str, section_name: str) -> str | None:
     """Match a concepto string to a Sheet1 field using config-driven keywords.
 
-    Uses match_keywords (at least one must match) and exclude_keywords (none can match)
-    from extraction.json to determine which field a concepto belongs to.
+    Uses ``match_keywords`` (at least one must match) and ``exclude_keywords``
+    (none may match) from ``extraction.json`` to determine the field.
 
-    Args:
-        concepto: The concepto string from the PDF (will be lowercased)
-        section_name: Section name ("nota_21", "nota_22", "ingresos")
+    Parameters
+    ----------
+    concepto
+        Concept string from the PDF; compared in lowercase.
+    section_name
+        Section name (``"nota_21"``, ``"nota_22"``, ``"ingresos"``).
 
     Returns
     -------
-        Field name if matched, None otherwise.
-
+    str | None
+        Field name when matched, otherwise ``None``.
     """
     concepto_lower = concepto.lower()
     field_mappings = get_sheet1_section_field_mappings(section_name)
@@ -736,9 +773,10 @@ def save_sheet1_data(data: Sheet1Data, output_dir: Path | None = None) -> Path:
 def print_sheet1_report(data: Sheet1Data) -> None:
     """Print a formatted Sheet1 report.
 
-    Args:
-        data: Sheet1Data to report
-
+    Parameters
+    ----------
+    data : Sheet1Data
+        Sheet1Data instance to display.
     """
     for _row_num, label, value in data.to_row_list():
         if value is not None or label:
@@ -753,14 +791,16 @@ def print_sheet1_report(data: Sheet1Data) -> None:
 def validate_sheet1_against_reference(data: Sheet1Data) -> list[str] | None:
     """Validate Sheet1 data against reference values.
 
-    Args:
-        data: Sheet1Data to validate
+    Parameters
+    ----------
+    data
+        Sheet1Data to validate against reference baselines.
 
     Returns
     -------
-        List of validation issue strings (empty if all match).
-        Returns None if no verified reference data exists for the period.
-
+    list[str] | None
+        Issue strings when mismatches exceed tolerance, or ``None`` when no
+        verified reference data is available.
     """
     ref_values = get_sheet1_reference_values(data.year, data.quarter_num)
     if ref_values is None:
@@ -799,20 +839,23 @@ def sections_to_sheet1data(
     Creates a Sheet1Data populated with totals from SectionBreakdown objects,
     using section_total_mapping from config to map section_id to field names.
 
-    This function uses duck typing - section objects must have:
-    - section_id: str (e.g., "nota_21", "nota_22")
-    - total_ytd_actual: int | None
-    - items: list of LineItem-like objects with concepto and ytd_actual
+    This function uses duck typing—section objects must expose ``section_id``,
+    ``total_ytd_actual``, and an ``items`` iterable with ``concepto`` and
+    ``ytd_actual`` attributes.
 
-    Args:
-        sections: Dict mapping section_id to SectionBreakdown-like objects
-        year: Year for period label
-        quarter: Quarter for period label
+    Parameters
+    ----------
+    sections
+        Mapping from section_id to SectionBreakdown-like objects.
+    year
+        Statement year.
+    quarter
+        Quarter number.
 
     Returns
     -------
-        Sheet1Data with fields populated from sections
-
+    Sheet1Data
+        Populated data class with totals and detail fields set.
     """
     quarter_label = format_quarter_label(year, quarter)
     data = Sheet1Data(quarter=quarter_label, year=year, quarter_num=quarter)

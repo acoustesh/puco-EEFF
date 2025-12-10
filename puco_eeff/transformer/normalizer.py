@@ -20,15 +20,19 @@ def normalize_financial_data(
 ) -> pd.DataFrame:
     """Normalize financial data for consistency.
 
-    Args:
-        data: Raw data as dictionary or DataFrame
-        date_columns: Columns to parse as dates
-        numeric_columns: Columns to parse as numbers
+    Parameters
+    ----------
+    data
+        Raw input as a mapping or DataFrame.
+    date_columns
+        Column names to coerce into datetime values.
+    numeric_columns
+        Column names to parse as numbers.
 
     Returns
     -------
-        Normalized DataFrame
-
+    pd.DataFrame
+        Normalized DataFrame with cleaned column names and parsed types.
     """
     logger.info("Normalizing financial data")
 
@@ -59,13 +63,15 @@ def normalize_financial_data(
 def _normalize_column_name(name: str) -> str:
     """Normalize a column name to snake_case.
 
-    Args:
-        name: Original column name
+    Parameters
+    ----------
+    name
+        Original column label from the source data.
 
     Returns
     -------
-        Normalized column name
-
+    str
+        Snake_case, ASCII-only column name without surrounding underscores.
     """
     # Convert to string and strip
     name = str(name).strip()
@@ -95,13 +101,16 @@ def _parse_number(value: Any) -> float | None:
     - Parentheses for negative numbers
     - Currency symbols
 
-    Args:
-        value: Value to parse
+    Parameters
+    ----------
+    value
+        Raw input value from a DataFrame cell.
 
     Returns
     -------
-        Parsed float or None if unparseable
-
+    float | None
+        Parsed float or ``None`` when the input cannot be interpreted as a
+        number.
     """
     if value is None or pd.isna(value):
         return None
@@ -152,13 +161,15 @@ def _parse_number(value: Any) -> float | None:
 def clean_text(text: str) -> str:
     """Clean extracted text for processing.
 
-    Args:
-        text: Raw text
+    Parameters
+    ----------
+    text
+        Raw string to normalize.
 
     Returns
     -------
-        Cleaned text
-
+    str
+        Whitespace-collapsed string without leading/trailing spaces.
     """
     # Normalize whitespace
     text = re.sub(r"\s+", " ", text)
@@ -170,13 +181,15 @@ def clean_text(text: str) -> str:
 def extract_tables_from_ocr_markdown(ocr_content: str) -> list[pd.DataFrame]:
     """Extract tables from OCR output in markdown format.
 
-    Args:
-        ocr_content: OCR-extracted content with markdown tables
+    Parameters
+    ----------
+    ocr_content
+        OCR text that may contain markdown tables.
 
     Returns
     -------
-        List of DataFrames extracted from markdown tables
-
+    list[pd.DataFrame]
+        Parsed tables, one DataFrame per markdown table detected.
     """
     tables: list[pd.DataFrame] = []
 

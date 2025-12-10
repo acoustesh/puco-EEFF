@@ -1,4 +1,8 @@
-"""XBRL/XML parser for financial statements."""
+"""XBRL/XML parsing utilities for financial statements.
+
+Parses CMF/Pucobre XBRL instance documents with lxml, extracts facts and
+contexts, and surfaces aggregate values used for Sheet1 cross-validation.
+"""
 
 from __future__ import annotations
 
@@ -16,15 +20,17 @@ logger = setup_logging(__name__)
 
 
 def _get_xbrl_config(config: dict | None = None) -> tuple[dict[str, str], list[str]]:
-    """Get XBRL namespaces and aggregate facts from config.
+    """Return namespaces and aggregate fact names from config.
 
-    Args:
-        config: Configuration dict, or None to load from file
+    Parameters
+    ----------
+    config : dict | None, optional
+        Preloaded config; when ``None`` it is fetched via :func:`get_config`.
 
     Returns
     -------
-        Tuple of (namespaces dict, aggregate_facts list)
-
+    tuple[dict[str, str], list[str]]
+        Namespace mapping and aggregate fact identifiers.
     """
     if config is None:
         config = get_config()
@@ -68,17 +74,29 @@ NAMESPACES = {
 
 
 def parse_xbrl_file(file_path: Path) -> dict[str, Any]:
-    """Parse an XBRL/XML file and extract financial data.
+    """Parse an XBRL/XML instance into facts and contexts.
 
-    Handles both .xml and .xbrl files with various encodings (UTF-8, ISO-8859-1).
+    Handles both ``.xml`` and ``.xbrl`` files; retries with ISO-8859-1 decoding
+    when the initial parse fails. Uses lxml to retain namespaces and context
+    references.
 
-    Args:
-        file_path: Path to the XBRL/XML file
+    Parameters
+    ----------
+    file_path : Path
+        Path to the XBRL/XML instance.
 
     Returns
     -------
-        Dictionary containing extracted financial data
+    dict[str, Any]
+        Parsed payload with ``facts``, ``contexts``, detected ``namespaces``,
+        and the ``source_file`` path.
 
+    Raises
+    ------
+    FileNotFoundError
+        If the file is missing.
+    lxml.etree.XMLSyntaxError
+        If parsing fails even after the ISO-8859-1 fallback.
     """
     logger.info("Parsing XBRL file: %s", file_path)
 
@@ -120,15 +138,17 @@ def parse_xbrl_file(file_path: Path) -> dict[str, Any]:
 
 
 def _detect_namespaces(root: etree._Element) -> dict[str, str]:
-    """Detect namespaces used in the XBRL document.
+    """Merge common namespaces with those declared in the document root.
 
-    Args:
-        root: Root element of the XML tree
+    Parameters
+    ----------
+    root : etree._Element
+        Parsed XBRL root element.
 
     Returns
     -------
-        Dictionary of namespace prefixes to URIs
-
+    dict[str, str]
+        Namespace prefixes mapped to URIs.
     """
     namespaces = dict(NAMESPACES)  # Start with common namespaces
 
@@ -139,16 +159,20 @@ def _detect_namespaces(root: etree._Element) -> dict[str, str]:
 
 
 def _extract_facts(root: etree._Element, namespaces: dict[str, str]) -> list[dict[str, Any]]:
-    """Extract XBRL facts (financial data points).
+    """Collect fact elements with context and unit references.
 
-    Args:
-        root: Root element of the XML tree
-        namespaces: Namespace mapping
+    Parameters
+    ----------
+    root : etree._Element
+        Parsed XBRL root element.
+    namespaces : dict[str, str]
+        Namespace mapping (unused here but kept for future filters).
 
     Returns
     -------
-        List of fact dictionaries
-
+    list[dict[str, Any]]
+        Facts with ``name``, ``namespace``, ``value``, ``context_ref``,
+        ``unit_ref``, and ``decimals`` fields.
     """
     facts = []
 
@@ -170,18 +194,22 @@ def _extract_facts(root: etree._Element, namespaces: dict[str, str]) -> list[dic
 
 
 def _extract_contexts(
-    root: etree._Element, namespaces: dict[str, str],
+    root: etree._Element,
+    namespaces: dict[str, str],
 ) -> dict[str, dict[str, Any]]:
-    """Extract XBRL contexts (periods and entity information).
+    """Extract period/entity contexts referenced by facts.
 
-    Args:
-        root: Root element of the XML tree
-        namespaces: Namespace mapping
+    Parameters
+    ----------
+    root : etree._Element
+        Parsed XBRL root element.
+    namespaces : dict[str, str]
+        Namespace mapping for XPath queries.
 
     Returns
     -------
-        Dictionary mapping context IDs to context information
-
+    dict[str, dict[str, Any]]
+        Context metadata keyed by ``contextRef`` identifiers.
     """
     contexts: dict[str, dict[str, Any]] = {}
 
@@ -222,32 +250,26 @@ def _extract_contexts(
 
 
 def _get_local_name(element: etree._Element) -> str:
-    """Get the local name of an element (without namespace).
-
-    Args:
-        element: XML element
-
-    Returns
-    -------
-        Local name string
-
-    """
+    """Return the element tag without namespace prefix."""
     if "}" in element.tag:
         return element.tag.split("}")[1]
     return element.tag
 
 
 def extract_by_xpath(file_path: Path, xpath_expr: str) -> list[str]:
-    """Extract values using an XPath expression.
+    """Evaluate an XPath expression against an XBRL/XML file.
 
-    Args:
-        file_path: Path to the XML file
-        xpath_expr: XPath expression to evaluate
+    Parameters
+    ----------
+    file_path : Path
+        XML file to parse.
+    xpath_expr : str
+        XPath expression using document namespaces.
 
     Returns
     -------
-        List of extracted values as strings
-
+    list[str]
+        Extracted string values in document order.
     """
     logger.debug("Extracting with XPath: %s", xpath_expr)
 
@@ -281,17 +303,21 @@ def get_facts_by_name(
     name_pattern: str,
     exact: bool = False,
 ) -> list[dict[str, Any]]:
-    """Get facts matching a name pattern.
+    """Return facts whose names match a pattern.
 
-    Args:
-        data: Parsed XBRL data from parse_xbrl_file()
-        name_pattern: Fact name or pattern to search for
-        exact: If True, match exactly; if False, match substring (case-insensitive)
+    Parameters
+    ----------
+    data : dict[str, Any]
+        Parsed payload from :func:`parse_xbrl_file`.
+    name_pattern : str
+        Fact name to match exactly or by substring.
+    exact : bool, optional
+        When ``True`` requires exact equality; otherwise case-insensitive substring match.
 
     Returns
     -------
-        List of matching facts with context information
-
+    list[dict[str, Any]]
+        Matching facts enriched with their context (when available).
     """
     matching_facts = []
     contexts = data.get("contexts", {})
@@ -313,15 +339,17 @@ def get_facts_by_name(
 
 
 def get_units(data: dict[str, Any]) -> dict[str, str]:
-    """Extract unit definitions from parsed XBRL data.
+    """Infer unit identifiers present in parsed facts.
 
-    Args:
-        data: Parsed XBRL data
+    Parameters
+    ----------
+    data : dict[str, Any]
+        Parsed payload from :func:`parse_xbrl_file`.
 
     Returns
     -------
-        Dictionary mapping unit IDs to their descriptions
-
+    dict[str, str]
+        Unit IDs mapped to descriptive labels (currency hinted by namespace when possible).
     """
     # Units are stored in the facts with unitRef attribute
     units: dict[str, str] = {}
@@ -339,15 +367,17 @@ def get_units(data: dict[str, Any]) -> dict[str, str]:
 
 
 def summarize_facts(data: dict[str, Any]) -> dict[str, int]:
-    """Summarize the facts by category.
+    """Count facts by inferred CamelCase category prefix.
 
-    Args:
-        data: Parsed XBRL data
+    Parameters
+    ----------
+    data : dict[str, Any]
+        Parsed payload from :func:`parse_xbrl_file`.
 
     Returns
     -------
-        Dictionary mapping category/prefix to count
-
+    dict[str, int]
+        Category counts sorted descending.
     """
     categories: dict[str, int] = {}
 
@@ -367,29 +397,20 @@ def extract_xbrl_aggregates(
     xml_path: Path,
     config: dict | None = None,
 ) -> dict[str, Any]:
-    """Extract aggregate financial facts from XBRL file.
+    """Extract key aggregates (e.g., Revenue, CostOfSales) for the latest period.
 
-    This is a thin wrapper that parses XBRL and extracts key aggregate
-    values (Revenue, CostOfSales, etc.) for the current period.
-
-    Args:
-        xml_path: Path to the XBRL/XML file
-        config: Configuration dict, or None to load from file
+    Parameters
+    ----------
+    xml_path : Path
+        XBRL instance path.
+    config : dict | None, optional
+        Optional preloaded config; defaults to :func:`get_config`.
 
     Returns
     -------
-        Dictionary with aggregate values:
-        {
-            "source_file": str,
-            "period": {"start": str, "end": str},
-            "aggregates": {
-                "Revenue": int,
-                "CostOfSales": int,
-                ...
-            },
-            "all_facts": list  # Full fact list for debugging
-        }
-
+    dict[str, Any]
+        Aggregates dict including ``source_file``, ``period`` window, aggregate
+        values, and the full fact list for debugging.
     """
     _, aggregate_fact_names = _get_xbrl_config(config)
 
@@ -449,17 +470,21 @@ def save_xbrl_aggregates(
     output_path: Path,
     config: dict | None = None,
 ) -> Path:
-    """Save extracted XBRL aggregates to JSON file.
+    """Persist XBRL aggregate output to JSON (without full fact list).
 
-    Args:
-        aggregates: Output from extract_xbrl_aggregates()
-        output_path: Path to save JSON file
-        config: Configuration dict (unused, for API consistency)
+    Parameters
+    ----------
+    aggregates : dict[str, Any]
+        Output from :func:`extract_xbrl_aggregates`.
+    output_path : Path
+        Destination JSON path.
+    config : dict | None, optional
+        Unused placeholder for API consistency.
 
     Returns
     -------
-        Path to saved file
-
+    Path
+        Written file path.
     """
     output_path.parent.mkdir(parents=True, exist_ok=True)
 

@@ -1,11 +1,22 @@
 """Configuration management for puco-EEFF.
 
-Handles environment variables, API clients, and config file loading.
-Supports split configuration:
-- config.json: Shared project config (sources, file patterns, period types)
-- extraction_specs.json: PDF extraction rules (search patterns, field mappings)
-- xbrl_specs.json: XBRL-specific config (fact names, validation, scaling)
-- reference_data.json: Known-good values for validation
+This module centralizes file-system paths, environment variables, and split
+configuration loaders used by the scraping and extraction pipeline.
+
+Split configuration files
+-------------------------
+* ``config.json``: shared project config (sources, file patterns, period types)
+* ``extraction_specs.json``: PDF extraction rules (search patterns, field mappings)
+* ``xbrl_specs.json``: XBRL-specific config (fact names, validation, scaling)
+* ``reference_data.json``: Known-good values for validation
+
+Environment variables
+---------------------
+``DATA_DIR``, ``AUDIT_DIR``, ``LOGS_DIR``, and ``TEMP_DIR`` override default
+directories; OCR providers rely on ``MISTRAL_API_KEY`` and ``OPENROUTER_API_KEY``
+while OpenAI-compatible fallbacks use ``OPENAI_API_KEY`` and ``ANTHROPIC_API_KEY``.
+Directories are created eagerly on import so downstream callers can rely on
+their existence.
 """
 
 from __future__ import annotations
@@ -45,7 +56,21 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 
 def get_config() -> dict[str, Any]:
-    """Load configuration from config.json."""
+    """Load the primary project configuration.
+
+    Returns
+    -------
+    dict[str, Any]
+        Parsed contents of ``config/config.json`` including period types and
+        file pattern templates.
+
+    Raises
+    ------
+    FileNotFoundError
+        If ``config/config.json`` is missing.
+    json.JSONDecodeError
+        If the file exists but is not valid JSON.
+    """
     config_path = CONFIG_DIR / "config.json"
     if not config_path.exists():
         msg = f"Configuration file not found: {config_path}"
@@ -56,16 +81,20 @@ def get_config() -> dict[str, Any]:
 
 
 def get_period_paths(year: int, quarter: int) -> dict[str, Path]:
-    """Get paths for a specific period (year/quarter).
+    """Return per-period paths for raw, processed, output, and audit data.
 
-    Args:
-        year: The year (e.g., 2024)
-        quarter: The quarter (1-4)
+    Parameters
+    ----------
+    year : int
+        Four-digit fiscal year (e.g., 2024).
+    quarter : int
+        Quarter number in ``{1, 2, 3, 4}``.
 
     Returns
     -------
-        Dictionary with paths for raw, processed, output, and audit directories.
-
+    dict[str, Path]
+        Mapping with keys ``raw_pdf``, ``raw_xbrl``, ``processed``, ``output``,
+        and ``audit`` (the latter names a subdirectory under ``AUDIT_DIR``).
     """
     period_str = f"{year}_Q{quarter}"
 
@@ -79,15 +108,18 @@ def get_period_paths(year: int, quarter: int) -> dict[str, Path]:
 
 
 def setup_logging(name: str = "puco_eeff") -> logging.Logger:
-    """Set up logging for a run.
+    """Configure a console+file logger if not already present.
 
-    Args:
-        name: Logger name
+    Parameters
+    ----------
+    name : str, optional
+        Logger namespace; reused to avoid duplicate handlers.
 
     Returns
     -------
-        Configured logger instance.
-
+    logging.Logger
+        Logger with INFO-level console handler and DEBUG-level rotating file
+        handler under ``LOGS_DIR``.
     """
     logger = logging.getLogger(name)
 
@@ -113,12 +145,13 @@ def setup_logging(name: str = "puco_eeff") -> logging.Logger:
 
 
 def validate_api_keys() -> dict[str, bool]:
-    """Check which API keys are configured.
+    """Report availability of optional third-party API keys.
 
     Returns
     -------
-        Dictionary mapping API name to whether it's configured.
-
+    dict[str, bool]
+        Flags for ``mistral``, ``anthropic``, ``openrouter``, and ``openai``
+        indicating whether corresponding environment variables are set.
     """
     return {
         "mistral": bool(MISTRAL_API_KEY),
@@ -129,16 +162,17 @@ def validate_api_keys() -> dict[str, bool]:
 
 
 def get_mistral_client() -> Any:
-    """Get Mistral AI client.
+    """Instantiate the synchronous Mistral SDK client.
 
     Returns
     -------
-        Configured Mistral client.
+    mistralai.Mistral
+        Client configured with ``MISTRAL_API_KEY`` for chat/completions.
 
     Raises
     ------
-        ValueError: If MISTRAL_API_KEY is not set.
-
+    ValueError
+        If ``MISTRAL_API_KEY`` is absent.
     """
     if not MISTRAL_API_KEY:
         msg = "MISTRAL_API_KEY is not set"
@@ -150,16 +184,17 @@ def get_mistral_client() -> Any:
 
 
 def get_openrouter_client() -> Any:
-    """Get OpenRouter client (uses OpenAI SDK).
+    """Instantiate an OpenAI-compatible client against OpenRouter.
 
     Returns
     -------
-        Configured OpenAI client pointing to OpenRouter.
+    openai.OpenAI
+        Client configured with ``OPENROUTER_API_KEY`` and OpenRouter base URL.
 
     Raises
     ------
-        ValueError: If OPENROUTER_API_KEY is not set.
-
+    ValueError
+        If ``OPENROUTER_API_KEY`` is absent.
     """
     if not OPENROUTER_API_KEY:
         msg = "OPENROUTER_API_KEY is not set"
@@ -179,12 +214,20 @@ def get_openrouter_client() -> Any:
 
 
 def get_extraction_specs() -> dict[str, Any]:
-    """Load extraction specifications from extraction_specs.json.
+    """Load PDF extraction specifications from ``extraction_specs.json``.
 
     Returns
     -------
-        Dictionary with general extraction settings (number_format, search_strategy, document_structure).
+    dict[str, Any]
+        Parsed extraction spec containing number formats, search strategy, and
+        document structure hints.
 
+    Raises
+    ------
+    FileNotFoundError
+        If the specs file is missing.
+    json.JSONDecodeError
+        If the specs file cannot be parsed.
     """
     specs_path = CONFIG_DIR / "extraction_specs.json"
     if not specs_path.exists():
@@ -201,13 +244,20 @@ def get_extraction_specs() -> dict[str, Any]:
 
 
 def get_xbrl_specs() -> dict[str, Any]:
-    """Load XBRL specifications from xbrl_specs.json.
+    """Load XBRL configuration from ``xbrl_specs.json``.
 
     Returns
     -------
-        Dictionary with general XBRL config (scaling_factor, namespaces, period_filter).
-        Sheet-specific fact mappings are in config/<sheet_name>/xbrl_mappings.json.
+    dict[str, Any]
+        Scaling factor, namespaces, and period filters. Sheet-specific mappings
+        live under ``config/<sheet>/xbrl_mappings.json``.
 
+    Raises
+    ------
+    FileNotFoundError
+        If the specs file is missing.
+    json.JSONDecodeError
+        If the specs file cannot be parsed.
     """
     xbrl_path = CONFIG_DIR / "xbrl_specs.json"
     if not xbrl_path.exists():
@@ -219,24 +269,24 @@ def get_xbrl_specs() -> dict[str, Any]:
 
 
 def get_xbrl_scaling_factor() -> int:
-    """Get XBRL scaling factor from config.
+    """Return the numeric scaling factor applied to XBRL facts.
 
     Returns
     -------
-        Scaling factor (default 1000 for MUS$ conversion).
-
+    int
+        Factor used to down-scale values (default ``1000`` for MUS$ conversion).
     """
     xbrl_specs = get_xbrl_specs()
     return cast("int", xbrl_specs.get("scaling_factor", 1000))
 
 
 def get_xbrl_namespaces() -> dict[str, str]:
-    """Get XBRL namespace definitions.
+    """Return namespace prefixes expected in XBRL documents.
 
     Returns
     -------
-        Dictionary mapping namespace prefixes to URIs.
-
+    dict[str, str]
+        Mapping from prefix to namespace URI.
     """
     xbrl_specs = get_xbrl_specs()
     return cast("dict[str, str]", xbrl_specs.get("namespaces", {}))
@@ -248,15 +298,17 @@ def get_xbrl_namespaces() -> dict[str, str]:
 
 
 def get_period_type_config(period_type: str = "quarterly") -> dict[str, Any]:
-    """Get period type configuration.
+    """Retrieve configuration for the requested period granularity.
 
-    Args:
-        period_type: One of "quarterly", "monthly", "yearly"
+    Parameters
+    ----------
+    period_type : str, optional
+        One of ``"quarterly"``, ``"monthly"``, or ``"yearly"``.
 
     Returns
     -------
-        Period type configuration dictionary.
-
+    dict[str, Any]
+        Period-type configuration falling back to ``quarterly`` if missing.
     """
     config = get_config()
     period_types = config.get("period_types", {})
@@ -264,29 +316,29 @@ def get_period_type_config(period_type: str = "quarterly") -> dict[str, Any]:
 
 
 def _get_roman_map(period_type: str = "quarterly") -> dict[str, str]:
-    """Get Roman numeral mapping from config."""
+    """Return the Roman numeral mapping for the configured period type."""
     type_config = get_period_type_config(period_type)
     return type_config.get("roman_numerals", {"1": "I", "2": "II", "3": "III", "4": "IV"})
 
 
 def quarter_to_roman(quarter: int) -> str:
-    """Convert a quarter number to Roman numeral.
+    """Convert a quarter number to its configured Roman numeral.
 
-    Uses the canonical period type config to allow custom numerals while
-    enforcing the 1-4 domain. This helper is the single implementation
-    shared across modules; other modules should import from here.
-
-    Args:
-        quarter: Quarter number (1-4)
+    Parameters
+    ----------
+    quarter : int
+        Quarter index in ``{1, 2, 3, 4}``.
 
     Returns
     -------
-        Roman numeral string (I, II, III, IV)
+    str
+        Roman numeral label (defaults to ``I``–``IV`` unless overridden in
+        config).
 
     Raises
     ------
-        ValueError: If quarter is not 1-4
-
+    ValueError
+        If ``quarter`` is outside the 1–4 range.
     """
     if quarter not in {1, 2, 3, 4}:
         msg = f"Invalid quarter: {quarter}. Must be 1-4."
@@ -300,31 +352,32 @@ def format_period(
     period_type: str = "quarterly",
     style: str = "key",
 ) -> str:
-    """Format a period string in key or display format.
+    """Format period identifiers for filenames or display labels.
 
-    Supports quarterly, monthly, and yearly period types with two output styles:
-    - style="key": Machine-readable keys for file naming (e.g., "2024_QII", "2024_M06")
-    - style="display": Human-readable labels (e.g., "IIQ2024", "06-2024")
-
-    Args:
-        year: Year
-        period: Period number (quarter 1-4, month 1-12, or 1 for yearly)
-        period_type: One of "quarterly", "monthly", "yearly"
-        style: "key" for machine keys, "display" for human-readable
+    Parameters
+    ----------
+    year : int
+        Fiscal year component.
+    period : int
+        Quarter (1–4), month (1–12), or ``1`` for yearly periods.
+    period_type : str, optional
+        One of ``"quarterly"``, ``"monthly"``, or ``"yearly"``.
+    style : str, optional
+        ``"key"`` for machine-readable keys or ``"display"`` for user-facing labels.
 
     Returns
     -------
-        Formatted period string.
+    str
+        Formatted period string such as ``"2024_QII"`` or ``"IIQ2024"``.
 
     Examples
     --------
-        >>> format_period(2024, 2, "quarterly", "key")
-        '2024_QII'
-        >>> format_period(2024, 2, "quarterly", "display")
-        'IIQ2024'
-        >>> format_period(2024, 6, "monthly", "key")
-        '2024_M06'
-
+    >>> format_period(2024, 2, "quarterly", "key")
+    '2024_QII'
+    >>> format_period(2024, 2, "quarterly", "display")
+    'IIQ2024'
+    >>> format_period(2024, 6, "monthly", "key")
+    '2024_M06'
     """
     use_key_style = style == "key"
 
@@ -343,24 +396,27 @@ def format_period(
 
 
 def format_quarter_label(year: int, quarter: int) -> str:
-    """Format quarter label for display (e.g., "IIQ2024")."""
+    """Format a quarter for display (e.g., ``"IIQ2024"``)."""
     return format_period(year, quarter, "quarterly", "display")
 
 
 def parse_period_key(period_key: str) -> tuple[int, int, str]:
-    """Parse a period key into its components.
+    """Parse a period key into year, period number, and period type.
 
-    Args:
-        period_key: Period key string (e.g., "2024_Q2", "2024_M06", "2024_FY")
+    Parameters
+    ----------
+    period_key : str
+        Key formatted by :func:`format_period` (e.g., ``"2024_Q2"`` or ``"2024_M06"``).
 
     Returns
     -------
-        Tuple of (year, period, period_type)
+    tuple[int, int, str]
+        Year, period number, and period type ``("quarterly"|"monthly"|"yearly")``.
 
     Raises
     ------
-        ValueError: If period key format is not recognized.
-
+    ValueError
+        If the key does not match any known pattern.
     """
     # Quarterly: 2024_Q2
     quarterly_match = re.match(r"(\d{4})_Q(\d)", period_key)
@@ -387,16 +443,18 @@ def parse_period_key(period_key: str) -> tuple[int, int, str]:
 
 
 def get_file_pattern(file_type: str) -> str:
-    """Get file pattern for a specific file type.
+    """Return the configured filename pattern for a document type.
 
-    Args:
-        file_type: One of "analisis_razonado", "estados_financieros_pdf",
-                   "estados_financieros_xbrl", "xbrl_zip", "pucobre_combined"
+    Parameters
+    ----------
+    file_type : str
+        One of ``analisis_razonado``, ``estados_financieros_pdf``,
+        ``estados_financieros_xbrl``, ``xbrl_zip``, or ``pucobre_combined``.
 
     Returns
     -------
-        File pattern string with placeholders.
-
+    str
+        Pattern string containing ``{year}`` and ``{quarter}`` placeholders.
     """
     config = get_config()
     patterns = config.get("file_patterns", {})
@@ -405,15 +463,17 @@ def get_file_pattern(file_type: str) -> str:
 
 
 def get_file_pattern_alternatives(file_type: str) -> list[str]:
-    """Get alternative file patterns for a file type.
+    """Return alternative filename patterns for a document type.
 
-    Args:
-        file_type: File type key
+    Parameters
+    ----------
+    file_type : str
+        File type key as used in ``config.json``.
 
     Returns
     -------
-        List of alternative patterns (may be empty).
-
+    list[str]
+        Optional pattern overrides, possibly empty.
     """
     config = get_config()
     patterns = config.get("file_patterns", {})
@@ -428,19 +488,25 @@ def format_filename(
     period: int | None = None,
     period_type: str = "quarterly",
 ) -> str:
-    """Format a filename using the configured pattern.
+    """Render a filename from configured patterns and period metadata.
 
-    Args:
-        file_type: File type key
-        year: Year
-        quarter: Quarter number (for backward compatibility)
-        period: Period number (alternative to quarter)
-        period_type: Period type (for non-quarterly patterns)
+    Parameters
+    ----------
+    file_type : str
+        File type key (see :func:`get_file_pattern`).
+    year : int
+        Four-digit year.
+    quarter : int, optional
+        Quarter number used by legacy callers.
+    period : int, optional
+        Alternative period number for non-quarterly files.
+    period_type : str, optional
+        Period type label stored in the pattern config.
 
     Returns
     -------
-        Formatted filename.
-
+    str
+        Filename with placeholders substituted.
     """
     pattern = get_file_pattern(file_type)
 
@@ -460,18 +526,23 @@ def find_file_with_alternatives(
     year: int,
     quarter: int,
 ) -> Path | None:
-    """Find a file using primary and alternative patterns.
+    """Locate a document using primary and alternative naming patterns.
 
-    Args:
-        base_dir: Directory to search in
-        file_type: File type key
-        year: Year
-        quarter: Quarter number
+    Parameters
+    ----------
+    base_dir : Path
+        Directory to search.
+    file_type : str
+        File type key.
+    year : int
+        Four-digit year.
+    quarter : int
+        Quarter number.
 
     Returns
     -------
-        Path to found file, or None if not found.
-
+    Path | None
+        First matching path if present, otherwise ``None``.
     """
     # Try primary pattern
     primary_name = format_filename(file_type, year, quarter)
@@ -490,12 +561,12 @@ def find_file_with_alternatives(
 
 
 def get_total_row_markers() -> list[str]:
-    """Get markers that identify total rows in tables.
+    """Return label markers that denote total rows in PDF tables.
 
     Returns
     -------
-        List of marker strings (e.g., ["Totales", "Total"]).
-
+    list[str]
+        Markers pulled from extraction specs, defaulting to ``["Totales", "Total"]``.
     """
     specs = get_extraction_specs()
     doc_structure = specs.get("document_structure", {})
@@ -504,16 +575,19 @@ def get_total_row_markers() -> list[str]:
 
 
 def _deep_merge(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
-    """Deep merge two dictionaries, with overlay values taking precedence.
+    """Recursively merge dictionaries, allowing overrides in ``overlay``.
 
-    Args:
-        base: Base dictionary
-        overlay: Dictionary to overlay on base
+    Parameters
+    ----------
+    base : dict[str, Any]
+        Original mapping.
+    overlay : dict[str, Any]
+        Values that override or extend ``base``.
 
     Returns
     -------
-        Merged dictionary
-
+    dict[str, Any]
+        New merged mapping.
     """
     result = base.copy()
     for key, value in overlay.items():
@@ -534,25 +608,28 @@ def extract_pdf_page_to_temp(
     page_number: int,
     prefix: str = "page_review_",
 ) -> Path:
-    """Extract a single page from PDF to a temporary file for user review.
+    """Write a single PDF page to ``TEMP_DIR`` for manual inspection.
 
-    This is used when automatic extraction fails and user needs to
-    manually review a specific page to help debug the issue.
-
-    Args:
-        pdf_path: Path to the source PDF
-        page_number: 1-indexed page number to extract
-        prefix: Prefix for the temp file name
+    Parameters
+    ----------
+    pdf_path : Path
+        Source PDF containing financial statements.
+    page_number : int
+        One-based page index to extract.
+    prefix : str, optional
+        Prefix used for the generated temporary filename.
 
     Returns
     -------
-        Path to the temporary PDF file containing just that page
+    Path
+        Path to the temporary one-page PDF.
 
     Raises
     ------
-        ImportError: If pypdf is not installed
-        ValueError: If page number is out of range
-
+    ImportError
+        If ``pypdf`` is not installed (required for page extraction).
+    ValueError
+        If ``page_number`` falls outside the PDF page range.
     """
     try:
         from pypdf import PdfReader, PdfWriter  # type: ignore[import-not-found]
@@ -582,15 +659,17 @@ def extract_pdf_page_to_temp(
 
 
 def cleanup_temp_files(prefix: str = "page_review_") -> int:
-    """Clean up temporary files created for page review.
+    """Remove temporary page review PDFs created by :func:`extract_pdf_page_to_temp`.
 
-    Args:
-        prefix: Prefix of files to clean up
+    Parameters
+    ----------
+    prefix : str, optional
+        Filename prefix to match under ``TEMP_DIR``.
 
     Returns
     -------
-        Number of files deleted
-
+    int
+        Count of deleted files.
     """
     count = 0
     if TEMP_DIR.exists():

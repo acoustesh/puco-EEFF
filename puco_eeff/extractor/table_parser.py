@@ -1,14 +1,7 @@
-"""Table parsing primitives for PDF extraction.
+"""Low-level PDF table parsing helpers.
 
-This module provides low-level functions for parsing table data from PDFs,
-including number parsing, text normalization, and row/table parsing.
-
-Key Functions:
-    parse_chilean_number(): Parse Chilean-formatted numbers.
-    normalize_for_matching(): Normalize text for fuzzy matching.
-    match_item(): Match concept text against expected items.
-    score_table_match(): Score how well a table matches expected content.
-    parse_cost_table(): Parse a cost breakdown table.
+This module normalizes concept labels, parses localized numbers, and scores PDF
+tables to locate cost breakdowns for Sheet1 extraction.
 """
 
 from __future__ import annotations
@@ -42,11 +35,22 @@ __all__ = [
 
 
 def parse_chilean_number(value: str | None) -> int | None:
-    """Parse a Chilean-formatted number.
+    """Parse a Chilean-formatted numeric string.
 
-    Chilean format uses:
-    - Period as thousands separator: 30.294 = 30,294
-    - Parentheses for negatives: (30.294) = -30,294
+    Notes
+    -----
+    Thousands separators are periods (``30.294`` → ``30294``). Parentheses
+    denote negative values (``(30.294)`` → ``-30294``).
+
+    Parameters
+    ----------
+    value : str | None
+        Raw string value to parse.
+
+    Returns
+    -------
+    int | None
+        Parsed integer or ``None`` when parsing fails.
     """
     if not value:
         return None
@@ -72,7 +76,7 @@ def parse_chilean_number(value: str | None) -> int | None:
 
 
 def normalize_for_matching(text: str) -> str:
-    """Normalize text for fuzzy matching."""
+    """Strip accents, punctuation, and extra spaces for fuzzy matching."""
     text = unicodedata.normalize("NFD", text)
     text = "".join(c for c in text if not unicodedata.combining(c))
     text = text.lower()
@@ -81,7 +85,7 @@ def normalize_for_matching(text: str) -> str:
 
 
 def match_item(concept: str, expected_items: list[str]) -> str | None:
-    """Match a concept text against expected items."""
+    """Return the best-matching expected label for a concept string."""
     norm_concept = normalize_for_matching(concept)
     sorted_items = sorted(expected_items, key=len, reverse=True)
 
@@ -112,18 +116,23 @@ def score_table_match(
     unique_items: list[str],
     exclude_items: list[str],
 ) -> int:
-    """Score how well a table matches the expected content.
+    """Score how well a table aligns with expected content.
 
-    Args:
-        table: The extracted table data
-        expected_items: Items that should be in the table
-        unique_items: Items that strongly indicate the correct table (+5 each)
-        exclude_items: Items that indicate the wrong table (-5 each)
+    Parameters
+    ----------
+    table : list[list[str | None]]
+        Extracted table grid.
+    expected_items : list[str]
+        Concepts that should appear somewhere in the table.
+    unique_items : list[str]
+        High-signal items worth +5 points each.
+    exclude_items : list[str]
+        Disqualifying items worth -5 points each.
 
     Returns
     -------
-        Match score (higher is better)
-
+    int
+        Match score (higher indicates closer alignment).
     """
     table_text = str(table).lower()
     score = sum(1 for item in expected_items if item.lower() in table_text)
@@ -151,7 +160,7 @@ def score_table_match(
 
 
 def _match_concept_or_total(concept: str, expected_items: list[str]) -> str | None:
-    """Match concept text against expected items or recognize as 'Totales'."""
+    """Match a concept against expected items or return ``"Totales"`` for totals."""
     matched = match_item(concept, expected_items)
     if matched:
         return matched
@@ -159,7 +168,7 @@ def _match_concept_or_total(concept: str, expected_items: list[str]) -> str | No
 
 
 def _extract_values_at_index(value_columns: list[list[str]], idx: int) -> list[int]:
-    """Extract parsed numeric values at a specific index from all columns."""
+    """Extract parsed numeric values across value columns at a given index."""
     values = []
     for col_values in value_columns:
         if idx < len(col_values):
@@ -174,7 +183,7 @@ def parse_multiline_row(
     value_columns: list[list[str]],
     expected_items: list[str],
 ) -> list[dict[str, Any]]:
-    """Parse a row with multiple concepts in a single cell (newline-separated)."""
+    """Parse a row whose first cell contains multiple newline-separated concepts."""
     parsed_rows = []
     for idx, concept in enumerate(concepts):
         concept = concept.strip()
@@ -190,7 +199,7 @@ def parse_multiline_row(
 
 
 def _extract_values_from_row_cells(row: list[str | None]) -> list[int]:
-    """Extract parsed numeric values from row cells (skipping first cell)."""
+    """Parse numeric values from a row, skipping the concept cell."""
     values = []
     for cell in row[1:]:
         if cell:
@@ -206,7 +215,7 @@ def parse_single_row(
     row: list[str | None],
     expected_items: list[str],
 ) -> dict[str, Any] | None:
-    """Parse a single-concept row."""
+    """Parse a row that contains a single concept label."""
     matched_item = _match_concept_or_total(row_text, expected_items)
     if not matched_item:
         return None
@@ -217,7 +226,7 @@ def parse_single_row(
 
 
 def _build_value_columns(row: list[str | None]) -> list[list[str]]:
-    """Build value columns from row cells (skipping first cell)."""
+    """Split value cells into columnar lists for multi-line parsing."""
     value_columns: list[list[str]] = []
     for cell in row[1:]:
         if cell:
@@ -229,7 +238,7 @@ def _build_value_columns(row: list[str | None]) -> list[list[str]]:
 
 
 def parse_cost_table(table: list[list[str | None]], expected_items: list[str]) -> list[dict[str, Any]]:
-    """Parse a cost breakdown table."""
+    """Convert a cost table into a list of concept/value dictionaries."""
     parsed_rows = []
 
     for row in table:
@@ -259,7 +268,7 @@ def parse_cost_table(table: list[list[str | None]], expected_items: list[str]) -
 
 
 def find_label_index(labels: list[str], match_keywords: list[str]) -> int | None:
-    """Find the index of a label that matches all keywords."""
+    """Return the index of the first label containing all keywords."""
     for i, label in enumerate(labels):
         if all(kw.lower() in label.lower() for kw in match_keywords):
             return i
@@ -267,7 +276,7 @@ def find_label_index(labels: list[str], match_keywords: list[str]) -> int | None
 
 
 def count_value_offset(labels: list[str], target_idx: int) -> int:
-    """Count how many prior labels have trailing digits (value offset)."""
+    """Count how many prior labels likely consume value slots (digit-ending labels)."""
     offset = 0
     for i in range(target_idx):
         label = labels[i].strip()
@@ -284,7 +293,7 @@ def _try_aligned_extraction(
     match_keywords: list[str],
     min_threshold: int,
 ) -> int | None:
-    """Try to extract value using aligned label position."""
+    """Extract value aligned to a matched ingresos label if above threshold."""
     ingresos_idx = find_label_index(labels, match_keywords)
     if ingresos_idx is None:
         return None
@@ -298,7 +307,7 @@ def _try_aligned_extraction(
 
 
 def _try_fallback_extraction(values: list[str], min_threshold: int) -> int | None:
-    """Try to extract any value above threshold as fallback."""
+    """Fallback: return the first value above the threshold if parsing succeeds."""
     for val_str in values:
         value = parse_chilean_number(val_str.strip())
         if value is not None and value > min_threshold:
@@ -307,7 +316,22 @@ def _try_fallback_extraction(values: list[str], min_threshold: int) -> int | Non
 
 
 def extract_value_from_row(row: list[Any], match_keywords: list[str], min_threshold: int) -> int | None:
-    """Try to extract ingresos value from a table row."""
+    """Extract ingresos value from a table row when keywords match the first column.
+
+    Parameters
+    ----------
+    row : list[Any]
+        Table row cells.
+    match_keywords : list[str]
+        Keywords that must all appear in the first column.
+    min_threshold : int
+        Minimum acceptable value to avoid spurious matches.
+
+    Returns
+    -------
+    int | None
+        Parsed value if found; otherwise ``None``.
+    """
     first_col = str(row[0] or "").lower()
     if not all(kw.lower() in first_col for kw in match_keywords):
         return None
