@@ -152,12 +152,22 @@ def compute_cosine_similarity(a: list[float], b: list[float]) -> float:
 
 
 def compute_combined_embedding(
-    openai_emb: list[float],
-    codestral_emb: list[float],
-    voyage_emb: list[float],
+    openai_text_emb: list[float],
+    openai_ast_emb: list[float],
+    codestral_text_emb: list[float],
+    codestral_ast_emb: list[float],
+    voyage_text_emb: list[float],
+    voyage_ast_emb: list[float],
 ) -> list[float]:
-    """Compute combined embedding by concatenating all three providers with L2 normalization."""
-    combined = openai_emb + codestral_emb + voyage_emb
+    """Compute combined embedding by concatenating all 6 base embeddings with L2 normalization."""
+    combined = (
+        openai_text_emb
+        + openai_ast_emb
+        + codestral_text_emb
+        + codestral_ast_emb
+        + voyage_text_emb
+        + voyage_ast_emb
+    )
 
     # L2 normalize the combined vector
     norm = np.linalg.norm(combined)
@@ -172,22 +182,39 @@ def get_cached_embedding(baselines: dict, content_hash: str, cache_key: str) -> 
     return baselines.get(cache_key, {}).get(content_hash)
 
 
-# Convenience aliases for backward compatibility with ProviderConfig.get_cached_fn
-def get_cached_openai_embedding(baselines: dict, content_hash: str) -> list[float] | None:
-    """Return cached OpenAI embedding."""
-    return get_cached_embedding(baselines, content_hash, "embeddings")
+# Text variant getters (keyed by text_hash)
+def get_cached_openai_text_embedding(baselines: dict, content_hash: str) -> list[float] | None:
+    """Return cached OpenAI text embedding."""
+    return get_cached_embedding(baselines, content_hash, "openai_text_embeddings")
 
 
-def get_cached_codestral_embedding(baselines: dict, content_hash: str) -> list[float] | None:
-    """Return cached Codestral embedding."""
-    return get_cached_embedding(baselines, content_hash, "codestral_embeddings")
+def get_cached_codestral_text_embedding(baselines: dict, content_hash: str) -> list[float] | None:
+    """Return cached Codestral text embedding."""
+    return get_cached_embedding(baselines, content_hash, "codestral_text_embeddings")
 
 
-def get_cached_voyage_embedding(baselines: dict, content_hash: str) -> list[float] | None:
-    """Return cached Voyage embedding."""
-    return get_cached_embedding(baselines, content_hash, "voyage_embeddings")
+def get_cached_voyage_text_embedding(baselines: dict, content_hash: str) -> list[float] | None:
+    """Return cached Voyage text embedding."""
+    return get_cached_embedding(baselines, content_hash, "voyage_text_embeddings")
 
 
+# AST variant getters (keyed by hash)
+def get_cached_openai_ast_embedding(baselines: dict, content_hash: str) -> list[float] | None:
+    """Return cached OpenAI AST embedding."""
+    return get_cached_embedding(baselines, content_hash, "openai_ast_embeddings")
+
+
+def get_cached_codestral_ast_embedding(baselines: dict, content_hash: str) -> list[float] | None:
+    """Return cached Codestral AST embedding."""
+    return get_cached_embedding(baselines, content_hash, "codestral_ast_embeddings")
+
+
+def get_cached_voyage_ast_embedding(baselines: dict, content_hash: str) -> list[float] | None:
+    """Return cached Voyage AST embedding."""
+    return get_cached_embedding(baselines, content_hash, "voyage_ast_embeddings")
+
+
+# Combined getter (keyed by text_hash)
 def get_cached_combined_embedding(baselines: dict, content_hash: str) -> list[float] | None:
     """Return cached Combined embedding."""
     return get_cached_embedding(baselines, content_hash, "combined_embeddings")

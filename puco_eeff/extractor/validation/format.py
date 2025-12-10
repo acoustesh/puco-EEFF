@@ -20,6 +20,7 @@ from puco_eeff.extractor.validation.types import (
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+# Module-level logger for validation formatting operations
 logger = logging.getLogger(__name__)
 
 __all__ = [
@@ -28,6 +29,13 @@ __all__ = [
     "format_validation_report",
     "log_validation_report",
 ]
+
+
+# =============================================================================
+# Status Formatting Functions
+# =============================================================================
+# These functions format individual validation results into human-readable
+# strings with status icons (✓ ✗ ⚠) for terminal and report output.
 
 
 def format_sum_validation_status(result: SumValidationResult) -> str:
@@ -43,6 +51,7 @@ def format_sum_validation_status(result: SumValidationResult) -> str:
     str
         Status string with an icon and mismatch context when relevant.
     """
+    # Handle missing total gracefully - common when PDF extraction fails
     if result.expected_total is None:
         return "⚠ No total value to compare"
     if result.match:
@@ -65,6 +74,13 @@ def format_cross_validation_status(r: CrossValidationResult) -> str:
     )
 
 
+# =============================================================================
+# Section Formatting Helpers
+# =============================================================================
+# Helper functions for building multi-section validation reports.
+# Uses a generic pattern: header + formatted items, with fallback for empty.
+
+
 def _format_section(
     header: str,
     items: list,
@@ -72,15 +88,18 @@ def _format_section(
     empty_line: str,
 ) -> list[str]:
     """Format validation sections generically."""
+    # Return placeholder when no items exist
     if not items:
         return [empty_line]
     lines = [header]
+    # Apply formatter function to each item
     lines.extend(formatter(item) for item in items)
     return lines
 
 
 def _format_pdf_xbrl_validation_item(v: ValidationResult) -> str:
     """Format a single PDF-XBRL validation item."""
+    # Both sources present - show comparison with match/mismatch indicator
     if v.source == "both":
         symbol = "✓" if v.match else "✗"
         diff_display = f"{v.difference:,}" if v.difference is not None else "n/a"
@@ -90,19 +109,24 @@ def _format_pdf_xbrl_validation_item(v: ValidationResult) -> str:
             f"  {symbol} {v.field_name}: {v.value_a:,} (PDF) ≠ "
             f"{v.value_b:,} (XBRL) [diff: {diff_display}]"
         )
+    # Single source scenarios - warn that cross-validation not possible
     if v.source == "xbrl_only":
         return f"  ⚠ {v.field_name}: {v.value_b:,} (XBRL only, used as source)"
+    # PDF-only: XBRL data unavailable for cross-check
     return f"  ⚠ {v.field_name}: {v.value_a:,} (PDF only, no XBRL)"
 
 
 def _format_reference_validations(report: ValidationReport) -> list[str]:
     """Format reference validations section."""
     lines: list[str] = []
+    # Reference validation is opt-in via CLI flag
     if report.reference_issues is None:
         lines.append("Reference Validation: (not run - use --validate-reference to enable)")
     elif len(report.reference_issues) == 0:
+        # All extracted values match known-good reference data
         lines.append("Reference Validation: ✓ All values match reference data")
     else:
+        # Mismatches found - list each issue for review
         lines.append("Reference Validation: ✗ MISMATCHES FOUND")
         lines.extend(f"  • {issue}" for issue in report.reference_issues)
     return lines
@@ -123,9 +147,11 @@ def format_validation_report(report: ValidationReport, verbose: bool = True) -> 
     str
         Formatted multi-line report string.
     """
+    # Build report with Unicode box characters for visual distinction
     separator = "═" * 60
     lines = [separator, "                    VALIDATION REPORT", separator, ""]
 
+    # Define sections: (header, items, item_formatter, empty_placeholder)
     sections = [
         (
             "Sum Validations:",
@@ -157,6 +183,13 @@ def format_validation_report(report: ValidationReport, verbose: bool = True) -> 
     return "\n".join(lines)
 
 
+# =============================================================================
+# Logging Functions
+# =============================================================================
+# Log validation results using appropriate severity levels:
+# - INFO for passes, WARNING for failures/mismatches
+
+
 def log_validation_report(report: ValidationReport) -> None:
     """Log validation results with appropriate log levels.
 
@@ -165,6 +198,7 @@ def log_validation_report(report: ValidationReport) -> None:
     report
         Aggregated validation results to log.
     """
+    # Log sum validations with appropriate level based on match status
     for v in report.sum_validations:
         if v.match:
             logger.info("✓ Sum: %s", v.description)

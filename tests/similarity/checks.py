@@ -2,30 +2,30 @@
 
 This module provides a single generic function that handles all embedding providers,
 eliminating the code duplication that existed in the original 4 separate functions.
+
+Tests operate on cached embeddings only - no API calls are made during tests.
+To populate embeddings, run: python -m tests.similarity.populate_embeddings
 """
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pytest
 
 from tests.similarity.embeddings import (
-    compute_combined_embedding,
     compute_cosine_similarity,
-    get_cached_codestral_embedding,
+    get_cached_codestral_ast_embedding,
+    get_cached_codestral_text_embedding,
     get_cached_combined_embedding,
-    get_cached_openai_embedding,
-    get_cached_voyage_embedding,
-    get_embeddings_batch,
-    get_embeddings_batch_codestral,
-    get_embeddings_batch_voyage,
+    get_cached_openai_ast_embedding,
+    get_cached_openai_text_embedding,
+    get_cached_voyage_ast_embedding,
+    get_cached_voyage_text_embedding,
 )
 from tests.similarity.pca import apply_pca_to_functions
 from tests.similarity.refactor_index import get_refactor_priority_message
-from tests.similarity.storage import save_baselines
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -39,67 +39,110 @@ class ProviderConfig:
 
     name: str
     cache_key: str  # Key in baselines dict for this provider's embeddings
+    hash_field: str  # Field on FunctionInfo to use as cache key ("hash" or "text_hash")
     threshold_pair_key: str  # Config key for pair threshold
     threshold_neighbor_key: str  # Config key for neighbor threshold
+    pca_variance_key: str  # Config key for PCA variance threshold
     default_threshold_pair: float
     default_threshold_neighbor: float
-    api_key_env_var: str
-    api_key_invalid_prefixes: tuple[str, ...]
+    default_pca_variance: float
     get_cached_fn: Callable[[dict, str], list[float] | None]
-    get_embeddings_fn: Callable[[list[str]], list[list[float]]] | None  # None for combined
 
 
-# Provider configurations
-OPENAI_PROVIDER = ProviderConfig(
-    name="OpenAI",
-    cache_key="embeddings",
-    threshold_pair_key="similarity_threshold_pair",
-    threshold_neighbor_key="similarity_threshold_neighbor",
+# Provider configurations (6 base + 1 combined)
+
+# Text variants (signature + docstring + comments, keyed by text_hash)
+OPENAI_TEXT_PROVIDER = ProviderConfig(
+    name="OpenAI-Text",
+    cache_key="openai_text_embeddings",
+    hash_field="text_hash",
+    threshold_pair_key="openai_text_similarity_threshold_pair",
+    threshold_neighbor_key="openai_text_similarity_threshold_neighbor",
+    pca_variance_key="openai_text_pca_variance_threshold",
     default_threshold_pair=0.86,
     default_threshold_neighbor=0.80,
-    api_key_env_var="OPENAI_API_KEY",
-    api_key_invalid_prefixes=("your_", "sk-xxx"),
-    get_cached_fn=get_cached_openai_embedding,
-    get_embeddings_fn=get_embeddings_batch,
+    default_pca_variance=0.99,
+    get_cached_fn=get_cached_openai_text_embedding,
 )
 
-CODESTRAL_PROVIDER = ProviderConfig(
-    name="Codestral",
-    cache_key="codestral_embeddings",
-    threshold_pair_key="codestral_similarity_threshold_pair",
-    threshold_neighbor_key="codestral_similarity_threshold_neighbor",
+CODESTRAL_TEXT_PROVIDER = ProviderConfig(
+    name="Codestral-Text",
+    cache_key="codestral_text_embeddings",
+    hash_field="text_hash",
+    threshold_pair_key="codestral_text_similarity_threshold_pair",
+    threshold_neighbor_key="codestral_text_similarity_threshold_neighbor",
+    pca_variance_key="codestral_text_pca_variance_threshold",
     default_threshold_pair=0.97,
     default_threshold_neighbor=0.93,
-    api_key_env_var="OPENROUTER_API_KEY",
-    api_key_invalid_prefixes=("your_", "sk-xxx"),
-    get_cached_fn=get_cached_codestral_embedding,
-    get_embeddings_fn=get_embeddings_batch_codestral,
+    default_pca_variance=0.99,
+    get_cached_fn=get_cached_codestral_text_embedding,
 )
 
-VOYAGE_PROVIDER = ProviderConfig(
-    name="Voyage",
-    cache_key="voyage_embeddings",
-    threshold_pair_key="voyage_similarity_threshold_pair",
-    threshold_neighbor_key="voyage_similarity_threshold_neighbor",
+VOYAGE_TEXT_PROVIDER = ProviderConfig(
+    name="Voyage-Text",
+    cache_key="voyage_text_embeddings",
+    hash_field="text_hash",
+    threshold_pair_key="voyage_text_similarity_threshold_pair",
+    threshold_neighbor_key="voyage_text_similarity_threshold_neighbor",
+    pca_variance_key="voyage_text_pca_variance_threshold",
     default_threshold_pair=0.95,
     default_threshold_neighbor=0.90,
-    api_key_env_var="VOYAGE_API_KEY",
-    api_key_invalid_prefixes=("your_", "pa-xxx"),
-    get_cached_fn=get_cached_voyage_embedding,
-    get_embeddings_fn=get_embeddings_batch_voyage,
+    default_pca_variance=0.99,
+    get_cached_fn=get_cached_voyage_text_embedding,
 )
 
+# AST variants (ast.unparse() output, keyed by hash)
+OPENAI_AST_PROVIDER = ProviderConfig(
+    name="OpenAI-AST",
+    cache_key="openai_ast_embeddings",
+    hash_field="hash",
+    threshold_pair_key="openai_ast_similarity_threshold_pair",
+    threshold_neighbor_key="openai_ast_similarity_threshold_neighbor",
+    pca_variance_key="openai_ast_pca_variance_threshold",
+    default_threshold_pair=0.86,
+    default_threshold_neighbor=0.80,
+    default_pca_variance=0.99,
+    get_cached_fn=get_cached_openai_ast_embedding,
+)
+
+CODESTRAL_AST_PROVIDER = ProviderConfig(
+    name="Codestral-AST",
+    cache_key="codestral_ast_embeddings",
+    hash_field="hash",
+    threshold_pair_key="codestral_ast_similarity_threshold_pair",
+    threshold_neighbor_key="codestral_ast_similarity_threshold_neighbor",
+    pca_variance_key="codestral_ast_pca_variance_threshold",
+    default_threshold_pair=0.97,
+    default_threshold_neighbor=0.93,
+    default_pca_variance=0.99,
+    get_cached_fn=get_cached_codestral_ast_embedding,
+)
+
+VOYAGE_AST_PROVIDER = ProviderConfig(
+    name="Voyage-AST",
+    cache_key="voyage_ast_embeddings",
+    hash_field="hash",
+    threshold_pair_key="voyage_ast_similarity_threshold_pair",
+    threshold_neighbor_key="voyage_ast_similarity_threshold_neighbor",
+    pca_variance_key="voyage_ast_pca_variance_threshold",
+    default_threshold_pair=0.95,
+    default_threshold_neighbor=0.90,
+    default_pca_variance=0.99,
+    get_cached_fn=get_cached_voyage_ast_embedding,
+)
+
+# Combined (6-way concatenation, keyed by text_hash)
 COMBINED_PROVIDER = ProviderConfig(
     name="Combined",
     cache_key="combined_embeddings",
+    hash_field="text_hash",
     threshold_pair_key="combined_similarity_threshold_pair",
     threshold_neighbor_key="combined_similarity_threshold_neighbor",
+    pca_variance_key="combined_pca_variance_threshold",
     default_threshold_pair=0.88,
     default_threshold_neighbor=0.82,
-    api_key_env_var="",  # Not used - combined computes from base providers
-    api_key_invalid_prefixes=(),
+    default_pca_variance=0.99,
     get_cached_fn=get_cached_combined_embedding,
-    get_embeddings_fn=None,  # Set dynamically based on baselines
 )
 
 
@@ -111,7 +154,9 @@ def _load_cached_embeddings(
     """Load cached embeddings and return list of uncached functions."""
     uncached = []
     for func in functions:
-        cached = provider.get_cached_fn(baselines, func.hash)
+        # Use provider-specific hash field (text_hash for Text/Combined, hash for AST)
+        cache_key = getattr(func, provider.hash_field)
+        cached = provider.get_cached_fn(baselines, cache_key)
         if cached is not None:
             func.embedding = cached
         else:
@@ -119,111 +164,15 @@ def _load_cached_embeddings(
     return uncached
 
 
-def _handle_uncached_skip(uncached: list[FunctionInfo], provider: ProviderConfig) -> None:
-    """Skip test if in cached-only mode with uncached functions."""
+def _skip_missing_embeddings(uncached: list[FunctionInfo], provider: ProviderConfig) -> None:
+    """Skip test if any functions lack cached embeddings."""
     uncached_names = [f"{f.file}:{f.name}" for f in uncached[:10]]
     more_msg = f"\n  ... and {len(uncached) - 10} more" if len(uncached) > 10 else ""
     pytest.skip(
-        f"--cached-only mode: {len(uncached)} functions lack "
-        f"cached {provider.name} embeddings:\n  " + "\n  ".join(uncached_names) + more_msg,
+        f"{len(uncached)} functions lack cached {provider.name} embeddings.\n"
+        f"Run: python -m tests.similarity.populate_embeddings --provider "
+        f"{provider.name.lower()}\n  " + "\n  ".join(uncached_names) + more_msg,
     )
-
-
-def _check_api_key(provider: ProviderConfig) -> str | None:
-    """Check if API key is valid, return None if invalid."""
-    from tests.similarity.embeddings import _load_api_key_from_env
-
-    api_key = _load_api_key_from_env(provider.api_key_env_var) or os.environ.get(
-        provider.api_key_env_var,
-    )
-    if not api_key or api_key.startswith(provider.api_key_invalid_prefixes) or len(api_key) < 20:
-        return None
-    return api_key
-
-
-def _fetch_and_cache_embeddings(
-    baselines: dict,
-    functions: list[FunctionInfo],
-    uncached: list[FunctionInfo],
-    provider: ProviderConfig,
-) -> None:
-    """Fetch embeddings for uncached functions and update cache.
-
-    For Combined provider, computes from base providers instead of API call.
-    """
-    if provider.name == "Combined":
-        _fetch_combined_from_base_providers(baselines, uncached)
-        return
-
-    if provider.get_embeddings_fn is None:
-        return
-
-    api_key = _check_api_key(provider)
-    if not api_key:
-        pytest.skip(
-            f"{provider.api_key_env_var} not set (or invalid) and some functions lack cached "
-            f"{provider.name} embeddings. Set a valid API key or run with --cached-only to skip.",
-        )
-
-    texts = [f.text for f in uncached]
-    try:
-        new_embeddings = provider.get_embeddings_fn(texts)
-    except Exception as e:
-        error_msg = str(e).lower()
-        if "401" in error_msg or "authentication" in error_msg or "api key" in error_msg:
-            pytest.skip(
-                f"Invalid {provider.api_key_env_var} and some functions lack cached {provider.name} embeddings. "
-                f"Set a valid API key or run with --cached-only to skip. Error: {e}",
-            )
-        pytest.fail(f"Failed to get {provider.name} embeddings: {e}")
-
-    for func, embedding in zip(uncached, new_embeddings, strict=True):
-        func.embedding = embedding
-        baselines.setdefault(provider.cache_key, {})[func.hash] = embedding
-
-    for func in functions:
-        baselines.setdefault("function_hashes", {})[
-            f"{func.file}:{func.name}:{func.start_line}"
-        ] = func.hash
-
-    save_baselines(baselines)
-
-
-def _fetch_combined_from_base_providers(
-    baselines: dict,
-    uncached: list[FunctionInfo],
-) -> None:
-    """Compute combined embeddings from base providers for uncached functions."""
-    missing_base = []
-    for func in uncached:
-        openai_emb = baselines.get("embeddings", {}).get(func.hash)
-        codestral_emb = baselines.get("codestral_embeddings", {}).get(func.hash)
-        voyage_emb = baselines.get("voyage_embeddings", {}).get(func.hash)
-
-        if openai_emb and codestral_emb and voyage_emb:
-            combined = compute_combined_embedding(openai_emb, codestral_emb, voyage_emb)
-            func.embedding = combined
-            baselines.setdefault("combined_embeddings", {})[func.hash] = combined
-        else:
-            missing = []
-            if not openai_emb:
-                missing.append("OpenAI")
-            if not codestral_emb:
-                missing.append("Codestral")
-            if not voyage_emb:
-                missing.append("Voyage")
-            missing_base.append((func, missing))
-
-    if missing_base:
-        details = [f"{f.file}:{f.name} (missing: {', '.join(m)})" for f, m in missing_base[:10]]
-        more_msg = f"\n  ... and {len(missing_base) - 10} more" if len(missing_base) > 10 else ""
-        pytest.skip(
-            f"{len(missing_base)} functions lack base provider embeddings. "
-            f"Run OpenAI, Codestral, and Voyage tests first:\n  " + "\n  ".join(details) + more_msg,
-        )
-
-    if baselines.get("combined_embeddings"):
-        save_baselines(baselines)
 
 
 def _format_pair_violation(func_a: FunctionInfo, func_b: FunctionInfo, similarity: float) -> str:
@@ -365,26 +314,22 @@ def run_provider_similarity_checks(
     """Unified workflow for similarity tests across all embedding providers.
 
     This single function handles OpenAI, Codestral, Voyage, and Combined providers
-    with the same flow: load cached → fetch uncached → apply PCA → find violations.
+    with the same flow: load cached → skip if uncached → apply PCA → find violations.
+
+    Tests operate on cached embeddings only - no API calls are made.
+    To populate embeddings, run: python -m tests.similarity.populate_embeddings
     """
     if len(functions) < 2:
         pytest.skip("Not enough functions to compare")
 
-    # Same flow for all providers
+    # Load cached embeddings, skip test if any are missing
     uncached = _load_cached_embeddings(baselines, functions, provider)
-
-    if cached_only and uncached:
-        _handle_uncached_skip(uncached, provider)
-
     if uncached:
-        _fetch_and_cache_embeddings(baselines, functions, uncached, provider)
+        _skip_missing_embeddings(uncached, provider)
 
-    if update_baselines:
-        pytest.skip(f"Updated {provider.name} embedding baselines")
-
-    # Apply PCA dimensionality reduction
+    # Apply PCA dimensionality reduction using provider-specific threshold
     config = baselines.get("config", {})
-    pca_variance = config.get("pca_variance_threshold", 0.95)
+    pca_variance = config.get(provider.pca_variance_key, provider.default_pca_variance)
     embeddings_cache = baselines.get(provider.cache_key, {})
     apply_pca_to_functions(functions, embeddings_cache, variance_threshold=pca_variance)
 

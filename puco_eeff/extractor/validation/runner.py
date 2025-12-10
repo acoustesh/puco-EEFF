@@ -6,19 +6,27 @@ PDF-XBRL comparisons, and cross-validations against extracted data.
 
 from __future__ import annotations
 
+# =============================================================================
+# Standard Library and Third-Party Imports
+# =============================================================================
 import logging
 from typing import TYPE_CHECKING
 
+# Internal validation utilities for formula evaluation
 from puco_eeff.extractor.validation.formula import (
     evaluate_cross_validation,
     resolve_cross_validation_values,
 )
+
+# Result dataclasses for validation outcomes
 from puco_eeff.extractor.validation.types import (
     CrossValidationResult,
     SumValidationResult,
     ValidationReport,
     ValidationResult,
 )
+
+# Sheet1-specific validation configuration getters
 from puco_eeff.sheets.sheet1 import (
     get_sheet1_cross_validations,
     get_sheet1_pdf_xbrl_validations,
@@ -34,12 +42,18 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# =============================================================================
+# Public API
+# =============================================================================
 __all__ = [
     "compare_with_tolerance",
     "run_sheet1_validations",
 ]
 
 
+# =============================================================================
+# Tolerance Comparison Utility
+# =============================================================================
 def compare_with_tolerance(a: int | None, b: int | None, tolerance: int) -> tuple[bool, int]:
     """Compare two values with tolerance, using absolute values.
 
@@ -60,10 +74,14 @@ def compare_with_tolerance(a: int | None, b: int | None, tolerance: int) -> tupl
     # Treat missing values as a soft pass; downstream callers decide how to log.
     if a is None or b is None:
         return True, 0
+    # Compare absolute values since financial figures may be negative
     diff = abs(abs(a) - abs(b))
     return diff <= tolerance, diff
 
 
+# =============================================================================
+# Sum Validations (row-total consistency checks)
+# =============================================================================
 def _run_sum_validations_impl(data: Sheet1Data) -> list[SumValidationResult]:
     """Run config-driven sum validations on Sheet1Data.
 
@@ -81,12 +99,15 @@ def _run_sum_validations_impl(data: Sheet1Data) -> list[SumValidationResult]:
     global_tolerance = get_sheet1_sum_tolerance()
     total_validations = get_sheet1_total_validations()
 
+    # Each rule defines: total_field (expected) vs sum of sum_fields (calculated)
     for rule in total_validations:
         description = rule.get("description", "Unknown validation")
         total_field = rule.get("total_field", "")
         sum_fields = rule.get("sum_fields", [])
+        # Allow per-rule tolerance override
         rule_tolerance = rule.get("tolerance", global_tolerance)
 
+        # Retrieve total from extracted data and compute sum of components
         expected_total = data.get_value(total_field)
         calculated_sum = sum(data.get_value(fld) or 0 for fld in sum_fields)
 
@@ -109,7 +130,9 @@ def _run_sum_validations_impl(data: Sheet1Data) -> list[SumValidationResult]:
         # Log result
         if expected_total is None:
             logger.info(
-                "⚠ %s: no total value to compare (sum=%s)", description, f"{calculated_sum:,}"
+                "⚠ %s: no total value to compare (sum=%s)",
+                description,
+                f"{calculated_sum:,}",
             )
         elif match:
             logger.info(
@@ -130,6 +153,9 @@ def _run_sum_validations_impl(data: Sheet1Data) -> list[SumValidationResult]:
     return results
 
 
+# =============================================================================
+# PDF ↔ XBRL Validations (cross-source comparison)
+# =============================================================================
 def _resolve_single_pdf_xbrl_validation(
     display_name: str,
     pdf_value: int | None,
@@ -166,7 +192,8 @@ def _resolve_single_pdf_xbrl_validation(
             difference=diff if not match else None,
         )
 
-    # Single source - apply XBRL fallback if needed
+    # Single source available - apply XBRL fallback if PDF extraction failed
+    # This enriches the extracted data with authoritative XBRL values
     is_xbrl = xbrl_value is not None
     if is_xbrl and use_fallback:
         logger.info("Using XBRL value for %s: %s", display_name, f"{xbrl_value:,}")
@@ -231,6 +258,9 @@ def _run_pdf_xbrl_validations_impl(
     return comparison_results
 
 
+# =============================================================================
+# Cross-Validations (formula-based consistency checks)
+# =============================================================================
 def _run_cross_validations_impl(
     data: Sheet1Data,
     xbrl_totals: Mapping[str, int | None] | None,
@@ -259,10 +289,15 @@ def _run_cross_validations_impl(
         formula = rule.get("formula", "")
         rule_tolerance = rule.get("tolerance", global_tolerance)
 
+        # Resolve all variables in the formula from data or XBRL sources
         values, missing = resolve_cross_validation_values(
-            data, xbrl_totals, formula, field_to_result
+            data,
+            xbrl_totals,
+            formula,
+            field_to_result,
         )
 
+        # Skip validation if any required values are unavailable
         if missing:
             result = CrossValidationResult(
                 description=description,
@@ -279,7 +314,9 @@ def _run_cross_validations_impl(
             continue
 
         expected, calculated, match, diff = evaluate_cross_validation(
-            formula, values, rule_tolerance
+            formula,
+            values,
+            rule_tolerance,
         )
 
         result = CrossValidationResult(
@@ -307,6 +344,9 @@ def _run_cross_validations_impl(
     return results
 
 
+# =============================================================================
+# Unified Validation Entry Point
+# =============================================================================
 def run_sheet1_validations(
     data: Sheet1Data,
     xbrl_totals: Mapping[str, int | None] | None = None,
@@ -338,10 +378,12 @@ def run_sheet1_validations(
     ValidationReport
         Aggregated validation results.
     """
+    # Initialize result containers for each validation type
     sum_results: list[SumValidationResult] = []
     pdf_xbrl_results: list[ValidationResult] = []
     cross_results: list[CrossValidationResult] = []
 
+    # Run each validation type based on caller configuration
     if run_sum_validations:
         sum_results = _run_sum_validations_impl(data)
 

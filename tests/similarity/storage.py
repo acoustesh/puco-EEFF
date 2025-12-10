@@ -13,11 +13,14 @@ import numpy as np
 
 from tests.similarity.constants import (
     BASELINES_FILE,
-    CODESTRAL_EMBEDDINGS_FILE,
+    CODESTRAL_AST_EMBEDDINGS_FILE,
+    CODESTRAL_TEXT_EMBEDDINGS_FILE,
     COMBINED_EMBEDDINGS_FILE,
-    EMBEDDINGS_FILE,
     FUNCTION_HASHES_FILE,
-    VOYAGE_EMBEDDINGS_FILE,
+    OPENAI_AST_EMBEDDINGS_FILE,
+    OPENAI_TEXT_EMBEDDINGS_FILE,
+    VOYAGE_AST_EMBEDDINGS_FILE,
+    VOYAGE_TEXT_EMBEDDINGS_FILE,
 )
 
 
@@ -58,56 +61,177 @@ def _save_compressed_embeddings(embeddings: dict[str, list[float]], file_path: P
         raise
 
 
-# Provider cache file mapping
+# Provider cache file mapping (6 base + 1 combined)
 _PROVIDER_FILES = {
-    "embeddings": EMBEDDINGS_FILE,
-    "codestral_embeddings": CODESTRAL_EMBEDDINGS_FILE,
-    "voyage_embeddings": VOYAGE_EMBEDDINGS_FILE,
+    # Text variants (keyed by text_hash)
+    "openai_text_embeddings": OPENAI_TEXT_EMBEDDINGS_FILE,
+    "codestral_text_embeddings": CODESTRAL_TEXT_EMBEDDINGS_FILE,
+    "voyage_text_embeddings": VOYAGE_TEXT_EMBEDDINGS_FILE,
+    # AST variants (keyed by hash)
+    "openai_ast_embeddings": OPENAI_AST_EMBEDDINGS_FILE,
+    "codestral_ast_embeddings": CODESTRAL_AST_EMBEDDINGS_FILE,
+    "voyage_ast_embeddings": VOYAGE_AST_EMBEDDINGS_FILE,
+    # Combined (keyed by text_hash)
     "combined_embeddings": COMBINED_EMBEDDINGS_FILE,
 }
 
+# Cache keys grouped by hash type for sync operations
+_TEXT_HASH_CACHES = [
+    "openai_text_embeddings",
+    "codestral_text_embeddings",
+    "voyage_text_embeddings",
+]
+_AST_HASH_CACHES = ["openai_ast_embeddings", "codestral_ast_embeddings", "voyage_ast_embeddings"]
 
-def validate_embedding_coverage(baselines: dict) -> dict[str, int]:
-    """Validate embedding coverage across all providers.
 
-    Returns a dict with coverage statistics. Raises warnings for inconsistencies.
+def get_valid_hashes(baselines: dict) -> tuple[set[str], set[str], dict[str, str]]:
+    """Extract valid hashes from function_hashes.
+
+    Returns
+    -------
+        tuple: (valid_text_hashes, valid_ast_hashes, text_to_ast_map)
+            - valid_text_hashes: set of text_hash values
+            - valid_ast_hashes: set of hash (AST) values
+            - text_to_ast_map: mapping from text_hash -> hash for combined lookup
     """
-    import warnings
+    function_hashes = baselines.get("function_hashes", {})
+    valid_text_hashes: set[str] = set()
+    valid_ast_hashes: set[str] = set()
+    text_to_ast_map: dict[str, str] = {}
 
-    openai_keys = set(baselines.get("embeddings", {}).keys())
-    codestral_keys = set(baselines.get("codestral_embeddings", {}).keys())
-    voyage_keys = set(baselines.get("voyage_embeddings", {}).keys())
-    combined_keys = set(baselines.get("combined_embeddings", {}).keys())
+    for entry in function_hashes.values():
+        if isinstance(entry, dict):
+            ast_hash = entry.get("hash")
+            text_hash = entry.get("text_hash")
+            if ast_hash:
+                valid_ast_hashes.add(ast_hash)
+            if text_hash:
+                valid_text_hashes.add(text_hash)
+            if ast_hash and text_hash:
+                text_to_ast_map[text_hash] = ast_hash
+        else:
+            # Legacy format: entry is just the hash string (AST only)
+            valid_ast_hashes.add(entry)
 
-    all_three = openai_keys & codestral_keys & voyage_keys
-    missing_from_combined = all_three - combined_keys
+    return valid_text_hashes, valid_ast_hashes, text_to_ast_map
 
-    stats = {
-        "openai": len(openai_keys),
-        "codestral": len(codestral_keys),
-        "voyage": len(voyage_keys),
-        "combined": len(combined_keys),
-        "all_three_providers": len(all_three),
-        "missing_from_combined": len(missing_from_combined),
+
+def count_missing_embeddings(baselines: dict) -> dict[str, int]:
+    """Count missing embeddings per provider.
+
+    Returns dict with missing_<provider> counts.
+    """
+    valid_text, valid_ast, _ = get_valid_hashes(baselines)
+
+    return {
+        "missing_openai_text": len(
+            valid_text - set(baselines.get("openai_text_embeddings", {}).keys())
+        ),
+        "missing_codestral_text": len(
+            valid_text - set(baselines.get("codestral_text_embeddings", {}).keys())
+        ),
+        "missing_voyage_text": len(
+            valid_text - set(baselines.get("voyage_text_embeddings", {}).keys())
+        ),
+        "missing_openai_ast": len(
+            valid_ast - set(baselines.get("openai_ast_embeddings", {}).keys())
+        ),
+        "missing_codestral_ast": len(
+            valid_ast - set(baselines.get("codestral_ast_embeddings", {}).keys())
+        ),
+        "missing_voyage_ast": len(
+            valid_ast - set(baselines.get("voyage_ast_embeddings", {}).keys())
+        ),
     }
 
-    if missing_from_combined:
-        warnings.warn(
-            f"Embedding coverage gap: {len(missing_from_combined)} functions have all 3 "
-            f"provider embeddings but are missing from combined cache. "
-            f"Run the combined similarity test to regenerate.",
-            stacklevel=2,
-        )
 
-    if len(openai_keys) != len(codestral_keys) or len(openai_keys) != len(voyage_keys):
-        warnings.warn(
-            f"Provider embedding counts differ: OpenAI={len(openai_keys)}, "
-            f"Codestral={len(codestral_keys)}, Voyage={len(voyage_keys)}. "
-            f"Run individual provider tests to sync caches.",
-            stacklevel=2,
-        )
+def remove_orphan_embeddings(baselines: dict) -> dict[str, int]:
+    """Remove orphan embeddings (hashes not in function_hashes).
 
-    return stats
+    Modifies baselines in place.
+    Returns dict with orphans_removed_<provider> counts.
+    """
+    valid_text, valid_ast, _ = get_valid_hashes(baselines)
+
+    orphan_stats: dict[str, int] = {}
+    cache_configs = [
+        ("openai_text", "openai_text_embeddings", valid_text),
+        ("codestral_text", "codestral_text_embeddings", valid_text),
+        ("voyage_text", "voyage_text_embeddings", valid_text),
+        ("openai_ast", "openai_ast_embeddings", valid_ast),
+        ("codestral_ast", "codestral_ast_embeddings", valid_ast),
+        ("voyage_ast", "voyage_ast_embeddings", valid_ast),
+        ("combined", "combined_embeddings", valid_text),
+    ]
+
+    for name, cache_key, valid_hashes in cache_configs:
+        cache = baselines.get(cache_key, {})
+        orphans = set(cache.keys()) - valid_hashes
+        for h in orphans:
+            del cache[h]
+        orphan_stats[f"orphans_removed_{name}"] = len(orphans)
+
+    return orphan_stats
+
+
+def rebuild_combined_embeddings(baselines: dict) -> int:
+    """Rebuild combined embeddings from all 6 base providers.
+
+    Combined uses text_hash as key and requires all 6 embeddings.
+    Modifies baselines["combined_embeddings"] in place.
+
+    Returns count of combined embeddings built.
+    """
+    from tests.similarity.embeddings import compute_combined_embedding
+
+    valid_text, _, text_to_ast = get_valid_hashes(baselines)
+
+    openai_text = baselines.get("openai_text_embeddings", {})
+    codestral_text = baselines.get("codestral_text_embeddings", {})
+    voyage_text = baselines.get("voyage_text_embeddings", {})
+    openai_ast = baselines.get("openai_ast_embeddings", {})
+    codestral_ast = baselines.get("codestral_ast_embeddings", {})
+    voyage_ast = baselines.get("voyage_ast_embeddings", {})
+
+    combined_cache: dict[str, list[float]] = {}
+    for text_hash in valid_text:
+        ast_hash = text_to_ast.get(text_hash)
+        if not ast_hash:
+            continue
+
+        ot = openai_text.get(text_hash)
+        ct = codestral_text.get(text_hash)
+        vt = voyage_text.get(text_hash)
+        oa = openai_ast.get(ast_hash)
+        ca = codestral_ast.get(ast_hash)
+        va = voyage_ast.get(ast_hash)
+
+        if all([ot, ct, vt, oa, ca, va]):
+            combined_cache[text_hash] = compute_combined_embedding(ot, oa, ct, ca, vt, va)
+
+    baselines["combined_embeddings"] = combined_cache
+    return len(combined_cache)
+
+
+def verify_cache_counts(baselines: dict) -> dict[str, int]:
+    """Verify cache counts for all providers.
+
+    Returns dict with counts per cache. All text caches should match,
+    all AST caches should match.
+    """
+    valid_text, valid_ast, _ = get_valid_hashes(baselines)
+
+    return {
+        "valid_text_hashes": len(valid_text),
+        "valid_ast_hashes": len(valid_ast),
+        "openai_text": len(baselines.get("openai_text_embeddings", {})),
+        "codestral_text": len(baselines.get("codestral_text_embeddings", {})),
+        "voyage_text": len(baselines.get("voyage_text_embeddings", {})),
+        "openai_ast": len(baselines.get("openai_ast_embeddings", {})),
+        "codestral_ast": len(baselines.get("codestral_ast_embeddings", {})),
+        "voyage_ast": len(baselines.get("voyage_ast_embeddings", {})),
+        "combined": len(baselines.get("combined_embeddings", {})),
+    }
 
 
 def load_baselines() -> dict:

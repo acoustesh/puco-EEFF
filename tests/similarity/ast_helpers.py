@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import io
+import tokenize
 from pathlib import Path
 
 from tests.similarity.constants import EXTRACTOR_DIR, PUCO_EEFF_DIR, PUCO_EEFF_SUBDIRS
@@ -26,9 +28,94 @@ def normalize_ast_tokens(node: ast.FunctionDef | ast.AsyncFunctionDef | ast.Clas
     return ast.dump(node, annotate_fields=True, include_attributes=False)
 
 
-def compute_content_hash(normalized_tokens: str) -> str:
-    """Compute SHA256 hash of normalized token sequence."""
-    return hashlib.sha256(normalized_tokens.encode("utf-8")).hexdigest()
+def compute_content_hash(text: str) -> str:
+    """Compute SHA256 hash of text content."""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def get_ast_text(node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef) -> str:
+    """Get human-readable AST representation via ast.unparse().
+
+    Returns the code reconstructed from AST, which excludes comments
+    but preserves structure, docstrings, and type hints.
+    """
+    return ast.unparse(node)
+
+
+def extract_text_for_embedding(
+    node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef,
+    source: str,
+) -> str:
+    """Extract signature + docstring + comment lines for text embedding.
+
+    This extracts:
+    - Decorators and function/class signature
+    - Docstring (if present)
+    - All lines containing # comments (with their context)
+
+    Args:
+        node: AST node for the function/class
+        source: Full source code of the file
+
+    Returns
+    -------
+        Text suitable for embedding (signature + docstring + comments)
+    """
+    lines = source.splitlines()
+    start_line = node.lineno  # 1-indexed
+    end_line = node.end_lineno or start_line
+
+    # Get decorator lines (before function definition)
+    decorator_lines = []
+    for decorator in getattr(node, "decorator_list", []):
+        if decorator.lineno < start_line:
+            for ln in range(decorator.lineno, start_line):
+                decorator_lines.append(lines[ln - 1])
+
+    # Get signature line(s) - from node.lineno to first body statement or end
+    signature_end = start_line
+    if node.body:
+        first_body = node.body[0]
+        signature_end = first_body.lineno - 1
+    signature_lines = [lines[ln - 1] for ln in range(start_line, signature_end + 1)]
+
+    # Get docstring
+    docstring = ast.get_docstring(node) or ""
+    docstring_text = f'"""{docstring}"""' if docstring else ""
+
+    # Extract comment lines within function range
+    comment_lines = []
+    try:
+        func_source = "\n".join(lines[start_line - 1 : end_line])
+        tokens = tokenize.generate_tokens(io.StringIO(func_source).readline)
+        for tok in tokens:
+            if tok.type == tokenize.COMMENT:
+                # tok.start[0] is 1-indexed line within func_source
+                actual_line_idx = start_line - 1 + tok.start[0] - 1
+                if actual_line_idx < len(lines):
+                    comment_lines.append(lines[actual_line_idx])
+    except tokenize.TokenizeError:  # type: ignore[attr-defined]
+        # Fall back to simple # detection
+        for ln in range(start_line - 1, end_line):
+            if ln < len(lines) and "#" in lines[ln]:
+                comment_lines.append(lines[ln])
+
+    # Combine all parts
+    parts = []
+    if decorator_lines:
+        parts.extend(decorator_lines)
+    parts.extend(signature_lines)
+    if docstring_text:
+        parts.append(docstring_text)
+    if comment_lines:
+        # Deduplicate (signature lines might contain comments)
+        seen = set(parts)
+        for cl in comment_lines:
+            if cl not in seen:
+                parts.append(cl)
+                seen.add(cl)
+
+    return "\n".join(parts)
 
 
 def _extract_function_from_node(
@@ -45,9 +132,19 @@ def _extract_function_from_node(
     if loc < min_loc:
         return None
 
+    # Full raw source text
     text = get_function_text(node, source)
+
+    # AST-based hash (ignores comments)
     normalized = normalize_ast_tokens(node)
-    content_hash = compute_content_hash(normalized)
+    ast_hash = compute_content_hash(normalized)
+
+    # AST text for AST embeddings
+    ast_text = get_ast_text(node)
+
+    # Text for text embeddings (signature + docstring + comments)
+    text_for_embedding = extract_text_for_embedding(node, source)
+    text_hash = compute_content_hash(text_for_embedding)
 
     return FunctionInfo(
         name=node.name,
@@ -55,8 +152,11 @@ def _extract_function_from_node(
         start_line=start,
         end_line=end,
         loc=loc,
-        hash=content_hash,
+        hash=ast_hash,
         text=text,
+        text_for_embedding=text_for_embedding,
+        text_hash=text_hash,
+        ast_text=ast_text,
     )
 
 
