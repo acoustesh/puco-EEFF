@@ -6,8 +6,8 @@
   "2024_Q1": {
     "_comment": "Q1 2024 - IQ2024 from CSV",
     "verified": true,
-    "verified_date": "2024-12-10",
-    "source": "Análisis Razonado + manual compilation",
+    "verified_date": "2024-12-11",
+    "source": "Análisis Razonado page 6 - verified against PDF",
 
     "values": {
       "cobre_concentrados": 64057,
@@ -19,7 +19,7 @@
       "libras_vendidas": 19.5,
       "cobre_fino": 19.9,
       "precio_efectivo": 3.97,
-      "cash_cost": 2.46,
+      "cash_cost": 2.64,
       "costo_unitario_total": 3.49,
       "non_cash_cost": 1.03,
       "toneladas_procesadas": 1342,

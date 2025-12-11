@@ -1,147 +1,64 @@
 {
-  "_description": "PDF extraction rules for Sheet2 data (Cuadro Resumen from Análisis Razonado).",
+  "_description": "Sheet2 field extraction - simple keyword to field mapping",
+  "_note": "PDF lines have format: Label ... Value1 Value2. We extract Value1 (current period).",
 
-  "primary_source": "analisis_razonado",
-  "fallback_source": "estados_financieros",
-  "_source_note": "Análisis Razonado can be standalone PDF or embedded at end of Estados Financieros",
-
-  "decimal_format": {
-    "locale": "es_CL",
-    "decimal_separator": ",",
-    "thousands_separator": ".",
-    "_note": "Spanish locale: 19,5 means 19.5, 1.342 means 1342"
-  },
-
-  "sections": {
-    "resumen_ingresos": {
-      "title": "Resumen de Ingresos por Producto",
-      "fallback_section": null,
-      "search_patterns": [
-        "cobre en concentrados",
-        "cobre en cátodos",
-        "cobre en catodos",
-        "oro subproducto",
-        "plata subproducto"
-      ],
-      "expected_position": {
-        "typical_page_range": [1, 15],
-        "_note": "Usually in first pages of Análisis Razonado or last pages of Estados Financieros"
-      },
-      "table_identifiers": {
-        "unique_items": ["cobre en concentrados", "cobre en cátodos", "oro subproducto", "plata subproducto"],
-        "exclude_items": []
-      },
-      "validation": {
-        "has_totales_row": true,
-        "min_detail_items": 3
-      },
-      "field_mappings": {
-        "cobre_concentrados": {
-          "pdf_labels": ["Cobre en concentrados M USD", "Cobre en concentrados", "Cobre concentrados"],
-          "match_keywords": ["cobre", "concentrados"],
-          "exclude_keywords": ["cátodos", "catodos"]
-        },
-        "cobre_catodos": {
-          "pdf_labels": ["Cobre en Cátodos", "Cobre en Catodos", "Cobre cátodos"],
-          "match_keywords": ["cobre", "cátodos", "catodos"],
-          "exclude_keywords": ["concentrados"]
-        },
-        "oro_subproducto": {
-          "pdf_labels": ["Oro subproducto", "Oro sub-producto"],
-          "match_keywords": ["oro", "subproducto"]
-        },
-        "plata_subproducto": {
-          "pdf_labels": ["Plata subproducto", "Plata sub-producto"],
-          "match_keywords": ["plata", "subproducto"]
-        },
-        "total_ingresos": {
-          "pdf_labels": ["Total", "Totales"],
-          "match_keywords": ["total"]
-        }
-      }
+  "field_keywords": {
+    "cobre_concentrados": {
+      "keyword": "cobre en concentrados mus",
+      "type": "int"
     },
-
-    "indicadores_operacionales": {
-      "title": "Indicadores Operacionales",
-      "fallback_section": "resumen_ingresos",
-      "search_patterns": [
-        "ebitda",
-        "libras de cobre",
-        "cash cost",
-        "costo unitario"
-      ],
-      "expected_position": {
-        "typical_page_range": [1, 15],
-        "_note": "Usually near revenue summary in Análisis Razonado"
-      },
-      "table_identifiers": {
-        "unique_items": ["ebitda", "cash cost", "libras de cobre", "toneladas procesadas"],
-        "exclude_items": []
-      },
-      "validation": {
-        "has_totales_row": false,
-        "min_detail_items": 3
-      },
-      "field_mappings": {
-        "ebitda": {
-          "pdf_labels": ["Ebitda del periodo", "EBITDA", "Ebitda"],
-          "match_keywords": ["ebitda"]
-        },
-        "libras_vendidas": {
-          "pdf_labels": ["Libras de cobre vendido (millones de libras)", "Libras de cobre vendido"],
-          "match_keywords": ["libras", "vendido"],
-          "exclude_keywords": ["obtenido", "fino"]
-        },
-        "cobre_fino": {
-          "pdf_labels": ["Cobre Fino Obtenido (millones de libras)", "Cobre fino obtenido"],
-          "match_keywords": ["cobre fino", "obtenido"]
-        },
-        "precio_efectivo": {
-          "pdf_labels": ["Precio efectivo de venta del cobre (US$/lb)", "Precio efectivo"],
-          "match_keywords": ["precio efectivo"]
-        },
-        "cash_cost": {
-          "pdf_labels": ["Cash Cost (US$/lb)", "Cash Cost", "Cash cost"],
-          "match_keywords": ["cash cost"],
-          "exclude_keywords": ["non cash", "non-cash"]
-        },
-        "costo_unitario_total": {
-          "pdf_labels": ["Costo unitario Total (US$/lb)", "Costo unitario total", "Costo unitario"],
-          "match_keywords": ["costo unitario", "unitario total"]
-        },
-        "non_cash_cost": {
-          "pdf_labels": ["Non Cash cost (US$/lb)", "Non Cash cost", "Non-cash cost"],
-          "match_keywords": ["non cash", "non-cash"]
-        },
-        "toneladas_procesadas": {
-          "pdf_labels": ["Total Toneladas Procesadas (miles)", "Toneladas procesadas", "Total toneladas"],
-          "match_keywords": ["toneladas", "procesadas"]
-        },
-        "oro_onzas": {
-          "pdf_labels": ["Oro en Onzas (miles)", "Oro en onzas", "Oro onzas"],
-          "match_keywords": ["oro", "onzas"]
-        }
-      }
-    }
-  },
-
-  "period_overrides": {
-    "2024_Q1": {
-      "_comment": "Q1 2024 - Verified from Análisis Razonado",
-      "verified": false,
-      "deviations": {}
+    "cobre_catodos": {
+      "keyword": "cobre en cátodos mus",
+      "type": "int"
     },
-    "2024_Q2": {
-      "_comment": "Q2 2024 - Primary reference period with XBRL available",
-      "verified": true,
-      "verified_date": "2024-12-10",
-      "deviations": {}
+    "oro_subproducto": {
+      "keyword": "oro subproducto mus",
+      "type": "int"
     },
-    "2024_Q4": {
-      "_comment": "Q4 2024 - Data marked as 0 or missing in CSV",
-      "verified": false,
-      "known_gaps": ["Most operational metrics missing"],
-      "deviations": {}
+    "plata_subproducto": {
+      "keyword": "plata subproducto mus",
+      "type": "int"
+    },
+    "total_ingresos": {
+      "keyword": "total ingresos operacionales",
+      "type": "int"
+    },
+    "ebitda": {
+      "keyword": "ebitda del periodo",
+      "type": "int"
+    },
+    "libras_vendidas": {
+      "keyword": "libras de cobre vendid",
+      "type": "float"
+    },
+    "cobre_fino": {
+      "keyword": "cobre fino obtenido",
+      "type": "float"
+    },
+    "precio_efectivo": {
+      "keyword": "precio ventas efectivo",
+      "type": "float"
+    },
+    "cash_cost": {
+      "keyword": "cash cost",
+      "exclude": ["non cash", "non-cash"],
+      "type": "float"
+    },
+    "costo_unitario_total": {
+      "keyword": "costo unitario total",
+      "type": "float"
+    },
+    "non_cash_cost": {
+      "keyword": "non cash cost",
+      "type": "float"
+    },
+    "toneladas_procesadas": {
+      "keyword": "total toneladas procesadas",
+      "type": "float"
+    },
+    "oro_onzas": {
+      "keyword": "subproducto oro",
+      "type": "float"
     }
   }
 }

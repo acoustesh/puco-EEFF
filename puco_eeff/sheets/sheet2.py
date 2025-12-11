@@ -90,6 +90,18 @@ def get_sheet2_extraction_config() -> dict[str, Any]:
     return _load_sheet2_config("extraction.json")
 
 
+def get_sheet2_field_keywords() -> dict[str, dict[str, Any]]:
+    """Get field keyword mappings from config.
+
+    Returns
+    -------
+    dict[str, dict[str, Any]]
+        Field name -> {keyword, type, exclude (optional)}
+    """
+    config = get_sheet2_extraction_config()
+    return cast("dict[str, dict[str, Any]]", config.get("field_keywords", {}))
+
+
 def get_sheet2_xbrl_mappings() -> dict[str, Any]:
     """Load Sheet2 XBRL mappings from xbrl_mappings.json."""
     return _load_sheet2_config("xbrl_mappings.json")
@@ -217,6 +229,18 @@ def get_sheet2_section_search_patterns(section_name: str) -> list[str]:
         msg = f"search_patterns not found for section '{section_name}' in sheet2/extraction.json"
         raise ValueError(msg)
     return cast("list[str]", patterns)
+
+
+def get_sheet2_value_patterns() -> dict[str, dict[str, Any]]:
+    """Get value extraction patterns from config.
+
+    Returns
+    -------
+    dict[str, dict[str, Any]]
+        Pattern definitions keyed by pattern name.
+    """
+    config = get_sheet2_extraction_config()
+    return cast("dict[str, dict[str, Any]]", config.get("value_patterns", {}))
 
 
 def get_sheet2_sum_tolerance() -> int:
@@ -540,75 +564,75 @@ def print_sheet2_report(data: Sheet2Data) -> None:
     print(
         f"  Cobre en concentrados:  {data.cobre_concentrados:>12,}"
         if data.cobre_concentrados
-        else "  Cobre en concentrados:  -"
+        else "  Cobre en concentrados:  -",
     )
     print(
         f"  Cobre en cátodos:       {data.cobre_catodos:>12,}"
         if data.cobre_catodos
-        else "  Cobre en cátodos:       -"
+        else "  Cobre en cátodos:       -",
     )
     print(
         f"  Oro subproducto:        {data.oro_subproducto:>12,}"
         if data.oro_subproducto
-        else "  Oro subproducto:        -"
+        else "  Oro subproducto:        -",
     )
     print(
         f"  Plata subproducto:      {data.plata_subproducto:>12,}"
         if data.plata_subproducto
-        else "  Plata subproducto:      -"
+        else "  Plata subproducto:      -",
     )
     print(f"  {'─' * 40}")
     print(
         f"  TOTAL:                  {data.total_ingresos:>12,}"
         if data.total_ingresos
-        else "  TOTAL:                  -"
+        else "  TOTAL:                  -",
     )
 
     print("\nIndicadores Operacionales:")
     print(
         f"  EBITDA (MUS$):          {data.ebitda:>12,}"
         if data.ebitda
-        else "  EBITDA (MUS$):          -"
+        else "  EBITDA (MUS$):          -",
     )
     print(
         f"  Libras vendidas (MM):   {data.libras_vendidas:>12.1f}"
         if data.libras_vendidas
-        else "  Libras vendidas (MM):   -"
+        else "  Libras vendidas (MM):   -",
     )
     print(
         f"  Cobre fino (MM lbs):    {data.cobre_fino:>12.1f}"
         if data.cobre_fino
-        else "  Cobre fino (MM lbs):    -"
+        else "  Cobre fino (MM lbs):    -",
     )
     print(
         f"  Precio efectivo ($/lb): {data.precio_efectivo:>12.2f}"
         if data.precio_efectivo
-        else "  Precio efectivo ($/lb): -"
+        else "  Precio efectivo ($/lb): -",
     )
     print(
         f"  Cash cost ($/lb):       {data.cash_cost:>12.2f}"
         if data.cash_cost
-        else "  Cash cost ($/lb):       -"
+        else "  Cash cost ($/lb):       -",
     )
     print(
         f"  Costo unitario ($/lb):  {data.costo_unitario_total:>12.2f}"
         if data.costo_unitario_total
-        else "  Costo unitario ($/lb):  -"
+        else "  Costo unitario ($/lb):  -",
     )
     print(
         f"  Non-cash cost ($/lb):   {data.non_cash_cost:>12.2f}"
         if data.non_cash_cost
-        else "  Non-cash cost ($/lb):   -"
+        else "  Non-cash cost ($/lb):   -",
     )
     print(
         f"  Toneladas (miles):      {data.toneladas_procesadas:>12,.0f}"
         if data.toneladas_procesadas
-        else "  Toneladas (miles):      -"
+        else "  Toneladas (miles):      -",
     )
     print(
         f"  Oro (miles oz):         {data.oro_onzas:>12.1f}"
         if data.oro_onzas
-        else "  Oro (miles oz):         -"
+        else "  Oro (miles oz):         -",
     )
 
     print(f"{'=' * 60}\n")
@@ -654,14 +678,14 @@ def validate_sheet2_against_reference(data: Sheet2Data) -> list[str] | None:
                     rel_diff = abs(ref_value - actual_value) / abs(ref_value)
                     if rel_diff > 0.01:  # 1% tolerance
                         issues.append(
-                            f"{field_name}: expected {ref_value}, got {actual_value} (diff: {rel_diff:.1%})"
+                            f"{field_name}: expected {ref_value}, got {actual_value} (diff: {rel_diff:.1%})",
                         )
             else:
                 # For integers, use absolute tolerance
                 diff = abs(ref_value - actual_value)
                 if diff > tolerance:
                     issues.append(
-                        f"{field_name}: expected {ref_value:,}, got {actual_value:,} (diff: {diff})"
+                        f"{field_name}: expected {ref_value:,}, got {actual_value:,} (diff: {diff})",
                     )
         elif ref_value is not None and actual_value is None:
             issues.append(f"{field_name}: expected {ref_value}, got None")
@@ -705,6 +729,202 @@ def validate_sheet2_sums(data: Sheet2Data) -> list[str]:
 
 
 # =============================================================================
+# PDF Extraction Functions (Simple keyword-based)
+# =============================================================================
+
+
+def _find_pdf_for_sheet2(year: int, quarter: int) -> Path | None:
+    """Locate the PDF file for Sheet2 extraction.
+
+    Prefers Análisis Razonado PDF, falls back to Estados Financieros.
+
+    Parameters
+    ----------
+    year
+        Fiscal year.
+    quarter
+        Quarter number (1-4).
+
+    Returns
+    -------
+    Path | None
+        Path to PDF if found.
+    """
+    from puco_eeff.config import find_file_with_alternatives, get_period_paths
+
+    paths = get_period_paths(year, quarter)
+    raw_pdf = paths["raw_pdf"]
+
+    # Try Análisis Razonado first (primary source)
+    ar_path = find_file_with_alternatives(raw_pdf, "analisis_razonado", year, quarter)
+    if ar_path and ar_path.exists():
+        logger.debug("Using Análisis Razonado: %s", ar_path)
+        return ar_path
+
+    # Fallback to Estados Financieros
+    ef_path = find_file_with_alternatives(raw_pdf, "estados_financieros_pdf", year, quarter)
+    if ef_path and ef_path.exists():
+        logger.debug("Using Estados Financieros (fallback): %s", ef_path)
+        return ef_path
+
+    return None
+
+
+def _normalize_pdf_line(line: str) -> str:
+    """Fix OCR artifacts in PDF line - merge split numbers.
+
+    Examples
+    --------
+    - '6 5.483' -> '65.483' (split integer)
+    - '3 8,4' -> '38,4' (split decimal)
+    - '2 ,59' -> '2,59' (space before comma)
+
+    Parameters
+    ----------
+    line
+        Raw line from PDF text.
+
+    Returns
+    -------
+    str
+        Normalized line with merged numbers.
+    """
+    # Fix space before comma/dot: '2 ,59' -> '2,59'
+    line = re.sub(r"(\d)\s+([,.])(\d)", r"\1\2\3", line)
+    # Fix single digit space digits at word boundary: '6 5.483' -> '65.483'
+    line = re.sub(r"(?<=\s)(\d)\s+(\d)", r"\1\2", line)
+    return line
+
+
+def _get_numbers_from_line(line: str) -> list[str]:
+    """Extract number tokens from a line.
+
+    Parameters
+    ----------
+    line
+        PDF line (should be normalized first).
+
+    Returns
+    -------
+    list[str]
+        Number strings found in the line.
+    """
+    parts = line.split()
+    return [p for p in parts if re.match(r"^[\d.,]+$", p)]
+
+
+def _get_current_value(line: str) -> int | float | None:
+    """Extract current period value from a PDF line.
+
+    PDF lines have format: Label ... Value1 Value2
+    where Value1 is current period and Value2 is previous period.
+
+    Parameters
+    ----------
+    line
+        PDF line with data.
+
+    Returns
+    -------
+    int | float | None
+        Current period value (second to last number).
+    """
+    line = _normalize_pdf_line(line)
+    nums = _get_numbers_from_line(line)
+
+    if len(nums) >= 2:
+        return parse_spanish_number(nums[-2])
+    if len(nums) == 1:
+        return parse_spanish_number(nums[0])
+    return None
+
+
+def _extract_from_pdf(pdf_path: Path, data: Sheet2Data) -> tuple[bool, list[str]]:
+    """Extract Sheet2 data from PDF using simple keyword matching.
+
+    PDF tables have clear structure:
+    - Table 3.2: Revenue by product (MUS$)
+    - Table 2: Processing data (tons, lbs, oz)
+    - Costs section: Cash cost, costo unitario (US$/lb)
+
+    Parameters
+    ----------
+    pdf_path
+        Path to Análisis Razonado or Estados Financieros PDF.
+    data
+        Sheet2Data instance to populate.
+
+    Returns
+    -------
+    tuple[bool, list[str]]
+        (success, issues) - success is True if any data was extracted.
+    """
+    import pdfplumber
+
+    issues: list[str] = []
+    field_keywords = get_sheet2_field_keywords()
+
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            all_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+
+        if not all_text.strip():
+            return False, ["No text extracted from PDF"]
+
+        logger.info("Extracted text from %s pages", len(all_text.split("\n")))
+
+        # Extract each field by finding its keyword in lines
+        for field_name, field_config in field_keywords.items():
+            keyword = field_config.get("keyword", "").lower()
+            field_type = field_config.get("type", "float")
+            exclude = field_config.get("exclude", [])
+
+            if not keyword:
+                continue
+
+            for line in all_text.split("\n"):
+                line_lower = line.lower()
+
+                # Check keyword match
+                if keyword not in line_lower:
+                    continue
+
+                # Check exclusions
+                if any(ex.lower() in line_lower for ex in exclude):
+                    continue
+
+                # Extract value
+                value = _get_current_value(line)
+                if value is not None:
+                    if field_type == "int":
+                        data.set_value(field_name, int(value))
+                    else:
+                        data.set_value(field_name, float(value))
+                    logger.debug(
+                        "Extracted %s = %s from: %s",
+                        field_name,
+                        value,
+                        line.strip()[:60],
+                    )
+                    break
+
+        # Check if we got minimum data
+        if data.total_ingresos is not None or data.cobre_concentrados is not None:
+            data.source = (
+                "analisis_razonado"
+                if "analisis" in str(pdf_path).lower()
+                else "estados_financieros"
+            )
+            return True, issues
+
+        return False, [*issues, "Could not extract revenue data from PDF"]
+
+    except Exception as e:
+        logger.exception("PDF extraction failed: %s", e)
+        return False, [f"PDF extraction error: {e}"]
+
+
+# =============================================================================
 # Extraction Entry Point
 # =============================================================================
 
@@ -735,12 +955,6 @@ def extract_sheet2(
     tuple[Sheet2Data | None, list[str]]
         Extracted data and list of validation issues.
         Returns (None, [error_message]) on extraction failure.
-
-    Note
-    ----
-    This is a stub implementation. Full PDF extraction logic should be
-    implemented when the extraction patterns are finalized based on
-    actual Análisis Razonado PDF structure.
     """
     logger.info("Extracting Sheet2 for %s Q%s", year, quarter)
 
@@ -750,23 +964,54 @@ def extract_sheet2(
         quarter=quarter_label,
         year=year,
         quarter_num=quarter,
-        source="reference_data",  # Will be updated when PDF extraction is implemented
+        source="pdf",
     )
 
-    # For now, populate from reference data if available
+    validation_issues: list[str] = []
+
+    # Step 1: Try PDF extraction
+    pdf_path = _find_pdf_for_sheet2(year, quarter)
+    pdf_success = False
+
+    if pdf_path:
+        logger.info("Extracting from PDF: %s", pdf_path.name)
+        pdf_success, pdf_issues = _extract_from_pdf(pdf_path, data)
+        validation_issues.extend(pdf_issues)
+
+        if pdf_success:
+            logger.info("Successfully extracted from PDF")
+        else:
+            logger.warning("PDF extraction incomplete: %s", pdf_issues)
+    else:
+        logger.warning("No PDF file found for %s Q%s", year, quarter)
+        validation_issues.append(f"No PDF file found for {year} Q{quarter}")
+
+    # Step 2: Fill gaps with reference data if available
     ref_values = get_sheet2_reference_values(year, quarter)
     if ref_values:
-        for field_name, value in ref_values.items():
-            data.set_value(field_name, value)
-        logger.info("Populated Sheet2 from reference data for %s Q%s", year, quarter)
-    else:
-        logger.warning("No reference data available for %s Q%s", year, quarter)
-        return None, [f"No reference data available for {year} Q{quarter}"]
+        fields_filled = 0
+        for field_name, ref_value in ref_values.items():
+            current_value = data.get_value(field_name)
+            if current_value is None and ref_value is not None:
+                data.set_value(field_name, ref_value)
+                fields_filled += 1
+                logger.debug("Filled %s from reference data: %s", field_name, ref_value)
 
-    # Run sum validations
-    validation_issues = validate_sheet2_sums(data)
+        if fields_filled > 0:
+            logger.info("Filled %s fields from reference data", fields_filled)
+            if not pdf_success:
+                data.source = "reference_data"
 
-    # Cross-validate with XBRL if requested
+    # Step 3: Check if we have minimum required data
+    if data.total_ingresos is None and data.cobre_concentrados is None and not ref_values:
+        # No revenue data at all - fail
+        return None, [*validation_issues, f"No data extracted for {year} Q{quarter}"]
+
+    # Step 4: Run sum validations
+    sum_issues = validate_sheet2_sums(data)
+    validation_issues.extend(sum_issues)
+
+    # Step 5: Cross-validate with XBRL if requested
     if validate_with_xbrl:
         xbrl_issues = _validate_with_xbrl(data, year, quarter)
         if xbrl_issues:
@@ -874,6 +1119,7 @@ __all__ = [
     "get_sheet2_sum_tolerance",
     "get_sheet2_total_validations",
     "get_sheet2_value_fields",
+    "get_sheet2_value_patterns",
     "get_sheet2_xbrl_mappings",
     "match_concepto_to_field_sheet2",
     "parse_spanish_number",

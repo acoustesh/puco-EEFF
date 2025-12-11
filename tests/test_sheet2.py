@@ -180,41 +180,40 @@ class TestSheet2ExtractionConfig:
         """Load sheet2 extraction config."""
         return get_sheet2_extraction_config()
 
-    def test_has_sections(self, extraction_config: dict) -> None:
-        """Should have resumen_ingresos and indicadores_operacionales sections."""
-        assert "sections" in extraction_config
-        sections = extraction_config["sections"]
-        assert "resumen_ingresos" in sections
-        assert "indicadores_operacionales" in sections
+    def test_has_field_keywords(self, extraction_config: dict) -> None:
+        """Should have field_keywords section with all fields."""
+        assert "field_keywords" in extraction_config
+        field_keywords = extraction_config["field_keywords"]
+        assert isinstance(field_keywords, dict)
+        assert len(field_keywords) > 0
 
-    def test_has_decimal_format(self, extraction_config: dict) -> None:
-        """Should have decimal_format for Spanish locale."""
-        assert "decimal_format" in extraction_config
-        decimal_format = extraction_config["decimal_format"]
-        assert decimal_format.get("decimal_separator") == ","
-        assert decimal_format.get("thousands_separator") == "."
+        # Should have all Sheet2 fields
+        expected = [
+            "cobre_concentrados",
+            "cobre_catodos",
+            "oro_subproducto",
+            "plata_subproducto",
+            "total_ingresos",
+            "ebitda",
+            "libras_vendidas",
+            "cobre_fino",
+            "precio_efectivo",
+            "cash_cost",
+            "costo_unitario_total",
+            "non_cash_cost",
+            "toneladas_procesadas",
+            "oro_onzas",
+        ]
+        for field in expected:
+            assert field in field_keywords, f"Missing field: {field}"
 
-    def test_sections_have_field_mappings(self, extraction_config: dict) -> None:
-        """Each section should have field_mappings."""
-        sections = extraction_config["sections"]
-
-        for section_name in ["resumen_ingresos", "indicadores_operacionales"]:
-            section = sections[section_name]
-            assert "field_mappings" in section, f"{section_name} missing field_mappings"
-            assert isinstance(section["field_mappings"], dict)
-            assert len(section["field_mappings"]) > 0
-
-    def test_field_mappings_have_keywords(self, extraction_config: dict) -> None:
-        """Each field mapping should have match_keywords list."""
-        sections = extraction_config["sections"]
-
-        for section_name, section in sections.items():
-            for field_name, mapping in section.get("field_mappings", {}).items():
-                assert "match_keywords" in mapping, (
-                    f"{section_name}.{field_name} missing match_keywords"
-                )
-                assert isinstance(mapping["match_keywords"], list)
-                assert len(mapping["match_keywords"]) > 0
+    def test_field_keywords_have_keyword_and_type(self, extraction_config: dict) -> None:
+        """Each field should have keyword and type."""
+        field_keywords = extraction_config["field_keywords"]
+        for field_name, config in field_keywords.items():
+            assert "keyword" in config, f"{field_name} missing keyword"
+            assert "type" in config, f"{field_name} missing type"
+            assert config["type"] in ("int", "float"), f"{field_name} invalid type"
 
 
 # =============================================================================
@@ -400,9 +399,7 @@ class TestCrossFileConsistency:
         fields = get_sheet2_fields()
 
         # Get all field names from extraction config
-        extraction_fields = set()
-        for section in extraction["sections"].values():
-            extraction_fields.update(section.get("field_mappings", {}).keys())
+        extraction_fields = set(extraction.get("field_keywords", {}).keys())
 
         # Get value fields from fields.json
         value_fields = set(fields.get("value_fields", {}).keys())
@@ -416,9 +413,7 @@ class TestCrossFileConsistency:
         extraction = get_sheet2_extraction_config()
 
         # Get all field names from extraction config
-        extraction_fields = set()
-        for section in extraction["sections"].values():
-            extraction_fields.update(section.get("field_mappings", {}).keys())
+        extraction_fields = set(extraction.get("field_keywords", {}).keys())
 
         # Get Sheet2Data attributes
         sheet2_sample = Sheet2Data(quarter="test", year=2024, quarter_num=2)

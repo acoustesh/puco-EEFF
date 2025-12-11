@@ -1,0 +1,22 @@
+{
+  "quarter": "IQ2025",
+  "year": 2025,
+  "quarter_num": 1,
+  "period_type": "quarterly",
+  "source": "analisis_razonado",
+  "xbrl_available": true,
+  "cobre_concentrados": 95057,
+  "cobre_catodos": 7205,
+  "oro_subproducto": 12714,
+  "plata_subproducto": 828,
+  "total_ingresos": 116444,
+  "ebitda": 57206,
+  "libras_vendidas": 22.5,
+  "cobre_fino": 23.6,
+  "precio_efectivo": 4.39,
+  "cash_cost": 2.08,
+  "costo_unitario_total": 3.17,
+  "non_cash_cost": 1.09,
+  "toneladas_procesadas": 1467.0,
+  "oro_onzas": 4.6
+}

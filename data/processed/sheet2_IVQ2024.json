@@ -1,0 +1,22 @@
+{
+  "quarter": "IVQ2024",
+  "year": 2024,
+  "quarter_num": 4,
+  "period_type": "quarterly",
+  "source": "analisis_razonado",
+  "xbrl_available": true,
+  "cobre_concentrados": 295793,
+  "cobre_catodos": 31586,
+  "oro_subproducto": 44898,
+  "plata_subproducto": 3676,
+  "total_ingresos": 375953,
+  "ebitda": 142820,
+  "libras_vendidas": 82.4,
+  "cobre_fino": 83.8,
+  "precio_efectivo": 4.18,
+  "cash_cost": 2.45,
+  "costo_unitario_total": 3.42,
+  "non_cash_cost": null,
+  "toneladas_procesadas": 5649.0,
+  "oro_onzas": 18.4
+}
