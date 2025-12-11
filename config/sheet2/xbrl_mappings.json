@@ -1,0 +1,66 @@
+{
+  "_description": "XBRL fact mappings for Sheet2 fields. Maps field names to XBRL taxonomy concepts for cross-validation.",
+
+  "fact_mappings": {
+    "total_ingresos": {
+      "primary": "RevenueFromContractsWithCustomers",
+      "fallbacks": ["Revenue", "IngresosPorActividadesOrdinarias"],
+      "context_type": "duration",
+      "apply_scaling": true,
+      "_note": "Should match sheet1 ingresos_ordinarios for cross-sheet validation"
+    }
+  },
+
+  "result_key_mapping": {
+    "_description": "Maps Sheet2 field names to XBRL result keys",
+    "total_ingresos": "ingresos"
+  },
+
+  "section_total_mapping": {
+    "_description": "Maps PDF section_id to Sheet2Data total field name",
+    "resumen_ingresos": "total_ingresos"
+  },
+
+  "pdf_xbrl_validations": [
+    {
+      "field_name": "total_ingresos",
+      "xbrl_key": "ingresos",
+      "display_name": "Total Ingresos"
+    }
+  ],
+
+  "cross_sheet_validations": [
+    {
+      "description": "Sheet2 total_ingresos should match Sheet1 ingresos_ordinarios",
+      "sheet2_field": "total_ingresos",
+      "sheet1_field": "ingresos_ordinarios",
+      "tolerance": 1
+    }
+  ],
+
+  "validation_rules": {
+    "sum_tolerance": 1,
+    "_sum_tolerance_note": "Allow ±1 difference due to rounding",
+
+    "total_validations": [
+      {
+        "total_field": "total_ingresos",
+        "sum_fields": [
+          "cobre_concentrados",
+          "cobre_catodos",
+          "oro_subproducto",
+          "plata_subproducto"
+        ],
+        "xbrl_fact": "Revenue",
+        "description": "Resumen Ingresos - sum of product revenues"
+      }
+    ],
+
+    "cross_validations": []
+  },
+
+  "aggregate_facts": [
+    "RevenueFromContractsWithCustomers",
+    "Revenue"
+  ]
+}

@@ -12,9 +12,13 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 from puco_eeff.config import get_config, setup_logging
+from puco_eeff.extractor.extraction import get_all_field_labels
 from puco_eeff.extractor.validation import ComparisonResult
 
 logger = setup_logging(__name__)
+
+# Re-export for backward compatibility
+get_field_labels = get_all_field_labels
 
 # Import unified validation result class - use ReferenceValidationResult alias
 # for backward compatibility with existing code that uses this name
@@ -73,11 +77,6 @@ def get_standard_structure(
         )
 
     return structure
-
-
-# Re-export get_all_field_labels as get_field_labels for backward compatibility.
-# The unified implementation lives in extraction module and handles both
-# dynamic config loading and explicit config passing for tests.
 
 
 def map_to_structure(

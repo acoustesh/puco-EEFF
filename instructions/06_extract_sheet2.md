@@ -1,94 +1,156 @@
-# 07 - Extract Data for Sheet 2
+# 06 - Extract Data for Sheet 2 (Cuadro Resumen KPIs)
 
 ## Objective
 
-Extract Estado de Resultados (Income Statement) data following the same pattern as Sheet 1.
+Extract production and operational KPIs from Análisis Razonado PDF.
 
-## Steps
+## Quick Start
 
-### 1. Extract from XBRL
+```bash
+# Extract Sheet2 for Q2 2024
+python -m puco_eeff.main_sheet2 -y 2024 -q 2
 
-```python
-from puco_eeff.extractor.xbrl_parser import parse_xbrl_file, extract_by_xpath
-from puco_eeff.config import get_config, get_period_paths
+# With reference validation
+python -m puco_eeff.main_sheet2 -y 2024 -q 2 --validate-reference
 
-year, quarter = 2024, 3
-paths = get_period_paths(year, quarter)
-config = get_config()
-
-xml_path = paths["raw_xbrl"] / f"EEFF_{year}_Q{quarter}.xml"
-sheet2_config = config["sheets"]["sheet2"]
-
-extracted_data = {}
-for xpath in sheet2_config.get("xml_paths", []):
-    values = extract_by_xpath(xml_path, xpath)
-    field_name = xpath.split(":")[-1]
-    extracted_data[field_name] = values
-    print(f"{field_name}: {values}")
+# Skip download (use existing files)
+python -m puco_eeff.main_sheet2 -y 2024 -q 2 --skip-download
 ```
 
-### 2. Extract from PDF (if needed)
+## Extraction Steps
+
+### 1. Programmatic Extraction
 
 ```python
-from puco_eeff.extractor.pdf_parser import extract_tables_from_pdf, find_section_in_pdf
+from puco_eeff.sheets.sheet2 import extract_sheet2, print_sheet2_report
 
-pdf_path = paths["raw_pdf"] / f"EEFF_{year}_Q{quarter}.pdf"
-sections = find_section_in_pdf(pdf_path, "Estado de Resultados")
+year, quarter = 2024, 2
+data, issues = extract_sheet2(year, quarter)
 
-if sections:
-    pages = [s['page'] for s in sections]
-    tables = extract_tables_from_pdf(pdf_path, pages=pages)
+if data:
+    print_sheet2_report(data)
+    print(f"\nValidation issues: {issues}")
+else:
+    print(f"Extraction failed: {issues}")
 ```
 
-### 3. OCR Fallback
+### 2. Access Extracted Values
 
 ```python
-from puco_eeff.extractor.ocr_fallback import ocr_with_fallback
+# Revenue breakdown (MUS$)
+print(f"Cobre concentrados: {data.cobre_concentrados:,}")
+print(f"Cobre cátodos:      {data.cobre_catodos:,}")
+print(f"Oro subproducto:    {data.oro_subproducto:,}")
+print(f"Plata subproducto:  {data.plata_subproducto:,}")
+print(f"Total ingresos:     {data.total_ingresos:,}")
 
-if not extracted_data or all(not v for v in extracted_data.values()):
-    ocr_result = ocr_with_fallback(
-        pdf_path=pdf_path,
-        prompt="""Extract the Estado de Resultados (Income Statement) table.
-Return as markdown table with:
-- Concepto
-- Período Actual
-- Período Anterior
-
-Include: Ingresos, Costos, Gastos, Resultado operacional, Resultado neto.""",
-        audit_dir=paths["audit"]
-    )
+# Operational metrics
+print(f"EBITDA:             {data.ebitda:,} MUS$")
+print(f"Libras vendidas:    {data.libras_vendidas} MM lbs")
+print(f"Cash Cost:          ${data.cash_cost}/lb")
+print(f"Precio efectivo:    ${data.precio_efectivo}/lb")
 ```
 
-### 4. Structure and Save
+### 3. Save to JSON
 
 ```python
-import pandas as pd
-from puco_eeff.writer.sheet_writer import save_sheet_data
-from puco_eeff.transformer.source_tracker import SourceTracker
+from puco_eeff.sheets.sheet2 import save_sheet2_to_json
 
-# Create DataFrame with extracted data
-income_statement = pd.DataFrame([
-    {"concepto": "Ingresos de actividades ordinarias", "valor": extracted_data.get("Revenue", [None])[0]},
-    {"concepto": "Costo de ventas", "valor": extracted_data.get("CostOfSales", [None])[0]},
-    {"concepto": "Ganancia bruta", "valor": extracted_data.get("GrossProfit", [None])[0]},
-    {"concepto": "Gastos de administración", "valor": extracted_data.get("AdministrativeExpense", [None])[0]},
-    {"concepto": "Costos financieros", "valor": extracted_data.get("FinanceCosts", [None])[0]},
-    {"concepto": "Ganancia antes de impuesto", "valor": extracted_data.get("ProfitLossBeforeTax", [None])[0]},
-    {"concepto": "Gasto por impuesto", "valor": extracted_data.get("IncomeTaxExpenseContinuingOperations", [None])[0]},
-    {"concepto": "Ganancia del período", "valor": extracted_data.get("ProfitLoss", [None])[0]},
-])
+output_path = save_sheet2_to_json(data)
+print(f"Saved to: {output_path}")
+# Output: data/processed/sheet2_IIQ2024.json
+```
 
-# Save
-save_sheet_data("sheet2", income_statement, f"{year}_Q{quarter}")
+## Field Matching
 
-# Track sources
-tracker = SourceTracker(period=f"{year}_Q{quarter}")
-for field, values in extracted_data.items():
-    if values:
-        tracker.add_source(field, "xml", str(xml_path), f"//ifrs-full:{field}", "xbrl_parser")
-tracker.save()
+PDF labels are matched to fields using keywords from `config/sheet2/extraction.json`:
+
+```python
+from puco_eeff.sheets.sheet2 import match_concepto_to_field_sheet2
+
+# Example: match PDF label to field
+field = match_concepto_to_field_sheet2("Cobre en concentrados M USD", "resumen_ingresos")
+print(field)  # "cobre_concentrados"
+
+field = match_concepto_to_field_sheet2("Cash Cost (US$/lb)", "indicadores_operacionales")
+print(field)  # "cash_cost"
+```
+
+## Spanish Number Parsing
+
+The `parse_spanish_number()` function handles Spanish locale:
+
+```python
+from puco_eeff.sheets.sheet2 import parse_spanish_number
+
+# Comma as decimal separator
+parse_spanish_number("19,5")    # 19.5 (float)
+parse_spanish_number("3,97")   # 3.97 (float)
+
+# Period as thousands separator
+parse_spanish_number("64.057") # 64057 (int)
+parse_spanish_number("1.342")  # 1342 (int)
+```
+
+## Validation
+
+### Sum Validation
+
+Revenue products should sum to total:
+```python
+from puco_eeff.sheets.sheet2 import validate_sheet2_sums
+
+issues = validate_sheet2_sums(data)
+if issues:
+    print("Sum validation failed:")
+    for issue in issues:
+        print(f"  - {issue}")
+```
+
+### Reference Validation
+
+Compare against known-good values from `reference_data.json`:
+```python
+from puco_eeff.sheets.sheet2 import validate_sheet2_against_reference
+
+issues = validate_sheet2_against_reference(data)
+if issues is None:
+    print("No reference data for this period")
+elif not issues:
+    print("✓ All values match reference data")
+else:
+    print("Reference mismatches:")
+    for issue in issues:
+        print(f"  - {issue}")
+```
+
+## Output Format
+
+JSON output in `data/processed/sheet2_{quarter}Q{year}.json`:
+
+```json
+{
+  "quarter": "IIQ2024",
+  "year": 2024,
+  "quarter_num": 2,
+  "source": "reference_data",
+  "cobre_concentrados": 142391,
+  "cobre_catodos": 15022,
+  "oro_subproducto": 20223,
+  "plata_subproducto": 1529,
+  "total_ingresos": 179165,
+  "ebitda": 65483,
+  "libras_vendidas": 38.4,
+  "cobre_fino": 38.0,
+  "precio_efectivo": 4.3,
+  "cash_cost": 2.59,
+  "costo_unitario_total": 3.57,
+  "non_cash_cost": 0.98,
+  "toneladas_procesadas": 2683,
+  "oro_onzas": 8.2
+}
 ```
 
 ## Next Steps
 
-Proceed to `08_format_sheet2.md`
+Proceed to `07_format_sheet2.md`

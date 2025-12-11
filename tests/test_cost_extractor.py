@@ -919,7 +919,7 @@ class TestExtractSheet1MainEntry:
             with patch(
                 "puco_eeff.extractor.extraction_pipeline._load_xbrl_sheet1_data",
             ) as mock_xbrl:
-                mock_xbrl.return_value = (xbrl_data, None)  # Return tuple as expected
+                mock_xbrl.return_value = (xbrl_data, None, None)  # Return 3-tuple as expected
 
                 result = extract_sheet1(2024, 2, prefer_source="pdf")
 
@@ -1306,7 +1306,9 @@ class TestEvaluateCrossValidation:
         """Mismatch within tolerance should pass."""
         values = {"a": 100, "b": 101}
         _expected, _calculated, match, diff = evaluate_cross_validation(
-            "a == b", values, tolerance=5
+            "a == b",
+            values,
+            tolerance=5,
         )
         assert match is True
         assert diff == 1
@@ -1315,7 +1317,9 @@ class TestEvaluateCrossValidation:
         """Mismatch outside tolerance should fail."""
         values = {"a": 100, "b": 110}
         _expected, _calculated, match, diff = evaluate_cross_validation(
-            "a == b", values, tolerance=5
+            "a == b",
+            values,
+            tolerance=5,
         )
         assert match is False
         assert diff == 10
@@ -1656,10 +1660,10 @@ class TestPerRuleTolerance:
         # With per-rule tolerance=5, it should pass
         with (
             patch(
-                "puco_eeff.extractor.validation.runner.get_sheet1_cross_validations"
+                "puco_eeff.extractor.validation.runner.get_sheet1_cross_validations",
             ) as mock_cross,
             patch(
-                "puco_eeff.extractor.validation.runner.get_sheet1_sum_tolerance"
+                "puco_eeff.extractor.validation.runner.get_sheet1_sum_tolerance",
             ) as mock_tolerance,
         ):
             mock_tolerance.return_value = 1  # Global tolerance

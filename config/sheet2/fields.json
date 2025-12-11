@@ -1,0 +1,80 @@
+{
+  "_description": "Sheet2 field definitions and row mapping for 'Cuadro Resumen KPIs' sheet - production and operational metrics.",
+
+  "name": "Cuadro Resumen KPIs",
+  "description": "Revenue breakdown by product, EBITDA, and operational KPIs from Análisis Razonado",
+
+  "metadata_fields": ["quarter", "year", "quarter_num", "period_type", "source", "xbrl_available"],
+
+  "value_fields": {
+    "cobre_concentrados": {"type": "int", "section": "resumen_ingresos", "row": 1, "label": "Cobre en concentrados M USD", "unit": "MUS$"},
+    "cobre_catodos": {"type": "int", "section": "resumen_ingresos", "row": 2, "label": "Cobre en Cátodos", "unit": "MUS$"},
+    "oro_subproducto": {"type": "int", "section": "resumen_ingresos", "row": 3, "label": "Oro subproducto", "unit": "MUS$"},
+    "plata_subproducto": {"type": "int", "section": "resumen_ingresos", "row": 4, "label": "Plata subproducto", "unit": "MUS$"},
+    "total_ingresos": {"type": "int", "section": "resumen_ingresos", "row": 5, "label": "Total", "unit": "MUS$", "is_total": true},
+
+    "ebitda": {"type": "int", "section": "indicadores_operacionales", "row": 7, "label": "Ebitda del periodo", "unit": "MUS$"},
+    "libras_vendidas": {"type": "float", "section": "indicadores_operacionales", "row": 8, "label": "Libras de cobre vendido (millones de libras)", "unit": "MM lbs"},
+    "cobre_fino": {"type": "float", "section": "indicadores_operacionales", "row": 9, "label": "Cobre Fino Obtenido (millones de libras)", "unit": "MM lbs"},
+    "precio_efectivo": {"type": "float", "section": "indicadores_operacionales", "row": 10, "label": "Precio efectivo de venta del cobre (US$/lb)", "unit": "US$/lb"},
+    "cash_cost": {"type": "float", "section": "indicadores_operacionales", "row": 11, "label": "Cash Cost (US$/lb)", "unit": "US$/lb"},
+    "costo_unitario_total": {"type": "float", "section": "indicadores_operacionales", "row": 12, "label": "Costo unitario Total (US$/lb)", "unit": "US$/lb"},
+    "non_cash_cost": {"type": "float", "section": "indicadores_operacionales", "row": 13, "label": "Non Cash cost (US$/lb)", "unit": "US$/lb"},
+    "toneladas_procesadas": {"type": "float", "section": "indicadores_operacionales", "row": 14, "label": "Total Toneladas Procesadas (miles)", "unit": "miles ton"},
+    "oro_onzas": {"type": "float", "section": "indicadores_operacionales", "row": 15, "label": "Oro en Onzas (miles)", "unit": "miles oz"}
+  },
+
+  "layout": {
+    "columns": "One column per quarter, from Q1 2024 onwards",
+    "header_row": "Quarter label (e.g., 'IQ2024', 'IIQ2024', 'IIIQ2024', 'IVQ2024')",
+    "total_rows": 15,
+    "sections": [
+      {
+        "name": "Resumen de Ingresos",
+        "rows": [1, 2, 3, 4, 5],
+        "items": [
+          "Cobre en concentrados M USD",
+          "Cobre en Cátodos",
+          "Oro subproducto",
+          "Plata subproducto",
+          "Total"
+        ],
+        "total_row": 5,
+        "total_label": "Total"
+      },
+      {
+        "name": "Indicadores Operacionales",
+        "rows": [7, 8, 9, 10, 11, 12, 13, 14, 15],
+        "items": [
+          "Ebitda del periodo",
+          "Libras de cobre vendido (millones de libras)",
+          "Cobre Fino Obtenido (millones de libras)",
+          "Precio efectivo de venta del cobre (US$/lb)",
+          "Cash Cost (US$/lb)",
+          "Costo unitario Total (US$/lb)",
+          "Non Cash cost (US$/lb)",
+          "Total Toneladas Procesadas (miles)",
+          "Oro en Onzas (miles)"
+        ]
+      }
+    ]
+  },
+
+  "row_mapping": {
+    "1": {"field": "cobre_concentrados", "label": "Cobre en concentrados M USD", "section": "resumen_ingresos"},
+    "2": {"field": "cobre_catodos", "label": "Cobre en Cátodos", "section": "resumen_ingresos"},
+    "3": {"field": "oro_subproducto", "label": "Oro subproducto", "section": "resumen_ingresos"},
+    "4": {"field": "plata_subproducto", "label": "Plata subproducto", "section": "resumen_ingresos"},
+    "5": {"field": "total_ingresos", "label": "Total", "section": "resumen_ingresos"},
+    "6": {"field": null, "label": "", "section": null},
+    "7": {"field": "ebitda", "label": "Ebitda del periodo", "section": "indicadores_operacionales"},
+    "8": {"field": "libras_vendidas", "label": "Libras de cobre vendido (millones de libras)", "section": "indicadores_operacionales"},
+    "9": {"field": "cobre_fino", "label": "Cobre Fino Obtenido (millones de libras)", "section": "indicadores_operacionales"},
+    "10": {"field": "precio_efectivo", "label": "Precio efectivo de venta del cobre (US$/lb)", "section": "indicadores_operacionales"},
+    "11": {"field": "cash_cost", "label": "Cash Cost (US$/lb)", "section": "indicadores_operacionales"},
+    "12": {"field": "costo_unitario_total", "label": "Costo unitario Total (US$/lb)", "section": "indicadores_operacionales"},
+    "13": {"field": "non_cash_cost", "label": "Non Cash cost (US$/lb)", "section": "indicadores_operacionales"},
+    "14": {"field": "toneladas_procesadas", "label": "Total Toneladas Procesadas (miles)", "section": "indicadores_operacionales"},
+    "15": {"field": "oro_onzas", "label": "Oro en Onzas (miles)", "section": "indicadores_operacionales"}
+  }
+}

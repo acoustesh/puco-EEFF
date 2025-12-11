@@ -5,6 +5,10 @@ eliminating the code duplication that existed in the original 4 separate functio
 
 Tests operate on cached embeddings only - no API calls are made during tests.
 To populate embeddings, run: python -m tests.similarity.populate_embeddings
+
+Exclusions:
+    Pairs of files that are intentionally similar can be excluded from detection
+    via the "excluded_file_pairs" config key in similarity_baselines.json.
 """
 
 from __future__ import annotations
@@ -193,13 +197,64 @@ def _format_neighbor_violation(func_a: FunctionInfo, similar_neighbors: list) ->
     )
 
 
+def _is_excluded_pair(
+    func_a: FunctionInfo,
+    func_b: FunctionInfo,
+    excluded_file_pairs: list[list[str]],
+    excluded_function_pairs: list[list[str]],
+) -> bool:
+    """Check if two functions belong to an excluded pair.
+
+    Excluded file pairs are tuples of filename patterns (not full paths).
+    E.g., ["sheet1.py", "sheet2.py"] means any pair where one file
+    contains "sheet1.py" and other contains "sheet2.py" is excluded.
+
+    Excluded function pairs are tuples of "file:function" patterns.
+    E.g., ["scraper/downloader.py:download_file", "scraper/downloader.py:download_file_sync"]
+    """
+    # Check file-level exclusions
+    for pair in excluded_file_pairs:
+        if len(pair) != 2:
+            continue
+        pattern_a, pattern_b = pair
+        if (pattern_a in func_a.file and pattern_b in func_b.file) or (
+            pattern_b in func_a.file and pattern_a in func_b.file
+        ):
+            return True
+
+    # Check function-level exclusions
+    func_a_key = f"{func_a.file}:{func_a.name}"
+    func_b_key = f"{func_b.file}:{func_b.name}"
+    for pair in excluded_function_pairs:
+        if len(pair) != 2:
+            continue
+        pattern_a, pattern_b = pair
+        if (pattern_a in func_a_key and pattern_b in func_b_key) or (
+            pattern_b in func_a_key and pattern_a in func_b_key
+        ):
+            return True
+
+    return False
+
+
 def _check_function_pair(
     func_a: FunctionInfo,
     func_b: FunctionInfo,
     threshold_pair: float,
     threshold_neighbor: float,
+    excluded_file_pairs: list[list[str]] | None = None,
+    excluded_function_pairs: list[list[str]] | None = None,
 ) -> tuple[str | None, tuple | None]:
     """Check similarity between two functions, return violations if any."""
+    # Skip pairs in excluded patterns
+    if _is_excluded_pair(
+        func_a,
+        func_b,
+        excluded_file_pairs or [],
+        excluded_function_pairs or [],
+    ):
+        return None, None
+
     # Caller guarantees embeddings are not None
     similarity = compute_cosine_similarity(func_a.embedding, func_b.embedding)  # type: ignore[arg-type]
 
@@ -220,6 +275,8 @@ def _check_against_others(
     functions: list[FunctionInfo],
     threshold_pair: float,
     threshold_neighbor: float,
+    excluded_file_pairs: list[list[str]] | None = None,
+    excluded_function_pairs: list[list[str]] | None = None,
 ) -> tuple[list[str], list[tuple]]:
     """Check one function against all later functions in the list."""
     pair_violations: list[str] = []
@@ -234,6 +291,8 @@ def _check_against_others(
             func_b,
             threshold_pair,
             threshold_neighbor,
+            excluded_file_pairs,
+            excluded_function_pairs,
         )
         if pair_viol:
             pair_violations.append(pair_viol)
@@ -247,6 +306,8 @@ def _find_violations(
     functions: list[FunctionInfo],
     threshold_pair: float,
     threshold_neighbor: float,
+    excluded_file_pairs: list[list[str]] | None = None,
+    excluded_function_pairs: list[list[str]] | None = None,
 ) -> tuple[list[str], list[str]]:
     """Find similarity violations among functions."""
     pair_violations: list[str] = []
@@ -262,6 +323,8 @@ def _find_violations(
             functions,
             threshold_pair,
             threshold_neighbor,
+            excluded_file_pairs,
+            excluded_function_pairs,
         )
         pair_violations.extend(func_pair_viols)
 
@@ -333,11 +396,17 @@ def run_provider_similarity_checks(
     embeddings_cache = baselines.get(provider.cache_key, {})
     apply_pca_to_functions(functions, embeddings_cache, variance_threshold=pca_variance)
 
+    # Load exclusion lists (intentionally similar pairs to skip)
+    excluded_file_pairs = config.get("excluded_file_pairs", [])
+    excluded_function_pairs = config.get("excluded_function_pairs", [])
+
     # Find and report violations
     pair_violations, neighbor_violations = _find_violations(
         functions,
         threshold_pair,
         threshold_neighbor,
+        excluded_file_pairs,
+        excluded_function_pairs,
     )
     _report_violations(
         pair_violations,

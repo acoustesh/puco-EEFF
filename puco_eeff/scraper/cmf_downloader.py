@@ -515,17 +515,31 @@ def _click_and_save_download(
 
     try:
         # Find the download link
+        # First try exact match, then try with normalized text (handles trailing spaces)
         link = page.get_by_text(link_text, exact=True)
 
         if link.count() == 0:
-            logger.warning("Link not found: %s", link_text)
-            return DownloadResult(
-                document_type=doc_type,
-                success=False,
-                file_path=None,
-                file_size=None,
-                error=f"Download link not found: {link_text}",
-            )
+            # Try with substring match for link text (handles trailing spaces in HTML)
+            logger.debug("Exact match failed, trying substring match for: %s", link_text)
+            all_links = page.locator("a")
+            found_link = None
+            for i in range(all_links.count()):
+                anchor = all_links.nth(i)
+                text = anchor.inner_text().strip()
+                if text == link_text or link_text in text:
+                    found_link = anchor
+                    logger.debug("Found link by substring: '%s'", text)
+                    break
+            if found_link is None:
+                logger.warning("Link not found: %s", link_text)
+                return DownloadResult(
+                    document_type=doc_type,
+                    success=False,
+                    file_path=None,
+                    file_size=None,
+                    error=f"Download link not found: {link_text}",
+                )
+            link = found_link
 
         # Trigger download
         with page.expect_download(timeout=60000) as download_info:

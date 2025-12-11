@@ -475,6 +475,26 @@
     "hash": "24b054f08dc776bf3c80334ba96fc986b73997d01e187b0cfdfbc3db1e733609",
     "text_hash": "66e1208d613d7a8e2647a4fa5ebaf96b744110777144d07df361347e1c32b57b"
   },
+  "main_sheet2.py:_run_reference_validation:182": {
+    "hash": "25eccbae6c5e1d3e92055082a694078a92b866abf91508dc58b3cf139cfdfbfa",
+    "text_hash": "0970b93236ac54690f4ff64dec3dd98a2491b02fe5fe09d48dd336d3cbe586bf"
+  },
+  "main_sheet2.py:ensure_files_downloaded:108": {
+    "hash": "9b12f313fef3f7184dac214ac993e9374ed5d69c18c03338cf2b6119af194559",
+    "text_hash": "fd87170e13a20c6504aa97c6c3ebd96b9b4946e07e3091f8414d01709bf3b80b"
+  },
+  "main_sheet2.py:files_exist_for_period:66": {
+    "hash": "0da786b72abe634521e7537f6b259155db0955ee5da211839f2af3c6e219874c",
+    "text_hash": "85c2f424644c524f81ad2040509b47e71145064369ebb9d279ba24d655b781d1"
+  },
+  "main_sheet2.py:main:310": {
+    "hash": "33996188146c363425aecd500a234f17b2cb5e98e1dcf4c6b91a2b933cc92e83",
+    "text_hash": "a0733ee7cab177cf2f479b1bd297c497df172e51a72d779d516f4a7740ced008"
+  },
+  "main_sheet2.py:process_sheet2:227": {
+    "hash": "9d048271851034d5755ee3f18082e8829dbe2d4ecba2073435c11a879079f61c",
+    "text_hash": "69c3a56c5e11d983e840f5570b0bdc24df11deaeed9a0c7304cfcb2f4a712f10"
+  },
   "scraper/browser.py:PeriodExtractor:33": {
     "hash": "00dd2633ce6f990d46cf0c0ffc1e6e65a5a89bf69ebd7f142407d8497966fd8e",
     "text_hash": "c904030e1c534ec6e5f03716f69d61997df34f39b773b966c632cdf3747c4c9b"
@@ -504,8 +524,8 @@
     "text_hash": "32cae56f28fea131036ccac2f3501d4886246f799d17c7f0d2deda19e8e43340"
   },
   "scraper/cmf_downloader.py:_click_and_save_download:497": {
-    "hash": "858944341541dd5d304bfd236af505f807dfdbe7043421dddd9b0e2f0ce99cca",
-    "text_hash": "272a528936f62bb2fe0a454287c86b1fd57d3d646ee55ec33d66c62f70287eae"
+    "hash": "e6d6fd14b669b88633a8b5870ed590572e6d22775052d95d0cfcb620445152e0",
+    "text_hash": "4db0e53d58185f55514c65510b02e229550579f590810942a98714f33be52797"
   },
   "scraper/cmf_downloader.py:_download_with_pucobre_fallback:185": {
     "hash": "ddac919063b0ef43aba9e17018e2bf83110e0f14bbf93e93c3004a5f5b97d571",
@@ -515,7 +535,15 @@
     "hash": "572e7b976f80c4165fb4a1ad93aea57cbe64ee6572df3f3113746cc902dc6383",
     "text_hash": "37e7867a5044c4b61a11e6c57e69084d95333a167ef2f5aeb37c22b8e477e9df"
   },
+  "scraper/cmf_downloader.py:_extract_cmf_periods_from_page:666": {
+    "hash": "572e7b976f80c4165fb4a1ad93aea57cbe64ee6572df3f3113746cc902dc6383",
+    "text_hash": "37e7867a5044c4b61a11e6c57e69084d95333a167ef2f5aeb37c22b8e477e9df"
+  },
   "scraper/cmf_downloader.py:_extract_xbrl_zip:575": {
+    "hash": "468db912448c194936fcca0f0b8c75bcdbee8979bae4f4f504e9081d43b42a98",
+    "text_hash": "c57283dea6a64c6806f823b362dbdcd2eb5f103a0ec100550a6d0d048a5eda1c"
+  },
+  "scraper/cmf_downloader.py:_extract_xbrl_zip:589": {
     "hash": "468db912448c194936fcca0f0b8c75bcdbee8979bae4f4f504e9081d43b42a98",
     "text_hash": "c57283dea6a64c6806f823b362dbdcd2eb5f103a0ec100550a6d0d048a5eda1c"
   },
@@ -532,6 +560,10 @@
     "text_hash": "384930731a6a319744f5e0feb910e69014736e59f8a49816fa5abf37a3d509ba"
   },
   "scraper/cmf_downloader.py:list_available_periods:697": {
+    "hash": "f3525e4a051b91b10738a55bd7bc99870facd1dbb4fbc791da6ae865353d6c82",
+    "text_hash": "862fed4132d75080198f5f6a4f7864ef7dc4299ee17167a250b2c80d2a7eb1bf"
+  },
+  "scraper/cmf_downloader.py:list_available_periods:711": {
     "hash": "f3525e4a051b91b10738a55bd7bc99870facd1dbb4fbc791da6ae865353d6c82",
     "text_hash": "862fed4132d75080198f5f6a4f7864ef7dc4299ee17167a250b2c80d2a7eb1bf"
   },
@@ -751,7 +783,123 @@
     "hash": "ad8a6150758e344c3ae4b8731fe12fafe4ec4ad6ac2708e7e8ed1f353d50f908",
     "text_hash": "2ede9309ab39f88b47348b822527de1c6cbaab3c8286cb4db06a5670314772f2"
   },
+  "sheets/sheet2.py:Sheet2Data:397": {
+    "hash": "bdd27acf8621917456beeee1107297e6e6ddc4a446679b7bf9d5e48dd0402b01",
+    "text_hash": "dbde745b5b75d7f08cf6cf689072add91339550d9b30024b8e751c0debbf0e5e"
+  },
+  "sheets/sheet2.py:_load_sheet2_config:56": {
+    "hash": "10824a4dcf09bece8891d8689e2f08cff0ebf081d58f6ff7d7c4149d6df800e1",
+    "text_hash": "903d556cc5de64f17aa78cf2116772199a4fb69c2686b6c40de9d7b3eca292e2"
+  },
+  "sheets/sheet2.py:_validate_with_xbrl:718": {
+    "hash": "92d97fd0fa348b052e1811b393d74b63446984d58ca6f1fe9973529d70e55838",
+    "text_hash": "6e2b312c02283b87ff983c77b445fe875fb7e4fd68c0cad7c43f870606fba849"
+  },
+  "sheets/sheet2.py:extract_sheet2:652": {
+    "hash": "acca93099e3ffff010dba75320efd32e124029f61b5d1571dc1fc9750af3415a",
+    "text_hash": "1be336823bcc0c567153214fd4eb3b38ec6287173218934b846b57c1207d2eef"
+  },
+  "sheets/sheet2.py:get_sheet2_extraction_config:88": {
+    "hash": "4da59eac3dfb55318df974629e32c80aea7047d770d250f0c99ae052f4172422",
+    "text_hash": "feacbd7fcd8a7050d232a22c16a1c14f5a576870fbe003c3c4e0b0af45bfd75f"
+  },
+  "sheets/sheet2.py:get_sheet2_extraction_sections:183": {
+    "hash": "f5255780d104e6260a7c422e124bf686e0134601af9f187d70bdf0b9835560d7",
+    "text_hash": "e0e8b8b49746d4af4e7ca86804dd96351e28abc63abbaaf58a119ce958ff843b"
+  },
+  "sheets/sheet2.py:get_sheet2_fields:83": {
+    "hash": "9d3e7271099f2d4394e6e161a1a284d64f6dc576b05062db7aea1fe9d1da8d00",
+    "text_hash": "9d19ce273b363ba523f03e29d21155253eb6e05f46d8e66e695eae8fe56f9c3a"
+  },
+  "sheets/sheet2.py:get_sheet2_metadata_fields:115": {
+    "hash": "bd818017da8ec1d502a27f6a79d77ba52d5ff8fdf6c6692c58ed2a5c29babff6",
+    "text_hash": "21b2af7fb91ff20b63aa3e734720733d9f9c4030e1a4bdac7fc7916f3a3fd034"
+  },
+  "sheets/sheet2.py:get_sheet2_reference_data:98": {
+    "hash": "33f4e3bdb91ea23613690f8c6293ae5c9729988c3610d2e12aeea7b95fee268b",
+    "text_hash": "803f4f5e360630b52e01517f10e4f98f73daf2e8cec0364ba8fd75ee8f250d0c"
+  },
+  "sheets/sheet2.py:get_sheet2_reference_values:249": {
+    "hash": "8cd24bbfc531a2187e46e1fbaaa869cbc10a2da8efeebd4e2f9f529f60c0a3dd",
+    "text_hash": "16f67331744a1769815c980306079d164988b906819f9bd19e8f5bf11fd4edb3"
+  },
+  "sheets/sheet2.py:get_sheet2_row_mapping:127": {
+    "hash": "cf3405204a5913a2e2bc5cf91d57b6903f8d6789532009154e212296a0fc1f67",
+    "text_hash": "60c3b267da2f21cb1d8ec3ae143ffa080b7a1150c8ac5e33f5113a02cd615bfd"
+  },
+  "sheets/sheet2.py:get_sheet2_section_field_mappings:166": {
+    "hash": "d8d09870eb921ff6e9e6f084a2c18352f0da06c6dfbdc275c482671abb56834b",
+    "text_hash": "76614ae6ba2c82a9347c77ff56caccd198b31696b6fb3b2df0c60adb9642959e"
+  },
+  "sheets/sheet2.py:get_sheet2_section_search_patterns:196": {
+    "hash": "92b596c12ef656481d65f1dfb0fe3118e3be5a2eb5fee0caddac8045796c9fed",
+    "text_hash": "1e9703af18a93ba22e97277f314e4e8c9a0f1668eb636acb45bf86d25243b3d0"
+  },
+  "sheets/sheet2.py:get_sheet2_section_spec:139": {
+    "hash": "84543f672cd2e3b6ca7834e539bb3f2c6a2943a01e972fc0cb9783c35f4631db",
+    "text_hash": "00517818cc570c8e7f81309ae9c0922378617f5c77e1995f5e4e39c1e51a87e0"
+  },
+  "sheets/sheet2.py:get_sheet2_sum_tolerance:222": {
+    "hash": "5eeb15d7829a044eeac91ab8063df1503a7b89f4900f30a1dc94fb9202108e05",
+    "text_hash": "4ab68147840a838a2d8d7e2945c4c6c442c12c7c505602b3ea22d8f7ab8a1527"
+  },
+  "sheets/sheet2.py:get_sheet2_total_validations:235": {
+    "hash": "3b123540b5fe98dd42519a84607127dc4aa2b69d2a23c18bfef11a87bf367b6f",
+    "text_hash": "2bd9730f643d08b26d59f0ab3c31100b6b4def8d0008d4debbafa998a6eabdc6"
+  },
+  "sheets/sheet2.py:get_sheet2_value_fields:103": {
+    "hash": "02b4d256061729f9042fd4a534868265159fa187b4b8ef0cc0fc4f7dbf63e3b2",
+    "text_hash": "d86011a476a5252dfce2ba79d91e633d6c48cad040cf9de032639ab4f0dc7638"
+  },
+  "sheets/sheet2.py:get_sheet2_xbrl_mappings:93": {
+    "hash": "df1e9ce644b41653a799ae9f931fea31d22ad68c3ad7e83539785ace9237ece8",
+    "text_hash": "a55d44843d2fbba14507f63f949ecaa5a30b35061b05c91b65141907fc8c3f72"
+  },
+  "sheets/sheet2.py:get_value:429": {
+    "hash": "c06fcf9760006b5e7999bfa951dcbdf900cf4f4593c715bfb29620cdc5977ef7",
+    "text_hash": "ff9758444005684b17b30147283605be1dd17f3afc17e6dbeeb02e94c6f4b76f"
+  },
+  "sheets/sheet2.py:match_concepto_to_field_sheet2:355": {
+    "hash": "4a96e91495839b867abed842907b222457afef2f62dd2e7fad01303441c2653b",
+    "text_hash": "e29faede1ce186a3503725699c60fbbc0431e7a36a9a7bf6c446fc9358c50841"
+  },
+  "sheets/sheet2.py:parse_spanish_number:279": {
+    "hash": "b468e02284e14fbbe3f02323289259d6cebed9385cc00643535953317a02b14c",
+    "text_hash": "41d727e4b06cb8ae8c896ce2df48b2d5b54c59383c906ae5f02acc55cad7841f"
+  },
+  "sheets/sheet2.py:print_sheet2_report:526": {
+    "hash": "2674950b6dbc5089944793a9c9c6805fcf2333629c1f70cb1f05dea8673eb360",
+    "text_hash": "4629ac180b34d8398da4b666bcbdf8ade121f35b18f58885c784ed2ca6cd3637"
+  },
+  "sheets/sheet2.py:save_sheet2_to_json:497": {
+    "hash": "bd43bd5db11edd8bc1d26270162204bb663c07772edb32fd317ab5eb2c8639d9",
+    "text_hash": "6347942c46c4e223674c1a0055f17e7c3bd59e45c298d7bdf2a94a749b78c082"
+  },
+  "sheets/sheet2.py:set_value:433": {
+    "hash": "e8e10fb3bcd30b6ad52fe1093a8986447d4c77a8d48d565adb1c3122d3ed5190",
+    "text_hash": "eccf40150e86b5d024129d6f775ae4db988449349cabd0bf0ea9cef157e1e417"
+  },
+  "sheets/sheet2.py:to_dict:440": {
+    "hash": "86cfc8e9d885e72f4ad9e8b6d61660410b84fc0e26eb49510dfd926beddde7c7",
+    "text_hash": "08af7e33202ab5ac39a532d8b4d06cf9e82d8945a5be3d46186dbf295dc10bce"
+  },
+  "sheets/sheet2.py:to_row_list:465": {
+    "hash": "ebeed4082af49e6cbd9e1b7b307f2e234ab592941b79dc062fb9289aa568e079",
+    "text_hash": "1c69b4aa72b4809445880650cb3ac27a3b05f20edca253f8383d801e6d83a697"
+  },
+  "sheets/sheet2.py:validate_sheet2_against_reference:566": {
+    "hash": "e4f89fa2248307149897fbd08f4d8f6d6f25949fd31b4d1c7551879a9e38c86a",
+    "text_hash": "ed860afdd988b7d44017f515a9c5847a014e1d6a1d6a615e32df81ea55a23ca3"
+  },
+  "sheets/sheet2.py:validate_sheet2_sums:612": {
+    "hash": "d6cd58dc130c16275356d216d7152b93325141cf90274054450af1d2ee155ca2",
+    "text_hash": "bbb9147b1a11bbd3864476e2f7b80e0ad53250b47ae351f3212513b8f601e271"
+  },
   "transformer/formatter.py:ValidatorFunc:25": {
+    "hash": "96477a921a32cdb8e671b030dbe90978624671aec85b3bfd5a5da2e6d786477e",
+    "text_hash": "dd8a9c10e0902e25ac9d29d7d859a95b612a8c500a99c52887318a48667eee60"
+  },
+  "transformer/formatter.py:ValidatorFunc:29": {
     "hash": "96477a921a32cdb8e671b030dbe90978624671aec85b3bfd5a5da2e6d786477e",
     "text_hash": "dd8a9c10e0902e25ac9d29d7d859a95b612a8c500a99c52887318a48667eee60"
   },
@@ -759,9 +907,21 @@
     "hash": "7e8ee89444e42d1f3036692d1cd971dcc63b28c8da3b12b74746248d30c051dd",
     "text_hash": "cb2414b40443785e84050695deaba965175c7949e0f4d4368d62e9e9bb307ed8"
   },
+  "transformer/formatter.py:__call__:32": {
+    "hash": "7e8ee89444e42d1f3036692d1cd971dcc63b28c8da3b12b74746248d30c051dd",
+    "text_hash": "cb2414b40443785e84050695deaba965175c7949e0f4d4368d62e9e9bb307ed8"
+  },
+  "transformer/formatter.py:_sum_fields:153": {
+    "hash": "442be197438178da5dd488eb1e05a0bd6b14344e43bdcddeb9d7b4898f8183a6",
+    "text_hash": "3440984421ca6d28817f1784e680ac9254083493e376a887205eb700a23852e1"
+  },
   "transformer/formatter.py:_sum_fields:154": {
     "hash": "442be197438178da5dd488eb1e05a0bd6b14344e43bdcddeb9d7b4898f8183a6",
     "text_hash": "3440984421ca6d28817f1784e680ac9254083493e376a887205eb700a23852e1"
+  },
+  "transformer/formatter.py:format_validation_report:312": {
+    "hash": "603ec445c643d815c7fae43fb11358580048914ab7a228f8f9bfdfa2e6e855a9",
+    "text_hash": "454a7584170107224cab9a8d7351aecf93307e37206f427bc24665dfcf280cea"
   },
   "transformer/formatter.py:format_validation_report:313": {
     "hash": "603ec445c643d815c7fae43fb11358580048914ab7a228f8f9bfdfa2e6e855a9",
@@ -771,17 +931,37 @@
     "hash": "429e8b4e3d79efb7d1e020f2e21df171b878ba09e6f9285d48ad4d52c7ef08a5",
     "text_hash": "aeda096dfa27cdd355faad1879798cf0e8b7af96fa7d9b30697c30d942171568"
   },
+  "transformer/formatter.py:get_standard_structure:41": {
+    "hash": "429e8b4e3d79efb7d1e020f2e21df171b878ba09e6f9285d48ad4d52c7ef08a5",
+    "text_hash": "aeda096dfa27cdd355faad1879798cf0e8b7af96fa7d9b30697c30d942171568"
+  },
+  "transformer/formatter.py:map_to_structure:82": {
+    "hash": "e43ac98cebc70ae1c96e7e1e6f92a074df5e4e8cfb1e8697c77bc890963d487f",
+    "text_hash": "7408f266650b6ac2682b424264ccce58ca9395bdf06b728fd911b4e8973f8e4e"
+  },
   "transformer/formatter.py:map_to_structure:83": {
     "hash": "e43ac98cebc70ae1c96e7e1e6f92a074df5e4e8cfb1e8697c77bc890963d487f",
     "text_hash": "7408f266650b6ac2682b424264ccce58ca9395bdf06b728fd911b4e8973f8e4e"
+  },
+  "transformer/formatter.py:validate_against_reference:231": {
+    "hash": "c8bccd207dcea56dcb1917ce7d33fef9a77b636229d95805872dc6595d38b88e",
+    "text_hash": "e6144afdd2fd4d1126515005c08d180d283cb24ffe3ed59aa5c0396cb0bb00c3"
   },
   "transformer/formatter.py:validate_against_reference:232": {
     "hash": "c8bccd207dcea56dcb1917ce7d33fef9a77b636229d95805872dc6595d38b88e",
     "text_hash": "e6144afdd2fd4d1126515005c08d180d283cb24ffe3ed59aa5c0396cb0bb00c3"
   },
+  "transformer/formatter.py:validate_balance_sheet:206": {
+    "hash": "01b671f46bc3cfead1ac88a56885aae8805c57321c2dc4ecd4bda1a144188f0b",
+    "text_hash": "1fa9b5fbbb11b1ae77bbac2fbc27644de9248cce17e456c3c332d144f28eb744"
+  },
   "transformer/formatter.py:validate_balance_sheet:207": {
     "hash": "01b671f46bc3cfead1ac88a56885aae8805c57321c2dc4ecd4bda1a144188f0b",
     "text_hash": "1fa9b5fbbb11b1ae77bbac2fbc27644de9248cce17e456c3c332d144f28eb744"
+  },
+  "transformer/formatter.py:validate_section_total:165": {
+    "hash": "34b08b82ef9f7f8ddb759b536c81d680e3239b435d901bd948e277b5fac6d517",
+    "text_hash": "8814d0be7cfc0009bb61ed09b2084275f64519173ec5307331cd99e13ef5f028"
   },
   "transformer/formatter.py:validate_section_total:166": {
     "hash": "34b08b82ef9f7f8ddb759b536c81d680e3239b435d901bd948e277b5fac6d517",
