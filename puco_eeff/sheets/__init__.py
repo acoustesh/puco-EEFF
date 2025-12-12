@@ -29,6 +29,10 @@ sheet2
     Cuadro Resumen KPIs (from Análisis Razonado PDF)
     Contains revenue breakdown by product, EBITDA, and operational metrics.
 
+sheet3
+    Estado de Resultados / Income Statement (from XBRL or PDF)
+    Contains income statement fields: revenue, costs, profit, EPS.
+
 Notes
 -----
 To add a new sheet, create config/sheetN/ directory with required JSON files,
@@ -95,12 +99,29 @@ from puco_eeff.sheets.sheet2 import (
     validate_sheet2_sums,
 )
 
-# Public API - all symbols re-exported from sheet1 and sheet2
+# Re-export all public symbols from sheet3
+from puco_eeff.sheets.sheet3 import (
+    Sheet3Data,
+    extract_sheet3,
+    get_reference_values_sheet3,
+    get_sheet3_extraction_config,
+    get_sheet3_field_keywords,
+    get_sheet3_fields,
+    get_sheet3_reference_data,
+    get_sheet3_xbrl_mappings,
+    load_sheet3_from_json,
+    save_sheet3_to_json,
+    validate_sheet3_against_reference,
+)
+
+# Public API - all symbols re-exported from sheet1, sheet2, and sheet3
 __all__ = [
     # Sheet1 Data class
     "Sheet1Data",
     # Sheet2 Data class
     "Sheet2Data",
+    # Sheet3 Data class
+    "Sheet3Data",
     # Quarter formatting
     "format_quarter_label",
     "quarter_to_roman",
@@ -162,4 +183,17 @@ __all__ = [
     "save_sheet2_to_json",
     "validate_sheet2_against_reference",
     "validate_sheet2_sums",
+    # Sheet3 Config loaders
+    "get_sheet3_extraction_config",
+    "get_sheet3_field_keywords",
+    "get_sheet3_fields",
+    "get_sheet3_reference_data",
+    "get_sheet3_xbrl_mappings",
+    "get_reference_values_sheet3",
+    # Sheet3 Extraction
+    "extract_sheet3",
+    # Sheet3 Output functions
+    "load_sheet3_from_json",
+    "save_sheet3_to_json",
+    "validate_sheet3_against_reference",
 ]

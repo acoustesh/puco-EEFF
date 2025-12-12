@@ -1,0 +1,61 @@
+{
+  "_description": "Extraction configuration for Sheet3 - Estado de Resultados. XBRL primary, PDF fallback.",
+
+  "source_priority": ["xbrl", "pdf"],
+  "_source_note": "XBRL is available from IIQ2024 onwards (CMF). Q1 2024 and earlier requires PDF extraction.",
+
+  "xbrl_config": {
+    "scale_factor": 1000,
+    "_scale_note": "XBRL values in full USD, divide by 1000 for MUS$",
+    "context_types": {
+      "primary": "duration",
+      "_primary_note": "Income statement items are period-based (duration context)"
+    },
+    "context_matching": {
+      "current_period": {
+        "id_pattern": "AcumuladoActual",
+        "fallback": "use_date_range"
+      },
+      "prior_period": {
+        "id_pattern": "AcumuladoAnterior",
+        "_note": "For YoY validation only, not stored"
+      }
+    }
+  },
+
+  "pdf_config": {
+    "target_documents": ["estados_financieros_pdf"],
+    "target_section": "estado_de_resultados",
+    "_section_note": "Estado de Resultados Consolidado / Estado Consolidado de Resultados",
+    "column_format": "current_period_first",
+    "_column_note": "PDF tables: Col1=Current period accumulated, Col2=Prior year accumulated"
+  },
+
+  "field_keywords": {
+    "ingresos_ordinarios": ["ingresos de actividades ordinarias", "actividades ordinarias", "revenue"],
+    "costo_ventas": ["costo de ventas", "cost of sales"],
+    "ganancia_bruta": ["ganancia bruta", "gross profit"],
+    "otros_ingresos": ["otros ingresos, por función", "otros ingresos", "other income"],
+    "otros_egresos_funcion": ["otros egresos, por función", "otros egresos"],
+    "ingresos_financieros": ["ingresos financieros", "financial income"],
+    "gastos_admin_ventas": ["gastos de administración y ventas", "gastos de administración", "administración y ventas", "administrative"],
+    "costos_financieros": ["costos financieros", "financial costs", "finance costs"],
+    "diferencias_cambio": ["diferencias de cambio", "exchange differences"],
+    "ganancia_antes_impuestos": ["antes de impuestos", "profit before tax"],
+    "gasto_impuestos": ["gasto por impuestos", "impuestos a las ganancias", "income tax"],
+    "ganancia_periodo": ["operaciones continuadas", "ganancia del período", "profit for the period", "net income"],
+    "resultado_accionistas": ["resultado disponible para accionistas", "attributable to owners"],
+    "acciones_emitidas": ["acciones emitidas", "shares issued"],
+    "acciones_dividendo": ["acciones con derecho a dividendo", "dividend shares"],
+    "ganancia_por_accion": ["por acción básica us$", "por accion basica", "ganancia por acción básica", "earnings per share", "eps básica"]
+  },
+
+  "sign_conventions": {
+    "_description": "How to handle signs for extracted values",
+    "costs_stored_as_negative": true,
+    "_costs_note": "costo_ventas, gastos_admin_ventas, costos_financieros, gasto_impuestos stored as negative",
+    "ensure_negative_fields": ["costo_ventas", "gastos_admin_ventas", "costos_financieros", "gasto_impuestos"],
+    "variable_sign_fields": ["diferencias_cambio"],
+    "_variable_note": "diferencias_cambio can be positive or negative based on exchange rate movement"
+  }
+}

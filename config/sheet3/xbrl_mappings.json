@@ -1,0 +1,164 @@
+{
+  "_description": "XBRL fact mappings for Sheet3 fields. Maps field names to XBRL taxonomy concepts.",
+
+  "fact_mappings": {
+    "ingresos_ordinarios": {
+      "primary": "Revenue",
+      "fallbacks": ["RevenueFromContractsWithCustomers", "IngresosPorActividadesOrdinarias"],
+      "context_type": "duration",
+      "apply_scaling": true
+    },
+    "costo_ventas": {
+      "primary": "CostOfSales",
+      "fallbacks": ["CostoDeVentas"],
+      "context_type": "duration",
+      "apply_scaling": true,
+      "ensure_negative": true
+    },
+    "ganancia_bruta": {
+      "primary": "GrossProfit",
+      "fallbacks": ["GananciaBruta"],
+      "context_type": "duration",
+      "apply_scaling": true
+    },
+    "otros_ingresos": {
+      "primary": "OtherIncome",
+      "fallbacks": ["OtrosIngresos"],
+      "context_type": "duration",
+      "apply_scaling": true
+    },
+    "otros_egresos_funcion": {
+      "primary": "OtherGainsLosses",
+      "fallbacks": ["OtherExpenseByFunction", "OtherExpense", "OtrosEgresos"],
+      "context_type": "duration",
+      "apply_scaling": true,
+      "default_value": 0,
+      "_note": "OtherGainsLosses can be positive or negative - represents 'Otras ganancias (pérdidas)'. Default 0 if not reported."
+    },
+    "ingresos_financieros": {
+      "primary": "FinanceIncome",
+      "fallbacks": ["InterestRevenueCalculatedUsingEffectiveInterestMethod", "IngresosFinancieros"],
+      "context_type": "duration",
+      "apply_scaling": true
+    },
+    "gastos_admin_ventas": {
+      "primary": "AdministrativeExpense",
+      "fallbacks": ["SellingGeneralAndAdministrativeExpense", "GastosDeAdministracionYVentas"],
+      "context_type": "duration",
+      "apply_scaling": true,
+      "ensure_negative": true,
+      "_note": "May need to sum AdministrativeExpense + SellingExpense if split"
+    },
+    "costos_financieros": {
+      "primary": "FinanceCosts",
+      "fallbacks": ["InterestExpense", "CostosFinancieros"],
+      "context_type": "duration",
+      "apply_scaling": true,
+      "ensure_negative": true
+    },
+    "diferencias_cambio": {
+      "primary": "GainsLossesOnExchangeDifferencesOnTranslationRecognisedInProfitOrLoss",
+      "fallbacks": ["ExchangeDifferencesOnTranslation", "DiferenciasDeCambio"],
+      "context_type": "duration",
+      "apply_scaling": true,
+      "_note": "Can be positive or negative"
+    },
+    "ganancia_antes_impuestos": {
+      "primary": "ProfitLossBeforeTax",
+      "fallbacks": ["GananciaAntesDeImpuestos"],
+      "context_type": "duration",
+      "apply_scaling": true
+    },
+    "gasto_impuestos": {
+      "primary": "IncomeTaxExpenseContinuingOperations",
+      "fallbacks": ["TaxExpenseBenefit", "GastoPorImpuestos"],
+      "context_type": "duration",
+      "apply_scaling": true,
+      "ensure_negative": true
+    },
+    "ganancia_periodo": {
+      "primary": "ProfitLoss",
+      "fallbacks": ["GananciaPerdida", "NetIncomeLoss"],
+      "context_type": "duration",
+      "apply_scaling": true
+    },
+    "resultado_accionistas": {
+      "primary": "ProfitLossAttributableToOwnersOfParent",
+      "fallbacks": ["ProfitLoss"],
+      "context_type": "duration",
+      "apply_scaling": true,
+      "_note": "Should match ganancia_periodo for single-entity reporting"
+    },
+    "acciones_emitidas": {
+      "primary": "NumberOfSharesIssued",
+      "fallbacks": ["IssuedCapitalNumberOfShares"],
+      "context_type": "instant",
+      "apply_scaling": false,
+      "_note": "Share count - no scaling"
+    },
+    "acciones_dividendo": {
+      "primary": "NumberOfSharesIssued",
+      "fallbacks": ["IssuedCapitalNumberOfShares"],
+      "context_type": "instant",
+      "apply_scaling": false,
+      "_note": "Usually same as acciones_emitidas unless treasury shares"
+    },
+    "ganancia_por_accion": {
+      "primary": "BasicEarningsLossPerShare",
+      "fallbacks": ["EarningsPerShare"],
+      "context_type": "duration",
+      "apply_scaling": false,
+      "precision": "full",
+      "_note": "EPS in USD - no scaling, preserve full precision"
+    }
+  },
+
+  "validation_rules": {
+    "tolerance": 1,
+    "_tolerance_note": "Allow ±1 MUS$ difference due to rounding",
+
+    "subtotal_validations": [
+      {
+        "field": "ganancia_bruta",
+        "formula": "ingresos_ordinarios + costo_ventas",
+        "description": "Gross Profit = Revenue + Cost of Sales (cost is negative)"
+      },
+      {
+        "field": "resultado_accionistas",
+        "equals": "ganancia_periodo",
+        "description": "Result for shareholders should equal net profit"
+      }
+    ],
+
+    "cross_validations": [
+      {
+        "description": "Gross Profit = Revenue - abs(Cost of Sales)",
+        "formula": "ganancia_bruta == ingresos_ordinarios - abs(costo_ventas)",
+        "tolerance": 1
+      },
+      {
+        "description": "EPS = Profit / Shares",
+        "formula": "ganancia_por_accion ≈ (ganancia_periodo * 1000) / acciones_emitidas",
+        "tolerance_percent": 0.01
+      }
+    ]
+  },
+
+  "xbrl_context_selection": {
+    "_description": "How to select the correct XBRL context for each extraction",
+    "duration_context": {
+      "prefer_id_pattern": "AcumuladoActual",
+      "fallback_date_range": {
+        "description": "Match by period dates if ID pattern not found",
+        "q1_dates": {"start": "01-01", "end": "03-31"},
+        "q2_dates": {"start": "01-01", "end": "06-30"},
+        "q3_dates": {"start": "01-01", "end": "09-30"},
+        "q4_dates": {"start": "01-01", "end": "12-31"}
+      }
+    },
+    "instant_context": {
+      "_note": "For share counts - use period end date",
+      "prefer_latest": true
+    }
+  }
+}

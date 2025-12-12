@@ -31,7 +31,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
@@ -41,6 +40,12 @@ from puco_eeff.config import (
     format_quarter_label,
     get_period_paths,
     quarter_to_roman,
+)
+from puco_eeff.utils.parsing import (
+    get_current_value,
+    get_numbers_from_line,
+    normalize_pdf_line,
+    parse_spanish_number,
 )
 
 logger = logging.getLogger(__name__)
@@ -293,82 +298,6 @@ def get_sheet2_reference_values(year: int, quarter: int) -> dict[str, int | floa
         return cast("dict[str, int | float | None]", period_data["values"])
 
     return None
-
-
-# =============================================================================
-# Number Parsing (Spanish Locale)
-# =============================================================================
-
-
-def parse_spanish_number(value_str: str) -> int | float | None:
-    """Parse a number string using Spanish locale conventions.
-
-    Spanish locale uses:
-    - Comma (,) as decimal separator
-    - Period (.) as thousands separator
-
-    Examples
-    --------
-    - "19,5" -> 19.5
-    - "1.342" -> 1342
-    - "64.057" -> 64057
-    - "3,97" -> 3.97
-
-    Parameters
-    ----------
-    value_str
-        String representation of number in Spanish locale.
-
-    Returns
-    -------
-    int | float | None
-        Parsed numeric value, or None if parsing fails.
-    """
-    if not value_str or value_str.strip() == "":
-        return None
-
-    # Clean the string
-    cleaned = value_str.strip()
-
-    # Remove any currency symbols or extra characters
-    cleaned = re.sub(r"[^\d.,\-]", "", cleaned)
-
-    if not cleaned:
-        return None
-
-    try:
-        # Check if it has a comma (decimal separator in Spanish)
-        if "," in cleaned:
-            # Replace thousands separator (.) with nothing
-            # Then replace decimal separator (,) with period
-            cleaned = cleaned.replace(".", "").replace(",", ".")
-            return float(cleaned)
-
-        if "." in cleaned:
-            # Could be thousands separator or decimal
-            # If there are multiple dots, they're thousands separators
-            dot_count = cleaned.count(".")
-            if dot_count > 1:
-                # Multiple dots = thousands separators
-                cleaned = cleaned.replace(".", "")
-                return int(cleaned)
-
-            # Single dot - check position for disambiguation
-            # If exactly 3 digits after dot, it's likely thousands separator
-            parts = cleaned.split(".")
-            if len(parts) == 2 and len(parts[1]) == 3:
-                # Thousands separator (e.g., "64.057" = 64057)
-                cleaned = cleaned.replace(".", "")
-                return int(cleaned)
-
-            # Decimal separator (e.g., "3.97" = 3.97)
-            return float(cleaned)
-
-        # No separators - just a plain integer
-        return int(cleaned)
-    except ValueError:
-        logger.warning("Could not parse number: %s", value_str)
-        return None
 
 
 # =============================================================================
@@ -770,73 +699,10 @@ def _find_pdf_for_sheet2(year: int, quarter: int) -> Path | None:
     return None
 
 
-def _normalize_pdf_line(line: str) -> str:
-    """Fix OCR artifacts in PDF line - merge split numbers.
-
-    Examples
-    --------
-    - '6 5.483' -> '65.483' (split integer)
-    - '3 8,4' -> '38,4' (split decimal)
-    - '2 ,59' -> '2,59' (space before comma)
-
-    Parameters
-    ----------
-    line
-        Raw line from PDF text.
-
-    Returns
-    -------
-    str
-        Normalized line with merged numbers.
-    """
-    # Fix space before comma/dot: '2 ,59' -> '2,59'
-    line = re.sub(r"(\d)\s+([,.])(\d)", r"\1\2\3", line)
-    # Fix single digit space digits at word boundary: '6 5.483' -> '65.483'
-    line = re.sub(r"(?<=\s)(\d)\s+(\d)", r"\1\2", line)
-    return line
-
-
-def _get_numbers_from_line(line: str) -> list[str]:
-    """Extract number tokens from a line.
-
-    Parameters
-    ----------
-    line
-        PDF line (should be normalized first).
-
-    Returns
-    -------
-    list[str]
-        Number strings found in the line.
-    """
-    parts = line.split()
-    return [p for p in parts if re.match(r"^[\d.,]+$", p)]
-
-
-def _get_current_value(line: str) -> int | float | None:
-    """Extract current period value from a PDF line.
-
-    PDF lines have format: Label ... Value1 Value2
-    where Value1 is current period and Value2 is previous period.
-
-    Parameters
-    ----------
-    line
-        PDF line with data.
-
-    Returns
-    -------
-    int | float | None
-        Current period value (second to last number).
-    """
-    line = _normalize_pdf_line(line)
-    nums = _get_numbers_from_line(line)
-
-    if len(nums) >= 2:
-        return parse_spanish_number(nums[-2])
-    if len(nums) == 1:
-        return parse_spanish_number(nums[0])
-    return None
+# Alias functions from utils to preserve internal naming convention
+_normalize_pdf_line = normalize_pdf_line
+_get_numbers_from_line = get_numbers_from_line
+_get_current_value = get_current_value
 
 
 def _extract_from_pdf(pdf_path: Path, data: Sheet2Data) -> tuple[bool, list[str]]:

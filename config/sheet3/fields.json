@@ -1,0 +1,112 @@
+{
+  "_description": "Sheet3 field definitions and row mapping for 'Estado de Resultados' (Income Statement) sheet.",
+
+  "name": "Estado de Resultados",
+  "description": "Income Statement / Profit & Loss from Estado de Resultados in Estados Financieros",
+
+  "metadata_fields": ["quarter", "year", "quarter_num", "period_type", "source", "xbrl_available"],
+
+  "value_fields": {
+    "ingresos_ordinarios": {"type": "int", "section": "income", "row": 1, "label": "Ingresos de actividades ordinarias", "sign": "positive"},
+    "costo_ventas": {"type": "int", "section": "costs", "row": 2, "label": "Costo de ventas", "sign": "negative"},
+    "ganancia_bruta": {"type": "int", "section": "subtotal", "row": 3, "label": "Ganancia bruta", "sign": "positive", "is_subtotal": true},
+    "otros_ingresos": {"type": "int", "section": "other", "row": 4, "label": "Otros ingresos, por función", "sign": "positive"},
+    "otros_egresos_funcion": {"type": "int", "section": "other", "row": 5, "label": "Otras ganancias (pérdidas)", "sign": "variable"},
+    "ingresos_financieros": {"type": "int", "section": "finance", "row": 6, "label": "Ingresos financieros", "sign": "positive"},
+    "gastos_admin_ventas": {"type": "int", "section": "costs", "row": 7, "label": "Gastos de administración y ventas", "sign": "negative"},
+    "costos_financieros": {"type": "int", "section": "finance", "row": 8, "label": "Costos financieros", "sign": "negative"},
+    "diferencias_cambio": {"type": "int", "section": "other", "row": 9, "label": "Diferencias de cambio", "sign": "variable"},
+    "ganancia_antes_impuestos": {"type": "int", "section": "subtotal", "row": 10, "label": "Ganancia antes de impuestos", "sign": "positive", "is_subtotal": true},
+    "gasto_impuestos": {"type": "int", "section": "taxes", "row": 11, "label": "Gasto por impuestos", "sign": "negative"},
+    "ganancia_periodo": {"type": "int", "section": "total", "row": 12, "label": "Ganancia del período", "sign": "positive", "is_total": true},
+    "resultado_accionistas": {"type": "int", "section": "attribution", "row": 13, "label": "Resultado disponible para accionistas", "sign": "positive"},
+    "acciones_emitidas": {"type": "int", "section": "shares", "row": 14, "label": "Cantidad de acciones emitidas", "sign": "positive", "no_scaling": true},
+    "acciones_dividendo": {"type": "int", "section": "shares", "row": 15, "label": "Cantidad de acciones con derecho a dividendo", "sign": "positive", "no_scaling": true},
+    "ganancia_por_accion": {"type": "float", "section": "eps", "row": 16, "label": "Ganancia por acción básica (US$)", "sign": "positive", "precision": "full", "no_scaling": true}
+  },
+
+  "layout": {
+    "columns": "One column per quarter, from Q1 2024 onwards",
+    "header_row": "Quarter label (e.g., 'IQ2024', 'IIQ2024', 'IIIQ2024', 'IVQ2024')",
+    "total_rows": 16,
+    "sections": [
+      {
+        "name": "Income",
+        "rows": [1],
+        "items": ["Ingresos de actividades ordinarias"]
+      },
+      {
+        "name": "Costs",
+        "rows": [2, 7],
+        "items": ["Costo de ventas", "Gastos de administración y ventas"]
+      },
+      {
+        "name": "Gross Profit",
+        "rows": [3],
+        "items": ["Ganancia bruta"],
+        "is_subtotal": true
+      },
+      {
+        "name": "Other Income/Expense",
+        "rows": [4, 5, 9],
+        "items": ["Otros ingresos", "Otros egresos, por función", "Diferencias de cambio"]
+      },
+      {
+        "name": "Finance",
+        "rows": [6, 8],
+        "items": ["Ingresos financieros", "Costos financieros"]
+      },
+      {
+        "name": "Pre-tax",
+        "rows": [10],
+        "items": ["Ganancia antes de impuestos"],
+        "is_subtotal": true
+      },
+      {
+        "name": "Taxes",
+        "rows": [11],
+        "items": ["Gasto por impuestos"]
+      },
+      {
+        "name": "Net Income",
+        "rows": [12],
+        "items": ["Ganancia del período"],
+        "is_total": true
+      },
+      {
+        "name": "Attribution",
+        "rows": [13],
+        "items": ["Resultado disponible para accionistas"]
+      },
+      {
+        "name": "Shares",
+        "rows": [14, 15],
+        "items": ["Cantidad de acciones emitidas", "Cantidad de acciones con derecho a dividendo"]
+      },
+      {
+        "name": "EPS",
+        "rows": [16],
+        "items": ["Ganancia por acción básica (US$)"]
+      }
+    ]
+  },
+
+  "row_mapping": {
+    "1": {"field": "ingresos_ordinarios", "label": "Ingresos de actividades ordinarias", "section": "income"},
+    "2": {"field": "costo_ventas", "label": "Costo de ventas", "section": "costs"},
+    "3": {"field": "ganancia_bruta", "label": "Ganancia bruta", "section": "subtotal"},
+    "4": {"field": "otros_ingresos", "label": "Otros ingresos", "section": "other"},
+    "5": {"field": "otros_egresos_funcion", "label": "Otros egresos, por función", "section": "other"},
+    "6": {"field": "ingresos_financieros", "label": "Ingresos financieros", "section": "finance"},
+    "7": {"field": "gastos_admin_ventas", "label": "Gastos de administración y ventas", "section": "costs"},
+    "8": {"field": "costos_financieros", "label": "Costos financieros", "section": "finance"},
+    "9": {"field": "diferencias_cambio", "label": "Diferencias de cambio", "section": "other"},
+    "10": {"field": "ganancia_antes_impuestos", "label": "Ganancia antes de impuestos", "section": "subtotal"},
+    "11": {"field": "gasto_impuestos", "label": "Gasto por impuestos", "section": "taxes"},
+    "12": {"field": "ganancia_periodo", "label": "Ganancia del período", "section": "total"},
+    "13": {"field": "resultado_accionistas", "label": "Resultado disponible para accionistas", "section": "attribution"},
+    "14": {"field": "acciones_emitidas", "label": "Cantidad de acciones emitidas", "section": "shares"},
+    "15": {"field": "acciones_dividendo", "label": "Cantidad de acciones con derecho a dividendo", "section": "shares"},
+    "16": {"field": "ganancia_por_accion", "label": "Ganancia por acción básica (US$)", "section": "eps"}
+  }
+}

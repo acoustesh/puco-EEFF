@@ -1,0 +1,79 @@
+{
+  "_description": "Reference values for Sheet3 validation. Known correct values from user-provided CSV.",
+
+  "2024_Q1": {
+    "_comment": "Q1 2024 - Values from user-provided reference CSV",
+    "verified": true,
+    "verified_date": "2025-01-15",
+    "source": "User-provided reference CSV (EERR column)",
+
+    "values": {
+      "ingresos_ordinarios": 80767,
+      "costo_ventas": -62982,
+      "ganancia_bruta": 17785,
+      "otros_ingresos": 226,
+      "otros_egresos_funcion": 0,
+      "ingresos_financieros": 238,
+      "gastos_admin_ventas": -5137,
+      "costos_financieros": -1329,
+      "diferencias_cambio": 2141,
+      "ganancia_antes_impuestos": 13924,
+      "gasto_impuestos": -3949,
+      "ganancia_periodo": 9975,
+      "resultado_accionistas": 9975,
+      "acciones_emitidas": 124668381,
+      "acciones_dividendo": 124668381,
+      "ganancia_por_accion": 0.08001
+    },
+
+    "internal_checks": {
+      "gross_profit_equals_revenue_minus_cost": true,
+      "resultado_equals_ganancia_periodo": true,
+      "eps_calculation_verified": true
+    }
+  },
+
+  "2024_Q2": {
+    "_comment": "Q2 2024 - Values from user-provided reference CSV (accumulated to June)",
+    "verified": true,
+    "verified_date": "2025-01-15",
+    "source": "User-provided reference CSV (IIQ2024 column)",
+
+    "values": {
+      "ingresos_ordinarios": 179165,
+      "costo_ventas": -126202,
+      "ganancia_bruta": 52963,
+      "otros_ingresos": 272,
+      "otros_egresos_funcion": 0,
+      "ingresos_financieros": 263,
+      "gastos_admin_ventas": -11632,
+      "costos_financieros": -2832,
+      "diferencias_cambio": 3018,
+      "ganancia_antes_impuestos": 42052,
+      "gasto_impuestos": -11973,
+      "ganancia_periodo": 30079,
+      "resultado_accionistas": 30079,
+      "acciones_emitidas": 124668381,
+      "acciones_dividendo": 124668381,
+      "ganancia_por_accion": 0.24127
+    },
+
+    "internal_checks": {
+      "gross_profit_equals_revenue_minus_cost": true,
+      "resultado_equals_ganancia_periodo": true,
+      "eps_calculation_verified": true
+    }
+  },
+
+  "2024_Q3": {
+    "_comment": "Q3 2024 - Reference values not yet available",
+    "verified": false,
+    "values": null
+  },
+
+  "2024_Q4": {
+    "_comment": "Q4 2024 - Reference values not yet available",
+    "verified": false,
+    "values": null
+  }
+}
